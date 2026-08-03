@@ -35,8 +35,14 @@ SPR_OFF = $ef                       ; sprite.asm attribute offset (in dp so
 
 ; The CPU return stack. An 8-bit txs in native mode zeroes SH, which would
 ; move the return stack into the direct page - so S is only ever loaded
-; 16-bit, with this value.
-RSTACK_TOP = $01ff
+; 16-bit, with this value. NOT the C64's $01FF: kernel calls (jsl + KENTER
+; frames + C bodies) and the VSYNC cursor IRQ land on this stack too, and
+; a 16-bit S that sinks below $0100 dives into the direct page and smashes
+; the Forth stacks at $41-$78. KERNEL.md 3.1 gives programs $0100-$1FFF of
+; stack; take the top. CATCH snapshots only SL (8-bit tsx), which stays
+; valid because Forth's own return depth keeps S inside the $1Fxx page -
+; THROW rebuilds SH from >RSTACK_TOP.
+RSTACK_TOP = $1fff
 
 ; Switch DBR to bank $00 for a run of I/O-page accesses. Clobbers A - use
 ; at word entry, before the first operand load.
@@ -52,12 +58,17 @@ RSTACK_TOP = $01ff
 
 ; PUTCHR - print A. The KERNAL-CHROUT shape: preserves A, X and Y.
 ; CON_PUTC interprets $08 backspace, $0a newline, $0d return; everything
-; else is a CP437 glyph.
+; else is a CP437 glyph. One translation: the Forth sends $0d meaning the
+; PETSCII "next line", but CON_PUTC's $0d is return-only (column 0, same
+; row) - so $0d becomes $0a here, or every REPL line would overprint row 0.
 PUTCHR
     phx
     phy
     pha
-    rep #$30
+    cmp #$0d
+    bne +
+    lda #$0a
++   rep #$30
 !al
 !rl
     and #$00ff
@@ -70,22 +81,27 @@ PUTCHR
     plx
     rts
 
-; kern_getc - blocking key read, A = character. Keys without a character
-; (F-keys, cursor keys - CON_GETC returns those as $01xx) are swallowed
-; here: the 8-bit Forth REPL has no way to express them yet.
+; kern_getc - blocking key read, A = character. Polls CON_GETKEY rather
+; than calling the blocking CON_GETC: the shell's own line reader polls
+; (the path run-fwboot.sh proves on the real keyboard), and polling from
+; here keeps the block on our side of the ABI. Keys without a character
+; ($01xx) are swallowed: the 8-bit Forth REPL cannot express them yet.
 kern_getc
     phx
     phy
 -   rep #$30
 !al
 !rl
-    jsl KERN_GETC
+    jsl KERN_GETKEY
     sta KTMP
     sep #$30
 !as
 !rs
+    lda KTMP
+    ora KTMP+1
+    beq -               ; no key yet
     lda KTMP+1
-    bne -
+    bne -               ; non-character key
     ply
     plx
     lda KTMP

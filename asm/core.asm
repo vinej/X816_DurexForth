@@ -308,10 +308,13 @@ BL
     rts
 
     +BACKLINK "depth", 5
+    ; depth = X_INIT - X (the empty sentinel is no longer 0 - see
+    ; durexforth.asm on the 65816 direct-page wrap)
     txa
     eor #$ff
+    clc
+    adc #X_INIT+1
     tay
-    iny
     dex
     sty LSB,x
     lda #0

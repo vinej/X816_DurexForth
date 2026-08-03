@@ -21,19 +21,41 @@ K_SPACE = ' '
 
 ; Addresses.
 ; X816 zeropage: the whole direct page is the program's (the kernel switches
-; to its own D on entry and restores ours). The split parameter stack keeps
-; its historical place; $E0-$EF is the kernel-crossing staging (x816.asm).
-LSB = $41 ; low-byte stack placed in [$09 .. $40]
-MSB = $79 ; high-byte stack placed in [$41 .. $78]
+; to its own D on entry and restores ours). $E0-$EF is the kernel-crossing
+; staging (x816.asm).
+;
+; The split stack keeps its SIZE but neither the C64 bytes nor the C64
+; indexing trick, for two hard-won reasons:
+;
+; 1. The 6502 original set LSB=$41/X_INIT=0 and relied on zp,x wrapping
+;    within the page, so the first push (dex -> X=$FF) landed at
+;    $41+$FF mod 256 = $40. A native-mode 65816 wraps direct-page indexing
+;    within BANK 0, not the page (X816_core doc/MEMORY_MAP.md) - the same
+;    push landed at $0140 while reads stayed at $78, and the REPL died on
+;    its first line. So the planes' BASES are the bottom of their ranges
+;    and X counts down from X_INIT with no wrap: empty X_INIT, full 0.
+;
+; 2. The C64 byte range $09-$40 is NOT available here. KERNEL.md 3.1
+;    reserves $00-$21 for the C-runtime pseudo-registers and $22-$31 for
+;    x16lib scratch - and that is not advisory: the kernel's VSYNC cursor
+;    handler runs C code at interrupt time with D=$0000, using those very
+;    bytes as its pseudo-registers and C stack pointer. A Forth stack at
+;    $09-$40 and the handler corrupt each other once per frame, with the
+;    victim chosen by interrupt phase - failures that look random and
+;    move every run. The planes live in the free region at $32+.
+LSB = $32 ; low-byte stack:  [$32 .. $69]
+MSB = $6a ; high-byte stack: [$6A .. $A1]
 ; Temporary work areas for words, two bytes each.  These MUST stay outside
 ; the X16 ROM's own zeropage segments (ZPKERNAL $80-$90, ZPDOS $91-$9B,
 ; ZPAUDIO $A7-$A8, ZPMATH $A9-$D3, ZPBASIC $D4-$FE): the C64 port had W at
 ; $8B, and any code word that parked the Forth stack pointer in W across a
 ; KERNAL call (open, chkin, ...) got it clobbered by CBDOS and crashed with
 ; a "stack" error.  $9C-$A6 is claimed by no ROM bank.
-W = $9c
-W2 = $9e ; must stay at W+2: some words use W..W2+1 as one 4-byte area
-W3 = $a0
+; Moved from the C64's $9C-$A1: that range is inside the relocated MSB
+; plane now. Still contiguous - some words use W..W2+1 as one 4-byte area.
+W = $a8
+W2 = $aa ; must stay at W+2
+W3 = $ac
 TIB = $600 ; text input buffer (X16 golden RAM; $600-$7ff = 512 bytes)
 ; TIB grows upward as nested INCLUDEs stack their current lines, so it gets
 ; the top 512-byte run of golden RAM all to itself.  It must NOT sit at $400:
@@ -58,7 +80,7 @@ WORDLIST_BASE = $9eff ; historical top; bank $01 has no I/O, could rise later
 ; in separate ranges on the zeropage, so that popping and
 ; pushing gets faster (only one inx/dex operation).
 
-X_INIT = 0
+X_INIT = $38 ; 56 cells, the original capacity - see the LSB/MSB comment
 
 ; Dictionary
 ; ----------
@@ -109,17 +131,25 @@ PLACEHOLDER_ADDRESS = $1200
 ; drops the file at $01:0000, so file offsets are bank-$01 offsets.
 * = $0000
 !text "X816"
-; Entered in native mode, M=0/X=0, D=$0000. Set the return stack 16-bit
-; (an 8-bit txs would zero SH), drop to 8-bit registers, and make this
-; bank the data bank so absolute references reach the image.
-    rep #$10
+; Entered in native mode, M=0/X=0 - and that is ALL runtime/exec.s
+; guarantees. Establish everything else: D is the SHELL's direct page at
+; handover (the kernel's $2000 - using it would corrupt kernel state), the
+; handover blob does sei and never cli, and S and DBR are wherever the
+; shell left them. The return stack is set 16-bit (an 8-bit txs would zero
+; SH and put it in the direct page).
+    rep #$30
+!al
 !rl
+    lda #0
+    tcd
     ldx #RSTACK_TOP
     txs
     sep #$30
+!as
 !rs
     phk
     plb
+    cli
     jmp COLD
 
 * = PROGRAM_BASE
