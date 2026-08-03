@@ -139,20 +139,19 @@ TWO_ROT ; ( a b c d e f -- c d e f a b )
     rts
 
     +BACKLINK "sleep", 5
-SLEEP ; ( jiffies -- ) wait jiffies 1/60s ticks
-    stx W3
-    jsr $ffde                   ; RDTIM: A=lo X=mid Y=hi
-    sta W                       ; start lo
-    stx W+1                     ; start mid
-    ldx W3
--   stx W3
-    jsr $ffde
+SLEEP ; ( jiffies -- ) wait n VSYNC frames (kernel IRQ_FRAMES; 60 Hz)
+    jsr kern_frames             ; KTMP = frame count (16-bit, wraps)
+    lda KTMP                    ; start
+    sta W
+    lda KTMP+1
+    sta W+1
+-   jsr kern_frames
+    lda KTMP
     sec
-    sbc W                       ; elapsed lo
+    sbc W                       ; elapsed lo (wrap-safe 16-bit subtract)
     sta W2
-    txa
+    lda KTMP+1
     sbc W+1                     ; elapsed hi
-    ldx W3
     cmp MSB, x                  ; elapsed vs jiffies (hi)
     bcc -
     bne +
@@ -186,24 +185,18 @@ MS ; ( u -- ) wait ~u milliseconds (calibrated 8 MHz busy loop)
     rts
 
     +BACKLINK "reboot", 6
-REBOOT ; ( -- ) soft reboot through the reset vector
-    jmp ($fffc)
+REBOOT ; ( -- ) leave Forth: back to the kernel prompt (EXIT, status 0)
+    jmp kern_exit
 
     +BACKLINK "ticks", 5
-TICKS ; ( -- ud ) 24-bit jiffy counter as an unsigned double
-    stx W3
-    jsr $ffde                   ; A=lo X=mid Y=hi
-    sta W
-    stx W+1
-    sty W2
-    ldx W3
+TICKS ; ( -- ud ) VSYNC frame counter as an unsigned double (16-bit, wraps)
+    jsr kern_frames             ; KTMP = frames
     dex
     dex
-    lda W
+    lda KTMP
     sta LSB+1, x                ; low cell lo
-    lda W+1
+    lda KTMP+1
     sta MSB+1, x                ; low cell hi
-    lda W2
-    sta LSB, x                  ; high cell lo (bits 16-23)
-    stz MSB, x                  ; high cell hi = 0
+    stz LSB, x                  ; high cell = 0
+    stz MSB, x
     rts

@@ -277,18 +277,16 @@ R_TO
     jmp (W)
 
     ; Exempt from TCE as top of return stack must contain a return address.
+    ; X816: stack-relative addressing replaces the tsx / $103,x dance -
+    ; lda n,s always reads bank $00, independent of DBR, and the cell sits
+    ; above this word's own return address (1,s/2,s).
     +BACKLINK "r@", 2 | F_NO_TAIL_CALL_ELIMINATION
 R_FETCH
-    txa
-    tsx
-    ldy $103,x
-    sty W
-    ldy $104,x
-    tax
     dex
-    sty MSB,x
-    lda W
+    lda 3,s
     sta LSB,x
+    lda 4,s
+    sta MSB,x
     rts
 
     +BACKLINK "bl", 2

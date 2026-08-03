@@ -42,11 +42,15 @@ close_all_logical_files:
 QUIT
     jsr quit_reset
 
-    ; resets the return stack
+    ; resets the return stack. 16-bit txs: an 8-bit txs in native mode
+    ; zeroes SH and would put the return stack in the direct page.
     txa
-INIT_S = * + 1
-    ldx #0
+    rep #$10
+!rl
+    ldx #RSTACK_TOP
     txs
+    sep #$10
+!rs
     tax
 
 interpret_and_close
@@ -159,9 +163,19 @@ INTERPRET
     ldy #0
     lda (W), y
     cmp #$22 ; '"'
+    ; X816: jmp (abs) fetches its pointer from bank $00, but these vector
+    ; cells live in the program bank - copy through W2 (dp) and jmp (W2).
     bne +
-    jmp (QUOTE_VEC)
-+   jmp (NOTFOUND_VEC)
+    lda QUOTE_VEC
+    sta W2
+    lda QUOTE_VEC+1
+    sta W2+1
+    jmp (W2)
++   lda NOTFOUND_VEC
+    sta W2
+    lda NOTFOUND_VEC+1
+    sta W2+1
+    jmp (W2)
 
     ; yep, it's a number...
 .was_number
@@ -196,10 +210,11 @@ FOUND_WORD_WITH_NO_TCE = * + 1
     ; Executes the word if it is immediate, or interpreting.
     lda MSB-1, x
     and STATE
-    beq EXECUTE
+    bne +
+    jmp EXECUTE
 
     ; OK, this word should be compiled...
-    jmp COMPILE_COMMA
++   jmp COMPILE_COMMA
 
     +BACKLINK "notfound",8
 print_word_not_found_error ; ( caddr u -- )

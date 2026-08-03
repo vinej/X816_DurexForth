@@ -62,27 +62,16 @@ TWO_R_TO ; ( -- x1 x2 ) (R: x1 x2 -- )
 
     +BACKLINK "2r@", 3 | F_NO_TAIL_CALL_ELIMINATION
 TWO_R_FETCH ; ( -- x1 x2 ) (R: x1 x2 -- x1 x2)
-    txa
-    tsx
-    ; CPU stack top-down here: ret_lo($101,x) ret_hi($102,x)
-    ;   x2_lo($103) x2_hi($104) x1_lo($105) x1_hi($106)
-    ldy $103,x
-    sty W
-    ldy $104,x
-    sty W+1
-    ldy $105,x
-    sty W2
-    ldy $106,x
-    sty W2+1
-    tax                 ; restore the data-stack pointer
+    ; X816: stack-relative addressing (always bank $00, DBR-independent).
+    ; CPU stack top-down: ret(1,s/2,s) x2(3,s/4,s) x1(5,s/6,s).
     dex
     dex
-    lda W               ; x2 -> top data cell
+    lda 3,s             ; x2 -> top data cell
     sta LSB,x
-    lda W+1
+    lda 4,s
     sta MSB,x
-    lda W2              ; x1 -> second data cell
+    lda 5,s             ; x1 -> second data cell
     sta LSB+1,x
-    lda W2+1
+    lda 6,s
     sta MSB+1,x
     rts

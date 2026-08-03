@@ -8,13 +8,13 @@ EMIT
 
     +BACKLINK "page", 4
 PAGE
-    lda #K_CLRSCR
-    jmp PUTCHR
+    jmp kern_cls
 
     +BACKLINK "rvs", 3
 RVS ; ( -- ) invert text output
-    lda #$12
-    jmp PUTCHR
+    ; X816: CON_PUTC has no reverse-video control code; the console cursor
+    ; owns the attribute byte. No-op until an attribute API exists.
+    rts
 
     +BACKLINK "cr", 2
 CR ; ( -- )
@@ -35,8 +35,6 @@ TYPE ; ( caddr u -- )
 .type_underflow
     lda #-4 ; throws "stack" (stack underflow)
     jmp throw_a
-+   lda #0 ; quote mode off
-    sta $381 ; X16 qtsw
 -   lda LSB,x
     ora MSB,x
     bne +
@@ -53,9 +51,7 @@ TYPE ; ( caddr u -- )
     +BACKLINK "key?", 4
     lda .key_pending
     bne .pushtrue
-    stx W
-    jsr $ffe4 ; GETIN
-    ldx W
+    jsr kern_getin ; preserves X/Y
     sta .key_pending
     beq +
 .pushtrue
@@ -66,9 +62,7 @@ TYPE ; ( caddr u -- )
     +BACKLINK "key", 3
     lda .key_pending
     bne +
--   stx W
-    jsr $ffe4 ; GETIN
-    ldx W
+-   jsr kern_getin
     cmp #0
     beq -
 +   ldy #0
@@ -102,18 +96,28 @@ REFILL ; ( -- flag )
     bne .return_false ; X816: file sources return with the FS_* words
 
     ; getLineFromConsole
+    ; X816: the KERNAL BASIN screen editor is gone; read keys from the
+    ; kernel console and edit the line here. CON_PUTC interprets $08 as
+    ; backspace, so echoing the key IS the screen edit.
 
     stx W          ; save forth stack pointer
-    ldy #0         ; TIB index
--   sty W2         ; BASIN clobbers X/Y - keep index in W2
-    jsr $ffcf      ; BASIN (reads a screen-edited line, char by char)
-    ldy W2
+    ldy #0         ; TIB index (kern_getc/PUTCHR preserve X and Y)
+-   jsr kern_getc
     cmp #$d
     beq .gotReturn
-    sta TIB,y
-    cpy #$58 ; TIB area is $400-$458
+    cmp #$08
+    beq .backspace
+    cpy #$58       ; line-length limit
     beq -
+    sta TIB,y
+    jsr PUTCHR     ; echo
     iny
+    jmp -
+.backspace
+    cpy #0
+    beq -
+    dey
+    jsr PUTCHR     ; echo the $08: the console steps back and blanks
     jmp -
 .gotReturn
     ; Set TIB_SIZE to number of chars fetched.

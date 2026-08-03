@@ -2,10 +2,12 @@
 
 ; ACME assembler
 
-!cpu 65c02	; Commander X16 (WDC 65C02)
-!to "build/durexforth.prg", cbm	; set output file and format
-; No !ct: text/char literals stay ASCII, matching the X16 ISO charset
-; (enabled at boot). Control codes ($93 clear, $0d cr, $12 rvs) still work.
+!cpu 65816	; X816: 65816 native. The core is still 8-bit code (M=1, X=1);
+		; asm/x816.asm is the only file that switches widths.
+!to "build/forth.bin", plain	; X816 image: file offset = offset in bank $01
+; No !ct: text/char literals stay ASCII. The X816 console is CP437, which
+; agrees with ASCII in $20-$7E; the X16 control codes ($93 clear, $12 rvs)
+; are gone - CON_PUTC interprets only $08, $0a and $0d.
 
 ; Opcodes.
 OP_JMP = $4c
@@ -15,13 +17,12 @@ OP_INX = $e8
 
 ; CHROUT keys.
 K_RETURN = $d
-K_CLRSCR = $93
 K_SPACE = ' '
 
 ; Addresses.
-; X16 zeropage: $00/$01 = RAM/ROM bank regs, $08 = kernal mhz.
-; Only $08 is used by the core X16 kernal in $02-$7f, so the split
-; parameter stack is placed just above it.
+; X816 zeropage: the whole direct page is the program's (the kernel switches
+; to its own D on entry and restores ours). The split parameter stack keeps
+; its historical place; $E0-$EF is the kernel-crossing staging (x816.asm).
 LSB = $41 ; low-byte stack placed in [$09 .. $40]
 MSB = $79 ; high-byte stack placed in [$41 .. $78]
 ; Temporary work areas for words, two bytes each.  These MUST stay outside
@@ -42,8 +43,9 @@ TIB = $600 ; text input buffer (X16 golden RAM; $600-$7ff = 512 bytes)
 ; deeply-included files).
 PROGRAM_BASE = $801
 ;HERE_POSITION = $801 + assembled program (defined below)
-WORDLIST_BASE = $9eff ; below X16 I/O area ($9f00-$9fff)
-PUTCHR = $ffd2 ; kernal CHROUT routine
+WORDLIST_BASE = $9eff ; historical top; bank $01 has no I/O, could rise later
+; PUTCHR is a routine in x816.asm now (CON_PUTC via the kernel), not a ROM
+; address - callers are unchanged.
 
 ; Parameter Stack
 ; ---------------
@@ -102,19 +104,30 @@ F_NO_TAIL_CALL_ELIMINATION = $40
 ; used instead.
 PLACEHOLDER_ADDRESS = $1200
 
+; X816 image header: the "X816" magic at $01:0000, entry point at $01:0004 -
+; the format boot/boot.s and the kernel's EXEC both recognise. The loader
+; drops the file at $01:0000, so file offsets are bank-$01 offsets.
+* = $0000
+!text "X816"
+; Entered in native mode, M=0/X=0, D=$0000. Set the return stack 16-bit
+; (an 8-bit txs would zero SH), drop to 8-bit registers, and make this
+; bank the data bank so absolute references reach the image.
+    rep #$10
+!rl
+    ldx #RSTACK_TOP
+    txs
+    sep #$30
+!rs
+    phk
+    plb
+    jmp COLD
+
 * = PROGRAM_BASE
 
-!byte $b, $08, $a, 0, $9E, $32, $30, $36, $31, 0, 0, 0
-; basic header, and program entry:
-
-    tsx
-    stx INIT_S
+COLD
     ldx #X_INIT
 
     jsr quit_reset
-
-    lda	#$0f ; enable ISO charset mode (X16)
-    jsr PUTCHR
 
     jsr PAGE
 
@@ -166,6 +179,7 @@ MINUS_ONE
     +BACKLINK "lsb", 3
     +VALUE	LSB
 
+!src "x816.asm"
 !src "core.asm"
 !src "math.asm"
 !src "move.asm"
@@ -180,12 +194,12 @@ MINUS_ONE
 !src "sprite.asm"
 !src "tile.asm"
 !src "palfx.asm"
-!src "input.asm"
+; X816: input.asm (KERNAL joystick/mouse), clock.asm (X16 RTC), irq.asm
+; (chains the KERNAL CINV vector) and sysx.asm (ROM I2C/charset/keymap/
+; monitor) are parked - they come back on the kernel APIs (IRQ_SET slots,
+; CON_*) in the platform-hooks phase. See X816_core doc/DUREXFORTH.md.
 !src "coreadd.asm"
-!src "clock.asm"
-!src "irq.asm"
 !src "rstack.asm"
-!src "sysx.asm"
 
 BOOT_STRING
 !src "../build/version.asm"

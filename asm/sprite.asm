@@ -5,9 +5,8 @@
 
 VERA_DC_VIDEO = $9f29           ; DCSEL 0: bit6 = sprite enable
 
-; Point VERA ADDR0 at sprite attribute byte: $1fc00 + sprite*8 + .spr_off,
+; Point VERA ADDR0 at sprite attribute byte: $1fc00 + sprite*8 + SPR_OFF,
 ; bank 1, auto-increment 1.  A = sprite index. Preserves X (forth stack ptr).
-.spr_off !byte 0
 set_sprite
     stz VERA_CTRL
     stz W+1
@@ -18,7 +17,7 @@ set_sprite
     asl
     rol W+1                     ; A / W+1 = sprite*8
     clc
-    adc .spr_off
+    adc SPR_OFF
     sta VERA_ADDR_L             ; $fc00 low byte is 0
     lda W+1
     adc #$fc
@@ -29,24 +28,29 @@ set_sprite
 
     +BACKLINK "sprites-on", 10
 SPRITES_ON ; ( -- )
+    +VIO
     stz VERA_CTRL
     lda VERA_DC_VIDEO
     ora #$40
     sta VERA_DC_VIDEO
+    +VIO_END
     rts
 
     +BACKLINK "sprites-off", 11
 SPRITES_OFF ; ( -- )
+    +VIO
     stz VERA_CTRL
     lda VERA_DC_VIDEO
     and #$bf
     sta VERA_DC_VIDEO
+    +VIO_END
     rts
 
     +BACKLINK "sprite-pos", 10
 SPRITE_POS ; ( x y sprite -- )
+    +VIO
     lda #2
-    sta .spr_off
+    sta SPR_OFF
     lda LSB, x                  ; sprite
     jsr set_sprite
     lda LSB+2, x                ; x lo
@@ -62,12 +66,14 @@ SPRITE_POS ; ( x y sprite -- )
     inx
     inx
     inx
+    +VIO_END
     rts
 
     +BACKLINK "sprite-get", 10
 SPRITE_GET ; ( sprite -- x y )
+    +VIO
     lda #2
-    sta .spr_off
+    sta SPR_OFF
     lda LSB, x
     jsr set_sprite
     lda VERA_DATA0              ; x lo
@@ -89,11 +95,13 @@ SPRITE_GET ; ( sprite -- x y )
     sta LSB, x
     lda W3
     sta MSB, x
+    +VIO_END
     rts
 
     +BACKLINK "sprite-image", 12
 SPRITE_IMAGE ; ( graphaddr sprite -- ) 4bpp image, 32-aligned VRAM address
-    stz .spr_off
+    +VIO
+    stz SPR_OFF
     lda LSB, x                  ; sprite
     jsr set_sprite
     lda MSB+1, x                ; graphaddr hi
@@ -112,12 +120,14 @@ SPRITE_IMAGE ; ( graphaddr sprite -- ) 4bpp image, 32-aligned VRAM address
     sta VERA_DATA0             ; byte1 = high nibble, 4bpp (mode bit7 = 0)
     inx
     inx
+    +VIO_END
     rts
 
     +BACKLINK "sprite-size", 11
 SPRITE_SIZE ; ( width height sprite -- ) size codes 0-3 = 8/16/32/64
+    +VIO
     lda #7
-    sta .spr_off
+    sta SPR_OFF
     lda LSB, x
     jsr set_sprite
     lda LSB+1, x                ; height
@@ -140,12 +150,14 @@ SPRITE_SIZE ; ( width height sprite -- ) size codes 0-3 = 8/16/32/64
     inx
     inx
     inx
+    +VIO_END
     rts
 
     +BACKLINK "sprite-z", 8
 SPRITE_Z ; ( z sprite -- ) Z-depth 0=off 1=behind 2=between 3=front
+    +VIO
     lda #6
-    sta .spr_off
+    sta SPR_OFF
     lda LSB, x
     jsr set_sprite
     lda LSB+1, x                ; z
@@ -155,12 +167,14 @@ SPRITE_Z ; ( z sprite -- ) Z-depth 0=off 1=behind 2=between 3=front
     sta VERA_DATA0
     inx
     inx
+    +VIO_END
     rts
 
     +BACKLINK "sprite", 6
 SPRITE ; ( num zdepth -- ) set Z-depth on sprite num and enable the layer
+    +VIO
     lda #6
-    sta .spr_off
+    sta SPR_OFF
     lda LSB+1, x                ; num
     jsr set_sprite
     lda LSB, x                  ; zdepth
@@ -170,12 +184,14 @@ SPRITE ; ( num zdepth -- ) set Z-depth on sprite num and enable the layer
     sta VERA_DATA0
     inx
     inx
+    +VIO_END
     jmp SPRITES_ON
 
     +BACKLINK "sprite-mov", 10
 SPRITE_MOV ; ( num x y -- ) = BASIC MOVSPR num,x,y
+    +VIO
     lda #2
-    sta .spr_off
+    sta SPR_OFF
     lda LSB+2, x                ; num
     jsr set_sprite
     lda LSB+1, x                ; x lo
@@ -191,11 +207,13 @@ SPRITE_MOV ; ( num x y -- ) = BASIC MOVSPR num,x,y
     inx
     inx
     inx
+    +VIO_END
     rts
 
     +BACKLINK "sprite-mem", 10
 SPRITE_MEM ; ( num bank addr -- ) point image at VRAM bank:addr
-    stz .spr_off
+    +VIO
+    stz SPR_OFF
     lda LSB+2, x                ; num
     jsr set_sprite
     lda MSB, x                  ; addr hi
@@ -222,4 +240,5 @@ SPRITE_MEM ; ( num bank addr -- ) point image at VRAM bank:addr
     inx
     inx
     inx
+    +VIO_END
     rts

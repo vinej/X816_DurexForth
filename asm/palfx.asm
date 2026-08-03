@@ -5,6 +5,7 @@ VERA_PALETTE = $fa00            ; VRAM $1fa00, bank 1, 2 bytes/entry
 
     +BACKLINK "pal!", 4
 PAL ; ( rgb index -- ) set palette entry index (0-255) to 12-bit $0RGB
+    +VIO
     stz VERA_CTRL
     lda LSB, x                  ; index
     asl                         ; index*2 (carry = high bit)
@@ -21,18 +22,22 @@ PAL ; ( rgb index -- ) set palette entry index (0-255) to 12-bit $0RGB
     sta VERA_DATA0
     inx
     inx
+    +VIO_END
     rts
 
     +BACKLINK "dcsel", 5
 DCSEL ; ( n -- ) select DCSEL bank 0-63 (VERA FX)
+    +VIO
     lda LSB, x
     asl                         ; DCSEL occupies CTRL bits 7:1, ADDRSEL = 0
     sta VERA_CTRL
     inx
+    +VIO_END
     rts
 
     +BACKLINK "fx-mult", 7
 FX_MULT ; ( a b -- lo hi ) signed 16x16 -> 32-bit via the VERA FX multiplier
+    +VIO
     lda #$04                    ; DCSEL=2
     sta VERA_CTRL
     stz $9f29                   ; FX_CTRL = 0
@@ -81,6 +86,7 @@ FX_MULT ; ( a b -- lo hi ) signed 16x16 -> 32-bit via the VERA FX multiplier
     stz $9f29                   ; FX_CTRL = 0 (cache-write off)
     stz $9f2c                   ; FX_MULT = 0 (multiplier off)
     stz VERA_CTRL               ; DCSEL=0, ADDRSEL=0
+    +VIO_END
     rts
 
     +BACKLINK "fx*", 3
@@ -88,30 +94,36 @@ FX_MULT ; ( a b -- lo hi ) signed 16x16 -> 32-bit via the VERA FX multiplier
 
     +BACKLINK "fx-off", 6
 FX_OFF ; ( -- ) turn the VERA FX helpers back off (so plain VPOKE works)
+    +VIO
     lda #$04
     sta VERA_CTRL               ; DCSEL=2
     stz $9f29                   ; FX_CTRL = 0
     stz $9f2c                   ; FX_MULT = 0
     stz VERA_CTRL               ; DCSEL=0
+    +VIO_END
     rts
 
     +BACKLINK "fx-fill", 7
 FX_FILL ; ( byte vbank vaddr count -- ) fast VRAM fill via the 32-bit cache
+    +VIO
     lda LSB+3, x                ; fill byte
     jsr fx_fill_core
     inx
     inx
     inx
     inx
+    +VIO_END
     rts
 
     +BACKLINK "fx-clear", 8
 FX_CLEAR ; ( vbank vaddr count -- ) zero a VRAM region
+    +VIO
     lda #0
     jsr fx_fill_core
     inx
     inx
     inx
+    +VIO_END
     rts
 
 ; A = fill byte; vbank=LSB+2,x vaddr=LSB+1,x count=LSB,x.  Leaves the stack.

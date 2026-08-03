@@ -46,13 +46,21 @@ THROW
 +   lda _EXCEPTION_HANDLER + 1
     beq .print_error_and_abort
 
-    ; restore previous return stack
+    ; restore previous return stack. CATCH saved only SL (8-bit tsx); SH
+    ; is always $01 here, and the restore must be a 16-bit txs - see QUIT.
     jsr EXCEPTION_HANDLER
     jsr FETCH
     stx W
     lda LSB,x
-    tax
+    sta W2
+    lda #>RSTACK_TOP
+    sta W2+1
+    rep #$10
+!rl
+    ldx W2
     txs
+    sep #$10
+!rs
     ldx W
     inx
 

@@ -9,6 +9,7 @@ VERA_L0_TILEBASE = $9f2f
 
     +BACKLINK "layer-on", 8
 LAYER_ON ; ( layer -- )
+    +VIO
     stz VERA_CTRL
     lda #$10                    ; layer 0 enable = DC_VIDEO bit4
     ldy LSB, x
@@ -17,10 +18,12 @@ LAYER_ON ; ( layer -- )
 +   ora VERA_DC_VIDEO
     sta VERA_DC_VIDEO
     inx
+    +VIO_END
     rts
 
     +BACKLINK "layer-off", 9
 LAYER_OFF ; ( layer -- )
+    +VIO
     stz VERA_CTRL
     lda #$10
     ldy LSB, x
@@ -30,10 +33,12 @@ LAYER_OFF ; ( layer -- )
     and VERA_DC_VIDEO
     sta VERA_DC_VIDEO
     inx
+    +VIO_END
     rts
 
     +BACKLINK "mapbase", 7
 MAPBASE ; ( layer bank addr -- ) 512-aligned tile-map base
+    +VIO
     stz VERA_CTRL
     lda MSB, x                  ; addr hi
     lsr                         ; addr >> 9 (bits 16:9 of the map base)
@@ -53,10 +58,12 @@ MAPBASE ; ( layer bank addr -- ) 512-aligned tile-map base
     inx
     inx
     inx
+    +VIO_END
     rts
 
     +BACKLINK "tilebase", 8
 TILEBASE ; ( layer bank addr -- ) 2 KB-aligned tile-data base, 8x8 tiles
+    +VIO
     stz VERA_CTRL
     lda MSB, x                  ; addr hi
     lsr
@@ -82,10 +89,12 @@ TILEBASE ; ( layer bank addr -- ) 2 KB-aligned tile-data base, 8x8 tiles
     inx
     inx
     inx
+    +VIO_END
     rts
 
     +BACKLINK "layer-mode", 10
 LAYER_MODE ; ( layer cfg -- ) write the layer config byte
+    +VIO
     stz VERA_CTRL
     lda LSB+1, x                ; layer * 7
     beq +
@@ -95,4 +104,5 @@ LAYER_MODE ; ( layer cfg -- ) write the layer config byte
     sta VERA_L0_CONFIG, y
     inx
     inx
+    +VIO_END
     rts
