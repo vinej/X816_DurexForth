@@ -14,12 +14,12 @@ PAGE
     +BACKLINK "rvs", 3
 RVS ; ( -- ) invert text output
     lda #$12
-    jmp CHROUT
+    jmp PUTCHR
 
     +BACKLINK "cr", 2
 CR ; ( -- )
     lda #$d
-    jmp CHROUT
+    jmp PUTCHR
 
     +BACKLINK "type", 4
 TYPE ; ( caddr u -- )
@@ -80,16 +80,12 @@ TYPE ; ( caddr u -- )
     !byte 0
 
 CLOSE_INPUT_SOURCE
+    ; X816: no file input sources until the kernel FS_* words exist, so
+    ; SOURCE_ID is only ever 0 (keyboard) or -1 (evaluate) - there is no
+    ; channel to close or re-select, just the input state to pop.
     stx W
-    lda	SOURCE_ID_LSB
-    jsr	CLOSE
     jsr POP_INPUT_SOURCE
-    ldx SOURCE_ID_LSB
-    beq +
-    jsr CHKIN
-    jmp ++
-+   jsr CLRCHN
-++  ldx W
+    ldx W
     rts
 
     +BACKLINK "refill", 6
@@ -103,7 +99,7 @@ REFILL ; ( -- flag )
 
     lda SOURCE_ID_LSB
     bmi .getLineFromEvaluateString
-    bne .getLineFromDisk
+    bne .return_false ; X816: file sources return with the FS_* words
 
     ; getLineFromConsole
 
@@ -131,27 +127,8 @@ REFILL ; ( -- flag )
     sta MSB,x
     rts
 
-.getLineFromDisk
-    jsr READST
-    bne .return_false ; eof/error
-
-    lda TIB_PTR
-    sta W
-    lda TIB_PTR + 1
-    sta W+1
--   stx W2
-    jsr	CHRIN
-    ldx W2
-    ora #0
-    beq .return_true
-    cmp #K_RETURN
-    beq .return_true
-    cmp #$0a           ; LF also ends a line (x16edit saves LF line endings;
-    beq .return_true   ; CR-then-LF just yields a harmless empty line)
-    ldy TIB_SIZE
-    sta (W),y
-    inc TIB_SIZE
-    jmp -
+; X816: .getLineFromDisk (READST/CHRIN over a CBM channel) was deleted with
+; disk.asm; its successor reads through FS_READ when the file words return.
 
 .return_false
     dex
@@ -347,14 +324,13 @@ IOABORT ; ( ioresult -- )
     lda #>.ioerr
     sta W+1
 
-    jsr CLRCHN
     jsr RVS
 
     ldy #0
 -   lda (W),y
     pha
     and #$7f
-    jsr CHROUT
+    jsr PUTCHR
     iny
     pla
     bpl -

@@ -2,26 +2,15 @@
 ; DOWORDS
 
 brk_handler
-    ; RESTORE-key NMI and brk instructions end up here (via the
-    ; kernal NMINV/CBINV vectors) and abort back to the interpreter.
+    ; brk instructions (and NMI) abort back to the interpreter. On X816 this
+    ; gets installed in the kernel's KIRQ_BRK/KIRQ_NMI slots via IRQ_SET in
+    ; the platform-hooks phase; the X16 NMINV/CBINV vector stores are gone
+    ; ($316-$319 is inside the X816 stack region, and there is no KERNAL).
     lda #-28 ; user interrupt
     jsr throw_a
 
 quit_reset
-    sei             ; goes here from QUIT and program start
-
-    lda #<brk_handler
-    sta $318        ; NMINV (RESTORE key)
-    sta $316        ; CBINV (BRK)
-    lda #>brk_handler
-    sta $319
-    sta $317
-
-    cli
-
-    lda #0
-    sta $01         ; select KERNAL ROM bank
-
+    ; goes here from QUIT and program start
     txa             ; preserve Forth stack pointer across reset
     pha
 
@@ -42,18 +31,9 @@ quit_reset
     stx     SOURCE_ID_MSB
     stx     SAVE_INPUT_STACK_DEPTH
 
-; Used registers: A, X, Y
+; X816: the CLRCHN/CLOSE-all loop went with the CBM channel model; open
+; kernel file handles will be closed here once the FS_* words exist.
 close_all_logical_files:
-    jsr CLRCHN
-    ldx #0
--   txa
-    pha
-    jsr CLOSE
-    pla
-    tax
-    dex
-    bne -
-
     pla
     tax
     rts
