@@ -94,7 +94,7 @@ repeat ; immediate
  1. jsr dodoes
  2. two-byte code pointer. default: rts
  3. variable length data )
-here 60 c, ( rts )
+here 6b c, ( rtl - the long world's empty DOES> behavior )
 ( split, not rshift: rshift is defined later in this file )
 : create
 header postpone dodoes literal dup w, split nip c, ;
@@ -135,7 +135,10 @@ dc value w3
 : 2drop ( a b -- )
 postpone drop postpone drop ; immediate
 
-: unused ( -- u ) latest here - $20 - ;
+( program space left: inside bank 1 it is the gap to the headers;
+  above, everything to the end of bank 4. )
+: unused ( -- u ) here $10000 < if latest here - $20 -
+else $50000 here - then ;
 : blank ( addr u -- ) bl fill ;
 \ X816: reset/poweroff (SMC i2cpoke) and save-forth (saveb) are gone with
 \ the parked sysx/disk modules; they return with the platform-hooks phase.
@@ -156,11 +159,11 @@ inx, inx, rtl, end-code
 code lshift ( x1 u -- x2 )
 lsb dec,x -branch bmi,
 lsb 2+ asl,x msb 2+ rol,x
-latest >xt jmp,
+latest >xt jml,
 code rshift ( x1 u -- x2 )
 lsb dec,x -branch bmi,
 msb 2+ lsr,x lsb 2+ ror,x
-latest >xt jmp,
+latest >xt jml,
 
 : variable
 0 value

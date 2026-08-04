@@ -95,6 +95,21 @@ decimal/hex printing of >16-bit values):
   for the bank byte - rshift does not exist yet when they load.
 - Bank $01 free after boot: 44739 bytes (jsl growth ~2.7 KB vs stage B).
 
+RESOLVED - the "nondeterministic" blocker: it was the DOES>-default
+blob, still a $60 rts. A short rts under a jsl frame pulls the correct
+16-bit PC but LEAKS THE BANK BYTE on the CPU stack; execution continues
+correctly and the misalignment detonates one rtl later, at a distance
+that shifts with timing - a perfect heisenbug that was one byte
+($60 -> $6b) to fix. Lesson: in the long world, EVERY reachable exit
+must be rtl - grep for stray $60 emissions when anything flakes.
+
+Multi-bank PROVEN: 1200 generated definitions push HERE from $0141E0 to
+$0315EC (bank 3), words execute from banks 1, 2 and 3, and bank_headroom
+bumps against the LIVE LATEST gap in bank 1 (the headers keep growing
+down there) and against $FC00 in banks 2-4. `unused` reports the gap in
+bank 1 or the space to $04FFFF above it.
+
+(the original blocker note, kept for the record:)
 OPEN - THE ONE BLOCKER: a NON-DETERMINISTIC boot-tail crash (exit codes
 vary 124/151/190 on the same card; sometimes the same card boots clean
 and runs the whole battery). Failure cluster: between the "accept.."

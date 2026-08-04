@@ -161,22 +161,38 @@ COLON
 
     jmp RBRAC ; enter compile mode
 
-; If HERE is within 1 KB of its bank's ceiling, advance to the next bank.
-; Bank $01's ceiling is the dictionary headers (checked per line by
-; interpret_tib); banks $02-$04 run to $FFFF. Beyond $04: -8 throw.
+; If HERE is within 1 KB of its bank's ceiling, advance to the next
+; bank. Bank $01's ceiling is LATEST - the headers keep growing down
+; there even after code moves on - and banks $02-$04 run to $FFFF.
+; Beyond $04: -8 throw.
 bank_headroom
+    lda HERE_BANK
+    and #$ff
+    cmp #1
+    bne .bh_high
+    lda LATEST_PTR
+    sec
+    sbc HERE_PTR
+    bcc .bh_bump ; crossed (a huge allot): bump rather than wedge
+    cmp #$0400
+    bcs .bh_done
+    bra .bh_bump
+.bh_high
     lda HERE_PTR
     cmp #$fc00
-    bcc +
+    bcc .bh_done
+.bh_bump
     lda HERE_BANK
     inc
+    and #$ff
     cmp #5
-    bcc ++
+    bcc +
     lda #-8
     jmp throw_a
-++  sta HERE_BANK
++   sta HERE_BANK
     stz HERE_PTR
-+   rtl
+.bh_done
+    rtl
 
     +BACKLINK "header", 6
 HEADER ; ( "name" -- )
