@@ -327,9 +327,16 @@ hide dodoes hide (abort")
 decimal
 
 cr
-( free program space, across all four fast banks - see UNUSED )
+( the machine's two spaces: program in the four single-cycle banks,
+  data in SDRAM from bank $05 up to $DF - the top 2 MB, banks $E0-$FF,
+  belong to the VERA2 window and the kernel firmware. )
+$50000 constant sdram ( first data address in SDRAM, flat )
+$e00000 sdram - constant sdram-size
+
 unused
-0 u.r space .( bytes free.) cr
+0 u.r space .( bytes program, fast ram.) cr
+sdram-size
+0 u.r space .( bytes data, sdram.) cr
 
 ( boot hook: if an AUTORUN file exists on the card, include it before the
   prompt. INCLUDED throws -37 silently for a missing file, so that case is
