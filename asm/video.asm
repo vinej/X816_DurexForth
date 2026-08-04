@@ -9,10 +9,13 @@ VERA_ADDR_H = $9f22
 VERA_DATA0  = $9f23
 VERA_CTRL   = $9f25
 VERA_DC_BORDER = $9f2c
-VERA_L1_HSCROLL_L = $9f37
-VERA_L1_HSCROLL_H = $9f38
-VERA_L1_VSCROLL_L = $9f39
-VERA_L1_VSCROLL_H = $9f3a
+; X816: the kernel console's text is LAYER 0 (runtime/console.c sets
+; DC_VIDEO = $11); the X16 put its text on layer 1. Scroll the layer the
+; text is actually on.
+VERA_L0_HSCROLL_L = $9f30
+VERA_L0_HSCROLL_H = $9f31
+VERA_L0_VSCROLL_L = $9f32
+VERA_L0_VSCROLL_H = $9f33
 ; X816: the I/O page is in bank $00 and the program's DBR is its own bank,
 ; so every word touching VERA registers runs between +VIO / +VIO_END
 ; (x816.asm). Word bodies use only VERA registers and the direct page, so
@@ -105,6 +108,23 @@ V_STOREW ; ( w -- ) low byte first
 ; X816: SCREEN (KERNAL screen_mode) and COLOR (the KERNAL's $0376 shadow)
 ; are gone - the kernel console owns the text mode and its attributes.
 
+; ioc@ - fetch a byte from bank $00, where the I/O page lives. A plain C@
+; goes through DBR (bank $01, the program), so VERA register readbacks
+; need this word. General bank-0 read on purpose: the I/O page is just
+; the caller that needs it today.
+    +BACKLINK "ioc@", 4
+IOFETCHBYTE ; ( addr -- byte )
+    +VIO
+    lda LSB, x
+    sta KTMP
+    lda MSB, x
+    sta KTMP+1
+    lda (KTMP)          ; dp indirect without ,y: reads DBR = bank $00
+    sta LSB, x
+    stz MSB, x
+    +VIO_END
+    rts
+
     +BACKLINK "border", 6
 BORDER ; ( color -- )
     +VIO
@@ -155,10 +175,10 @@ POS ; ( -- col )
 SCROLLX ; ( n -- )
     +VIO
     lda LSB, x
-    sta VERA_L1_HSCROLL_L
+    sta VERA_L0_HSCROLL_L
     lda MSB, x
     and #$0f
-    sta VERA_L1_HSCROLL_H
+    sta VERA_L0_HSCROLL_H
     inx
     +VIO_END
     rts
@@ -167,16 +187,17 @@ SCROLLX ; ( n -- )
 SCROLLY ; ( n -- )
     +VIO
     lda LSB, x
-    sta VERA_L1_VSCROLL_L
+    sta VERA_L0_VSCROLL_L
     lda MSB, x
     and #$0f
-    sta VERA_L1_VSCROLL_H
+    sta VERA_L0_VSCROLL_H
     inx
     +VIO_END
     rts
 
-; Text tilemap helpers. Default 80x60 mode: 128-wide map at VRAM $1b000,
-; two bytes/cell (code, attribute). Address = $b000 + y*256 + x*2, bank 1.
+; Text tilemap helpers. X816 console: 128-wide map at VRAM $00000 bank 0
+; (runtime/console.c, MAPBASE 0), two bytes/cell (code, attribute).
+; Address = y*256 + x*2 - the X16's $1b000 base is an X16-ism.
     +BACKLINK "tile", 4
 TILE ; ( x y code attr -- )
     +VIO
@@ -184,10 +205,8 @@ TILE ; ( x y code attr -- )
     asl                 ; x*2
     sta VERA_ADDR_L
     lda LSB+2, x        ; y
-    clc
-    adc #$b0
     sta VERA_ADDR_M
-    lda #$11            ; bank 1 + auto-increment 1
+    lda #$10            ; bank 0 + auto-increment 1
     sta VERA_ADDR_H
     lda LSB+1, x        ; code
     sta VERA_DATA0
@@ -207,10 +226,8 @@ TDATA ; ( x y -- code )
     asl
     sta VERA_ADDR_L
     lda LSB, x          ; y
-    clc
-    adc #$b0
     sta VERA_ADDR_M
-    lda #$01            ; bank 1, no increment
+    lda #$00            ; bank 0, no increment
     sta VERA_ADDR_H
     inx
     lda VERA_DATA0
@@ -227,10 +244,8 @@ TATTR ; ( x y -- attr )
     ora #1              ; attr byte at x*2+1
     sta VERA_ADDR_L
     lda LSB, x          ; y
-    clc
-    adc #$b0
     sta VERA_ADDR_M
-    lda #$01
+    lda #$00            ; bank 0, no increment
     sta VERA_ADDR_H
     inx
     lda VERA_DATA0

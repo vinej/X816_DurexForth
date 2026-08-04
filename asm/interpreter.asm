@@ -92,17 +92,23 @@ interpret_tib
     cmp TIB_SIZE + 1
     bne interpret_tib
 
-    ; 0 - keyboard, -1 evaluate, else file
-    lda SOURCE_ID_LSB
-    beq +
-    rts
-+   lda LATEST_LSB
+    ; X816: the dictionary-overflow check runs for EVERY source. Upstream
+    ; only checked at the keyboard prompt, so a big INCLUDE compiled HERE
+    ; straight through the headers and the machine died wherever the
+    ; corrupted dictionary took it - a silent wedge, not a diagnosis. The
+    ; suite found it; the throw names it.
+    lda LATEST_LSB
     sec
     sbc HERE_LSB
     lda LATEST_MSB
     sbc HERE_MSB
     beq .throw_dictionary_overflow
-    lda STATE
+
+    ; 0 - keyboard, -1 evaluate, else file
+    lda SOURCE_ID_LSB
+    beq +
+    rts
++   lda STATE
     bne +
     lda #'o'
     jsr PUTCHR

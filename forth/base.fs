@@ -326,11 +326,15 @@ cr
 ( free RAM = gap between here, growing up,
   and the dictionary, growing down. )
 latest here - $20 -
-. .( bytes free.) cr
+0 u.r space .( bytes free.) cr
 
 ( boot hook: if an AUTORUN file exists on the card, include it before the
-  prompt. INCLUDED throws -37 silently for a missing file, so the probe is
-  one CATCH - and a THROW from inside a real autorun script surfaces the
-  same way instead of being swallowed. )
+  prompt. INCLUDED throws -37 silently for a missing file, so that case is
+  quiet - but any OTHER code escaping the script is REPORTED, because a
+  swallowed error is a suite that "just stops" with no evidence. )
 : (autorun) s" autorun" included ;
-' (autorun) catch drop
+: (autorun-report) ( n -- )
+  ?dup if dup -37 = if drop else
+    cr ." autorun threw " . cr 1 emu-exit
+  then then ;
+' (autorun) catch (autorun-report)

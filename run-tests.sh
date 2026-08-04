@@ -88,7 +88,7 @@ PY
 # ~half an hour of emulated time (mostly compiling 50 KB of source read a
 # byte at a time through FS_READ). Overclocking the emulated CPU is fine
 # here and NOWHERE that measures time - benchmarks stay at 8.
-SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy timeout 900 \
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy timeout 480 \
     "$EMU/build/x16emu.exe" -boot "$(cygpath -m "$CORE/boot/boot.rom")" \
     -load "F00000,$(cygpath -m "$(pwd)/$KERNEL")" \
     -sdcard "$WOUT/card.img" \
@@ -126,7 +126,7 @@ px = im.convert('RGB').load()
 
 def row_text(r):
     out = ""
-    for col in range(60):
+    for col in range(80):
         bits = []
         for y in range(8):
             b = 0
@@ -137,7 +137,7 @@ def row_text(r):
         out += glyph.get(tuple(bits), '?')
     return out.rstrip()
 
-rows = [row_text(r) for r in range(34)]
+rows = [row_text(r) for r in range(60)]
 body = "\n".join(r for r in rows if r)
 
 def fail(msg):

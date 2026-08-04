@@ -219,6 +219,7 @@ EVALUATE_STRING_SIZE_MSB = * + 1
     bne .grow_tib_to_end_of_line
     jmp .return_true
 
+
     +BACKLINK "source", 6
 SOURCE
     dex
@@ -270,19 +271,27 @@ CHAR ; ( name -- char )
 SAVE_INPUT_STACK
     ; Forth standard 11.3.3 "Input Source":
     ; "Input [...] shall be nestable in any order to at least eight levels."
-    ; Eight levels is overkill for INCLUDED, since opening more than four DOS
-    ; channels gives a "no channel" error message on C64.
-    ; It is anyway nice to keep some extra levels for EVALUATE and LOAD.
-    !fill 8*12
+    ; X816: SIXTEEN levels, not the C64's eight, and the overflow is
+    ; CHECKED. The suite runs five levels deep before a single test runs
+    ; (keyboard > base > autorun > test > suite), and testcore's nested
+    ; EVALUATE tests stack more - upstream's ninth push landed on the
+    ; depth byte just past the array, and every pop after that was
+    ; misaligned: SOURCE_ID came back garbage and the interpreter fell
+    ; silently back to the keyboard mid-suite.
+    !fill 16*12
 SAVE_INPUT_STACK_DEPTH
     !byte 0
 
 push_input_stack
-    ; Stack overflow check could be added, but does not seem needed in practice.
     ldy SAVE_INPUT_STACK_DEPTH
+    cpy #16*12
+    bcs .input_stack_overflow
     sta SAVE_INPUT_STACK, y
     inc SAVE_INPUT_STACK_DEPTH
     rts
+.input_stack_overflow
+    lda #-8 ; dictionary/structure overflow - loud, never silent corruption
+    jmp throw_a
 
 pop_input_stack
     dec SAVE_INPUT_STACK_DEPTH

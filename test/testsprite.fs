@@ -7,8 +7,8 @@ decimal
 
 cr .( testsprite: enable flag ) cr
 \ SPRITES-ON/OFF toggle DC_VIDEO bit6 (DCSEL 0)
-T{ sprites-on  $9f29 c@ $40 and -> $40 }T
-T{ sprites-off $9f29 c@ $40 and -> 0 }T
+T{ sprites-on  $9f29 ioc@ $40 and -> $40 }T
+T{ sprites-off $9f29 ioc@ $40 and -> 0 }T
 
 cr .( testsprite: position ) cr
 \ SPRITE-POS writes bytes 2..5; SPRITE-GET reads them back
@@ -30,7 +30,13 @@ T{ 3 2 7 sprite-size  1 $fc3f vaddr v@ -> $b0 }T
 T{ 2 8 sprite-z  1 $fc46 vaddr v@ -> 8 }T
 \ SPRITE ( num zdepth -- ) sets byte6 z<<2 and enables the layer, sprite 9 ($1fc4e)
 T{ 9 3 sprite  1 $fc4e vaddr v@ -> $0c }T
-T{ $9f29 c@ $40 and -> $40 }T
+T{ $9f29 ioc@ $40 and -> $40 }T
+
+\ Leave the machine displayable: the tests above parked live sprites with
+\ garbage images over the text layer, and a later suite's failure report
+\ must not print underneath them.
+sprites-off
+T{ $9f29 ioc@ $40 and -> 0 }T
 
 cr .( testsprite ok ) cr
 

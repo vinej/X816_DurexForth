@@ -38,10 +38,13 @@ fs_blk
 ; FS_SEEK parameter block: handle +0, whence +2 (1 = KFS_CUR), signed
 ; 32-bit offset +4. kern_fs_seekback patches the handle and the offset's
 ; low byte; the $FF fill is the sign extension of every -1..-128.
+; +8 is the kernel's answer (the new absolute position) - it must be
+; allocated or the kernel writes it over whatever follows this block.
 fs_skblk
     !word 0                 ; +0  handle
     !byte 1, 0              ; +2  whence = current, pad
     !byte 0, $ff, $ff, $ff  ; +4  offset (low byte patched)
+    !fill 4, 0              ; +8  position result, written by the kernel
 
 ; The read-ahead cache. ONE cache for whatever source is current: every
 ; input-source switch goes through fs_flush (PUSH_INPUT_SOURCE) or the

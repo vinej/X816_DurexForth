@@ -65,7 +65,12 @@ TIB = $600 ; text input buffer (X16 golden RAM; $600-$7ff = 512 bytes)
 ; deeply-included files).
 PROGRAM_BASE = $801
 ;HERE_POSITION = $801 + assembled program (defined below)
-WORDLIST_BASE = $9eff ; historical top; bank $01 has no I/O, could rise later
+; The dictionary top. The C64/X16 stopped at $9EFF below the I/O page;
+; bank $01 has no I/O, so the only ceiling is what EXEC can load -
+; X816_EXEC_MAX is $FF00 bytes, putting the top at $FEFF and buying the
+; dictionary 24 KB the original never had. The test suite needs it: the
+; ANS core+ext runs compile ~30 KB of definitions.
+WORDLIST_BASE = $feff
 ; PUTCHR is a routine in x816.asm now (CON_PUTC via the kernel), not a ROM
 ; address - callers are unchanged.
 

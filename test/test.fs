@@ -15,15 +15,14 @@ marker ---test---
 
 page cr .( >> compat) cr parse-name compat included
 cr .( >> tester) cr parse-name tester included
-\ The ANS core tests define helper constants without a marker - including MSB,
-\ which SHADOWS the assembler's stack-page constant and silently breaks every
-\ CODE word compiled afterwards. Bracket them so all that leaks away before
-\ the later suites run.
-marker ---coretests---
+\ Upstream bracketed the core suites in their own marker because their
+\ helper constants shadow the assembler's (MSB especially), breaking any
+\ CODE word compiled afterwards. None of the remaining suites compiles a
+\ CODE word, and the X816 dictionary has 24 KB the C64 never did, so the
+\ definitions simply stay until ---test--- unwinds everything at the end.
 cr .( >> testcore) cr parse-name testcore included
 cr .( >> testcoreplus) cr parse-name coreplus included
 cr .( >> testcoreext) cr parse-name coreext included
----coretests---
 cr .( >> testexception) cr parse-name testexc included
 cr .( >> testdouble) cr parse-name testdbl included
 cr .( >> testvideo) cr parse-name testvid included

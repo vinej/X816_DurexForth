@@ -101,6 +101,17 @@ THROW
     jsr TYPE
 .cr_and_abort
     jsr CR
+    ; X816: an uncaught error stops the EMULATOR right here with the
+    ; message on screen (status 1), so a test harness never waits out a
+    ; timeout on a machine that has already said what went wrong. $9FBC
+    ; is open bus on hardware - there this falls through to the prompt.
+    phb
+    lda #0
+    pha
+    plb
+    lda #1
+    sta $9fbc
+    plb
     ldx #X_INIT
     jmp QUIT
 

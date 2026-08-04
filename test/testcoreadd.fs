@@ -39,7 +39,7 @@ ticks 2drop
 
 cr .( testcoreadd: 2 / unused / blank ) cr
 T{ 2 -> 2 }T
-T{ unused 0 > -> -1 }T
+T{ unused 0<> -> -1 }T \ unused is unsigned (ANS: u) and exceeds $7FFF here
 create bbuf 8 allot
 T{ bbuf 8 blank   bbuf c@  bbuf 7 + c@ -> 32 32 }T
 
@@ -89,11 +89,8 @@ T{ 100 s>d 7 -2 m*/ -> -350 s>d }T         \ sign of n2
 T{ -100 s>d -7 2 m*/ -> 350 s>d }T         \ two negatives cancel
 T{ 30000 s>d 20000 3 m*/ -> $c200 $0beb }T \ 600M/3 = 200,000,000 (double result)
 
-cr .( testcoreadd: i2c / charset ) cr
-\ RTC (device $6f) has battery-backed NVRAM from offset $20 - round-trips.
-T{ $6f $20 $ab i2cpoke  $6f $20 i2cpeek -> $ab }T
-T{ $6f $21 $5c i2cpoke  $6f $21 i2cpeek -> $5c }T
-1 charset                                  \ re-activate ISO charset (exercise)
+\ X816: the i2c (SMC/RTC) and charset tests are parked with their words -
+\ no SMC on the core, and the kernel console owns the character set.
 
 cr .( testcoreadd: number output .r u.r d.r holds ? ) cr
 T{ 0 0 <# s" xy" holds #> drop c@ -> 120 }T   \ 'x' first char

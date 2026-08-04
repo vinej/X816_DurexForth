@@ -7,20 +7,23 @@ marker ---testvideo---
 decimal
 
 cr .( testvideo: VRAM data port ) cr
-T{ 0 $1000 65 vpoke 0 $1000 vpeek -> 65 }T
-T{ 0 $1001 66 vpoke 0 $1001 vpeek -> 66 }T
+\ Scratch VRAM at bank 0 $8000+: the console's 128x60 tile map occupies
+\ $0000-$3BFF, so pokes there would scribble on the visible screen.
+T{ 0 $8100 65 vpoke 0 $8100 vpeek -> 65 }T
+T{ 0 $8101 66 vpoke 0 $8101 vpeek -> 66 }T
 \ VADDR sets the port with auto-increment; V! / V@ stream
-T{ 0 $1100 vaddr 10 v! 20 v! 30 v! -> }T
-T{ 0 $1100 vaddr v@ v@ v@ -> 10 20 30 }T
+T{ 0 $8200 vaddr 10 v! 20 v! 30 v! -> }T
+T{ 0 $8200 vaddr v@ v@ v@ -> 10 20 30 }T
 \ V!W writes a 16-bit word low byte first
-T{ 0 $1200 vaddr $abcd v!w -> }T
-T{ 0 $1200 vaddr v@ v@ -> $cd $ab }T
+T{ 0 $8300 vaddr $abcd v!w -> }T
+T{ 0 $8300 vaddr v@ v@ -> $cd $ab }T
 
-cr .( testvideo: colour / border ) cr
-\ COLOR sets the screen colour byte (bg<<4 | fg)
-T{ 1 6 color $0376 c@ -> $61 }T
-\ BORDER writes VERA DC_BORDER (DCSEL 0), which we can read straight back
-T{ 7 border $9f2c c@ -> 7 }T
+cr .( testvideo: border ) cr
+\ COLOR is parked with the console-attribute API (RVS is a no-op for the
+\ same reason - the X816 console owns the attribute byte, x816.asm).
+\ BORDER writes VERA DC_BORDER (DCSEL 0); IOC@ reads it back from the
+\ I/O page in bank 0 (a plain C@ would read the program bank).
+T{ 7 border $9f2c ioc@ -> 7 }T
 
 cr .( testvideo: tile cells ) cr
 \ TILE writes code+attr at (x,y); TDATA/TATTR read them back

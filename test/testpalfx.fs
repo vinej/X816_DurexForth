@@ -11,7 +11,7 @@ T{ $0abc 200 pal!  1 $fb90 vaddr v@ v@ -> $bc $0a }T
 T{ $0f00 201 pal!  1 $fb92 vaddr v@ v@ -> $00 $0f }T
 
 cr .( testpalfx: DCSEL ) cr
-T{ 5 dcsel $9f25 c@ -> 10 }T
+T{ 5 dcsel $9f25 ioc@ -> 10 }T
 0 dcsel
 
 cr .( testpalfx: FX-MULT ) cr
