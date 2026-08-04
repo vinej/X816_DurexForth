@@ -1,111 +1,105 @@
 ; MOVE
-
-; routines adapted from cc65
-; original by Ullrich von Bassewitz, Christian Krueger, Greg King
+;
+; Stage B: pointers are flat 24-bit and lengths 32-bit, so the cc65
+; page-stepping byte loops are replaced by [W]-long copies. Byte-at-a-time
+; with a sep/rep pair per byte - correct first; an MVN fast path for
+; in-bank copies is a later optimization, and MVN's own four silent traps
+; are already on record (X816_core, x816-mvn-block-move).
 
 SRC = W
 DST = W2
 LEN = W3
 
-cmove_getparams:
-	lda	LSB, x
-	sta	LEN
-	lda	MSB, x
-	sta	LEN + 1
-	lda	LSB + 1, x
-	sta	DST
-	lda	MSB + 1, x
-	sta	DST + 1
-	lda	LSB + 2, x
-	sta	SRC
-	lda	MSB + 2, x
-	sta	SRC + 1
+cmove_getparams: ; pop ( src dst u ) into SRC/DST/LEN, X dropped by 6
+	lda LSB, x
+	sta LEN
+	lda MSB, x
+	sta LEN + 2
+	lda LSB + 2, x
+	sta DST
+	lda MSB + 2, x
+	sta DST + 2
+	lda LSB + 4, x
+	sta SRC
+	lda MSB + 4, x
+	sta SRC + 2
+	sep #$20
+!as
+	txa
+	clc
+	adc #6
+	tax
+	rep #$20
+!al
 	rts
 
     +BACKLINK "cmove>", 6
 CMOVE_BACK ; ( src dst u -- ) copy u bytes, high addresses first (overlap-safe up)
-	txa
-	pha
 	jsr cmove_getparams
-    ; copy downwards. adjusts pointers to the end of memory regions.
-    lda SRC + 1
-    clc
-    adc LEN + 1
-    sta SRC + 1
-    lda DST + 1
-    clc
-    adc LEN + 1
-    sta DST + 1
-
-    ldy LEN
-    bne .entry
-    beq .pagesizecopy
-.copybyte
-    lda (SRC),y
-    sta (DST),y
-.entry
-    dey
-    bne .copybyte
-    lda (SRC),y
-    sta (DST),y
-.pagesizecopy
-    ldx LEN + 1
-    beq cmove_done
-.initbase
-    dec SRC + 1
-    dec DST + 1
-    dey
-.copybytes
-    lda (SRC),y
-    sta (DST),y
-    dey
-    lda (SRC),y
-    sta (DST),y
-    dey
-    lda (SRC),y
-    sta (DST),y
-    dey
-    bne .copybytes
-    lda (SRC),y
-    sta (DST),y
-    dex
-    bne .initbase
-	jmp cmove_done
+	; point SRC/DST one past their last byte
+	lda SRC
+	clc
+	adc LEN
+	sta SRC
+	lda SRC + 2
+	adc LEN + 2
+	sta SRC + 2
+	lda DST
+	clc
+	adc LEN
+	sta DST
+	lda DST + 2
+	adc LEN + 2
+	sta DST + 2
+-	lda LEN
+	ora LEN + 2
+	beq cmove_done
+	; step both pointers down, then copy
+	lda SRC
+	bne +
+	dec SRC + 2
++	dec SRC
+	lda DST
+	bne +
+	dec DST + 2
++	dec DST
+	sep #$20
+!as
+	lda [SRC]
+	sta [DST]
+	rep #$20
+!al
+	lda LEN
+	bne +
+	dec LEN + 2
++	dec LEN
+	bra -
 
     +BACKLINK "cmove", 5
 CMOVE ; ( src dst u -- ) copy u bytes, low addresses first
-    txa
-    pha
 	jsr cmove_getparams
-	ldy #0
-	ldx	LEN + 1
-	beq	.l2
-.l1
-	lda	(SRC),y ; copy byte
-	sta	(DST),y
-	iny
-	lda	(SRC),y ; copy byte again, to make it faster
-	sta	(DST),y
-	iny
-	bne .l1
-	inc	SRC + 1
-	inc DST + 1
-	dex ; next 256-byte block
-	bne .l1
-.l2
-	ldx	LEN
+-	lda LEN
+	ora LEN + 2
 	beq cmove_done
-.l3
-	lda (SRC),y
-	sta	(DST),y
-	iny
-	dex
-	bne	.l3
+	sep #$20
+!as
+	lda [SRC]
+	sta [DST]
+	rep #$20
+!al
+	inc SRC
+	bne +
+	inc SRC + 2
++	inc DST
+	bne +
+	inc DST + 2
++	lda LEN
+	bne +
+	dec LEN + 2
++	dec LEN
+	bra -
+
 cmove_done
-	pla
-    clc
-	adc #3
-	tax
 	rts
 
     +BACKLINK "move", 4

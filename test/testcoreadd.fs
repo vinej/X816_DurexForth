@@ -87,7 +87,7 @@ T{ -100 s>d 7 2 m*/ -> -350 s>d }T         \ sign of d
 T{ 100 s>d -7 2 m*/ -> -350 s>d }T         \ sign of n1
 T{ 100 s>d 7 -2 m*/ -> -350 s>d }T         \ sign of n2
 T{ -100 s>d -7 2 m*/ -> 350 s>d }T         \ two negatives cancel
-T{ 30000 s>d 20000 3 m*/ -> $c200 $0beb }T \ 600M/3 = 200,000,000 (double result)
+T{ 30000 s>d 20000 3 m*/ -> 200000000 s>d }T \ 600M/3 (double result)
 
 \ X816: the i2c (SMC/RTC) and charset tests are parked with their words -
 \ no SMC on the core, and the kernel console owns the character set.

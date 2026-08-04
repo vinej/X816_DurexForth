@@ -1,5 +1,12 @@
 ; QUIT EXECUTE NOTFOUND ' FIND FIND-NAME >XT PARSE-NAME WORD EVALUATE /STRING
 ; DOWORDS
+;
+; Stage B: the input system's pointers (TIB_PTR, evaluate strings, W3 in
+; the number parser) are 16-bit BANK-1-IMPLICIT - every input buffer lives
+; in this bank (TIB, the dictionary, golden RAM), so (dp) reads through
+; DBR do the right thing and SOURCE pushes BANK1+TIB_PTR. The dictionary
+; walk in FIND_NAME is byte logic through and through, so it runs inside
+; one sep #$20 window with the stage-A code shape intact.
 
 brk_handler
     ; brk instructions (and NMI) abort back to the interpreter. On X816 this
@@ -14,22 +21,20 @@ quit_reset
     txa             ; preserve Forth stack pointer across reset
     pha
 
-    ldx #0
-    stx _EXCEPTION_HANDLER
-    stx _EXCEPTION_HANDLER+1
-
-    lda #>TIB
-    sta TIB_PTR + 1
-
-    stx     STATE
-    stx     TIB_SIZE
-    stx     TIB_SIZE + 1
-    stx     TIB_PTR
-    stx     TO_IN_W
-    stx     TO_IN_W + 1
-    stx     SOURCE_ID_LSB
-    stx     SOURCE_ID_MSB
-    stx     SAVE_INPUT_STACK_DEPTH
+    lda #0
+    sta _EXCEPTION_HANDLER
+    sta STATE
+    sta TIB_SIZE
+    sta TO_IN_W
+    sta SOURCE_ID_LSB
+    sta SOURCE_ID_MSB
+    sep #$20
+!as
+    sta SAVE_INPUT_STACK_DEPTH
+    rep #$20
+!al
+    lda #TIB
+    sta TIB_PTR
 
 ; X816: close every kernel file handle. QUIT lands here after aborts that
 ; bypassed the include unwinding - and after a boot-time include chain
@@ -40,8 +45,7 @@ close_all_logical_files:
 -   pha
     jsr kern_fs_close
     pla
-    sec
-    sbc #1
+    dec
     bne -
 
     pla
@@ -64,9 +68,8 @@ QUIT
     tax
 
 interpret_and_close
-    ldy #>interpret_loop
-    lda #<interpret_loop
-    jsr pushya
+    lda #interpret_loop
+    jsr pushbank1
     jsr CATCH
     jsr CLOSE_INPUT_SOURCE
     jmp THROW
@@ -74,7 +77,8 @@ interpret_and_close
 interpret_loop
     jsr REFILL
     inx
-    lda MSB-1,x
+    inx
+    lda MSB-2,x
     beq .refill_failed
     jsr interpret_tib
     jmp interpret_loop
@@ -88,20 +92,15 @@ interpret_tib
     lda TO_IN_W
     cmp TIB_SIZE
     bne interpret_tib
-    lda TO_IN_W + 1
-    cmp TIB_SIZE + 1
-    bne interpret_tib
 
-    ; X816: the dictionary-overflow check runs for EVERY source. Upstream
-    ; only checked at the keyboard prompt, so a big INCLUDE compiled HERE
-    ; straight through the headers and the machine died wherever the
-    ; corrupted dictionary took it - a silent wedge, not a diagnosis. The
-    ; suite found it; the throw names it.
-    lda LATEST_LSB
+    ; X816: the dictionary-overflow check runs for EVERY source, and throws
+    ; both when the gap shrinks below a page and when the pointers have
+    ; already crossed.
+    lda LATEST_PTR
     sec
-    sbc HERE_LSB
-    lda LATEST_MSB
-    sbc HERE_MSB
+    sbc HERE_PTR
+    bcc .throw_dictionary_overflow
+    and #$ff00
     beq .throw_dictionary_overflow
 
     ; 0 - keyboard, -1 evaluate, else file
@@ -125,16 +124,20 @@ interpret_tib
     lda #-8
     ; fall through
 throw_a
-    ldy #$ff
-    jsr pushya
+    ; sign-extend the (always negative) code to a full cell - a bank
+    ; byte in Y cannot carry $FFFF
+    dex
+    dex
+    sta LSB,x
+    lda #$ffff
+    sta MSB,x
     jmp THROW
 
     +BACKLINK "execute", 7
 EXECUTE
     lda LSB, x
     sta W
-    lda MSB, x
-    sta W + 1
+    inx
     inx
     jmp (W)
 
@@ -145,6 +148,8 @@ INTERPRET
     bne +
     inx
     inx
+    inx
+    inx
     rts
 +
     jsr TWODUP
@@ -152,6 +157,7 @@ INTERPRET
     lda MSB, x
     bne .found_word
 
+    inx
     inx
     jsr READ_NUMBER
     beq .was_number
@@ -170,27 +176,25 @@ INTERPRET
     ; hooks (FLOAT literals). Default = the notfound error; base.fs
     ; installs the (quote) handler. Defined words still win: this path
     ; only runs after FIND_NAME failed.
-    ; ROLLBACK: replace this block with "jmp (NOTFOUND_VEC)" and delete
-    ; QUOTE_VEC + 'quote below (plus the (quote) block in base.fs).
-    lda LSB+1, x
+    lda LSB+2, x
     sta W
-    lda MSB+1, x
-    sta W + 1
-    ldy #0
-    lda (W), y
+    lda MSB+2, x
+    sta W + 2
+    sep #$20
+!as
+    lda [W]
+    rep #$20
+!al
+    and #$ff
     cmp #$22 ; '"'
     ; X816: jmp (abs) fetches its pointer from bank $00, but these vector
     ; cells live in the program bank - copy through W2 (dp) and jmp (W2).
     bne +
     lda QUOTE_VEC
     sta W2
-    lda QUOTE_VEC+1
-    sta W2+1
     jmp (W2)
 +   lda NOTFOUND_VEC
     sta W2
-    lda NOTFOUND_VEC+1
-    sta W2+1
     jmp (W2)
 
     ; yep, it's a number...
@@ -203,18 +207,21 @@ INTERPRET
     jmp LITERAL
 
 .found_word
-    ; OK, we found a word...
-
+    ; OK, we found a word... ( caddr u nt -- nt nt )
     lda MSB, x
-    ldy LSB, x
+    pha
+    lda LSB, x
     inx
+    inx
+    sta LSB, x
+    sta LSB+2, x
+    pla
     sta MSB, x
-    sty LSB, x
-    sta MSB+1, x
-    sty LSB+1, x
+    sta MSB+2, x
     jsr TO_XT
     jsr SWAP
     jsr GET_IMMED ; ( xt 1 | xt -1 )
+    inx
     inx
 
     lda curr_word_no_tail_call_elimination
@@ -224,7 +231,7 @@ FOUND_WORD_WITH_NO_TCE = * + 1
     sta curr_word_no_tail_call_elimination
 
     ; Executes the word if it is immediate, or interpreting.
-    lda MSB-1, x
+    lda MSB-2, x
     and STATE
     bne +
     jmp EXECUTE
@@ -245,34 +252,28 @@ NOTFOUND_VEC ; interpreter not-found hook (RAM cell, see INTERPRET)
     !word print_word_not_found_error
 
     +BACKLINK "'notfound", 9
-    dex
-    lda #<NOTFOUND_VEC
-    sta LSB, x
-    lda #>NOTFOUND_VEC
-    sta MSB, x
-    rts
+    lda #NOTFOUND_VEC
+    jmp pushbank1
 
 QUOTE_VEC ; "xxx" string-literal hook (RAM cell, see INTERPRET)
     !word print_word_not_found_error
 
     +BACKLINK "'quote", 6
-    dex
-    lda #<QUOTE_VEC
-    sta LSB, x
-    lda #>QUOTE_VEC
-    sta MSB, x
-    rts
+    lda #QUOTE_VEC
+    jmp pushbank1
 
     +BACKLINK "'", 1
     jsr PARSE_NAME
     jsr TWODUP
     jsr FIND_NAME ; ( addr u nt|0 )
     inx
-    lda MSB-1,x
+    inx
+    lda MSB-2,x
     beq print_word_not_found_error
     inx
+    inx
     sta MSB,x
-    lda LSB-2,x
+    lda LSB-4,x
     sta LSB,x
     jmp TO_XT
 
@@ -290,8 +291,10 @@ FIND ; ( xt -1 | xt 1 | caddr 0 )
     jsr GET_IMMED
     jsr R_TO
     inx
+    inx
     rts
 +   inx
+    inx
     jsr R_TO
     jmp ZERO
 
@@ -301,30 +304,41 @@ FIND_BUFFER_SIZE = 31
     +BACKLINK "find-name", 9
 FIND_NAME ; ( caddr u -- nt | 0 )
     inx
-    lda LSB-1,x
-    tay
+    inx
+    lda LSB-2,x ; u
     beq .find_failed
     cmp #FIND_BUFFER_SIZE+1
     bcs .find_failed
-    sta .findlen + 1
 
-    lda MSB,x
-    sta W2+1
+    ; copy the (lowercased) name into FIND_BUFFER
+    sep #$20
+!as
+    sta .findlen + 1
+    rep #$20
+!al
     lda LSB,x
     sta W2
+    lda MSB,x
+    sta W2 + 2
 
+    sep #$20
+!as
+    lda LSB-2,x
+    tay
     dey
--   lda (W2),y
+-   lda [W2],y
     jsr CHAR_TO_LOWERCASE
     sta FIND_BUFFER,y
     dey
     bpl -
 
-    lda LATEST_LSB
+    ; The walk is stage-A byte logic verbatim: W is a 16-bit little-endian
+    ; pointer in the direct page, so 8-bit adds with an inc W+1 carry work
+    ; exactly as they did on the 6502.
+    lda LATEST_PTR
     sta W
-    lda LATEST_MSB
+    lda LATEST_PTR+1
     sta W + 1
-    ; W now contains new dictionary pointer.
     ldy #0
     lda (W), y ; get string length of dictionary word
 .examine_word
@@ -346,10 +360,16 @@ FIND_NAME ; ( caddr u -- nt | 0 )
     bne .examine_word
 
     ; It is null - give up.
+    rep #$20
+!al
 .find_failed
+    inx
     inx
     jmp ZERO
 
+; the compare paths below are entered FROM the 8-bit walk - the assembler
+; must agree (a 16-bit immediate here runs its third byte as BRK)
+!as
 .string_compare
     ; equal strlen, now compare strings...
     tay
@@ -367,70 +387,74 @@ FIND_NAME ; ( caddr u -- nt | 0 )
     ; (E.g. DROP compiles inx instead of jsr DROP.)
     and #F_NO_TAIL_CALL_ELIMINATION | F_IMMEDIATE
     sta FOUND_WORD_WITH_NO_TCE
+    rep #$20
+!al
     lda W
     sta LSB, x
-    lda W + 1
+    lda #(BANK1 >> 16)
     sta MSB, x
     rts
 
+!as
 .word_not_equal
     ldy #0
     lda (W), y
     and #STRLEN_MASK
     jmp .string_compare_failed
+!al
 
 GET_IMMED ; ( nt -- 1 | -1 )
-    lda MSB, x
-    sta W + 1
     lda LSB, x
     sta W
-    ldy #0
-
-    lda (W), y ; a contains string length + mask
+    sep #$20
+!as
+    lda (W) ; a contains string length + mask
+    rep #$20
+!al
     and #F_IMMEDIATE
     beq .not_immed
-    sty MSB, x ; 0
-    iny
-    sty LSB, x ; 1
+    lda #1
+    sta LSB, x
+    stz MSB, x
     rts
 
 .not_immed
-    lda #$ff
+    lda #$ffff
     sta LSB, x
     sta MSB, x
     rts
 
     +BACKLINK ">xt", 3
 TO_XT
-    lda MSB, x
-    sta W + 1
     lda LSB, x
     sta W
-    ; W contains pointer to word
-    ldy #0
-    lda (W), y ; a contains string length + mask
+    sep #$20
+!as
+    lda (W) ; a contains string length + mask
+    rep #$20
+!al
     and #STRLEN_MASK
-    clc
-    adc #1 ; offset for char + string length
-    adc LSB, x
+    sec ; the +1 for the length byte rides in on the carry
+    adc W
+    sta W
+    lda (W) ; the 2-byte xt
     sta LSB, x
-    bcc +
-    inc MSB, x
-+   jsr FETCH
+    lda #(BANK1 >> 16)
+    sta MSB, x
     rts
 
 IS_SPACE ; ( c -- f )
-    ldy #1
     lda LSB,x
-    cmp #' ' | 0x80
+    cmp #' ' | $80
     beq .is_space
-    lda #' '
-    cmp LSB,x
-    bcs .is_space
-    dey
-.is_space:
-    sty LSB,x
-    sty MSB,x
+    cmp #' ' + 1
+    bcc .is_space
+    lda #0
+    bra +
+.is_space
+    lda #1
++   sta LSB,x
+    stz MSB,x
     rts
 
 IS_NOT_SPACE ; ( c -- f )
@@ -455,6 +479,7 @@ XT_SKIP ; ( addr n xt -- addr n )
 .done
     jsr R_TO
     inx
+    inx
     rts
 
     +BACKLINK "parse-name", 10
@@ -463,12 +488,12 @@ PARSE_NAME ; ( name -- addr u )
     jsr TO_IN
     jsr FETCH
     jsr SLASH_STRING
-    jsr LIT
+    jsr LITXT
     !word IS_SPACE
     jsr XT_SKIP
     jsr OVER
     jsr TO_R
-    jsr LIT
+    jsr LITXT
     !word IS_NOT_SPACE
     jsr XT_SKIP
     jsr TWODUP
@@ -477,9 +502,11 @@ PARSE_NAME ; ( name -- addr u )
     jsr PLUS
     jsr SOURCE
     inx
+    inx
     jsr MINUS
     jsr TO_IN
     jsr STORE
+    inx
     inx
     jsr R_TO
     jsr TUCK
@@ -500,6 +527,7 @@ WORD
     beq .skip_delimiters
 
 .append_char
+    ldy #0
     jsr pushya
 
     ; increment string length counter
@@ -524,6 +552,7 @@ WORD
 
 .reached_word_end
     inx
+    inx
     jmp HERE
 
 .is_delim
@@ -544,43 +573,35 @@ WORD
     lda TO_IN_W
     cmp TIB_SIZE
     bne +
-    lda TO_IN_W + 1
-    cmp TIB_SIZE + 1
-    bne +
     lda #0
     rts
-+
++   lda TIB_PTR
     clc
-    lda TIB_PTR
     adc TO_IN_W
     sta W
-    lda TIB_PTR + 1
-    adc TO_IN_W + 1
-    sta W + 1
-    ldy #0
-    lda (W),y
-
+    sep #$20
+!as
+    lda (W)
+    rep #$20
+!al
+    and #$ff
     inc TO_IN_W
-    bne +
-    inc TO_IN_W + 1
-+   rts
+    rts
 
     +BACKLINK "evaluate", 8
     jsr PUSH_INPUT_SOURCE
-    lda LSB + 1, x
-    sta EVALUATE_STRING_PTR_LSB
-    lda MSB + 1, x
-    sta EVALUATE_STRING_PTR_MSB
+    lda LSB + 2, x
+    sta EVALUATE_STRING_PTR
     lda LSB, x
-    sta EVALUATE_STRING_SIZE_LSB
-    lda MSB, x
-    sta EVALUATE_STRING_SIZE_MSB
+    sta EVALUATE_STRING_SIZE
+    inx
+    inx
     inx
     inx
 
-    ldy #-1
-    sty SOURCE_ID_MSB
-    sty SOURCE_ID_LSB
+    lda #$ffff
+    sta SOURCE_ID_LSB
+    sta SOURCE_ID_MSB
 
     jmp interpret_and_close
 
@@ -594,40 +615,50 @@ SLASH_STRING ; ( addr u n -- addr u )
     jsr PLUS
     jmp SWAP
 
+; (entered and left in 8-bit A mode, part of READ_NUMBER's byte phase)
+!as
 apply_base
     sta _BASE
     dec .chars_to_process
     inc W3
     bne +
     inc W3+1
-+   lda (W3),y
++   lda (W3)
     rts
+!al
 
 ; Z = success, NZ = fail
 ; success: ( caddr u -- number )
 ; fail: ( caddr u -- caddr u )
 READ_NUMBER
+    sep #$20
+!as
     lda LSB,x
     sta .chars_to_process
-    lda MSB+1,x
-    sta W3+1
-    lda LSB+1,x
-    sta W3
+    rep #$20
+!al
+    lda LSB+2,x
+    sta W3 ; string pointer, bank 1 implicit
 
     lda _BASE
     pha
 
-    ldy #0
-    sty .negate
     dex
     dex
-    sty LSB+1,x
-    sty MSB+1,x
-    sty MSB,x
+    dex
+    dex
+    stz LSB+2,x ; the 32-bit accumulator
+    stz MSB+2,x
+    stz MSB,x
 
-    lda (W3), y
+    sep #$20
+!as
+    stz .negate
+    lda (W3)
     cmp #"'"
-    beq .parse_char
+    bne +
+    jmp .parse_char
++
 
     cmp #"#"
     bne .check_decimal
@@ -653,19 +684,24 @@ READ_NUMBER
     jmp .prepare_next_char
 
 .next_digit
-    ; number *= _BASE
+    ; number *= _BASE (32-bit via UM*; overflow = nonzero high cell)
+    rep #$20
+!al
     lda _BASE
     sta LSB,x
+    stz MSB,x
     jsr U_M_STAR
     lda LSB,x
-    bne .parse_failed ; overflow!
-
+    ora MSB,x
+    bne .parse_failed
+    sep #$20
+!as
     inc W3
     bne +
     inc W3+1
-+   lda (W3), y
++   lda (W3)
 
-.loop_entry
+.loop_entry ; 8-bit A: char decode
     jsr CHAR_TO_LOWERCASE
 
     clc
@@ -678,58 +714,86 @@ READ_NUMBER
     adc #-$27 ; ascii a-f (a=$61) -> 10-15
 
     cmp #10
-    bcc .parse_failed
+    bcc .parse_failed_sep
 
 +   cmp _BASE
-    bcs .parse_failed
+    bcs .parse_failed_sep
 
-    adc LSB+1,x
-    sta LSB+1,x
-    bcc .prepare_next_char
-    inc MSB+1,x
-    beq .parse_failed
+    ; accumulator += digit, 32-bit
+    rep #$20
+!al
+    and #$ff
+    clc
+    adc LSB+2,x
+    sta LSB+2,x
+    bcc +
+    inc MSB+2,x
+    beq .parse_failed ; carried out of 32 bits
++   sep #$20
+!as
 .prepare_next_char
     dec .chars_to_process
     bne .next_digit
 
 .parse_done
+    rep #$20
+!al
     pla
     sta _BASE
 
-    lda LSB+1,x
-    sta LSB+3,x
-    lda MSB+1,x
-    sta MSB+3,x
+    ; the accumulator becomes the result, over caddr's slot
+    lda LSB+2,x
+    sta LSB+6,x
+    lda MSB+2,x
+    sta MSB+6,x
     inx
     inx
     inx
+    inx
+    inx
+    inx
+    sep #$20
+!as
 .negate = * + 1
     lda #0
+    rep #$20
+!al
+    and #$ff
     beq +
     jsr NEGATE
-    tya ; clear Z flag
+    lda #0 ; Z set: success
 +   rts
 
+; 'c' character literal (8-bit A on entry)
+!as
 .parse_char
     lda .chars_to_process
     cmp #3
-    bne .parse_failed
+    bne .parse_failed_sep
     ldy #2
     lda (W3),y
     cmp #"'"
-    bne .parse_failed
-    dey
+    bne .parse_failed_sep
+    ldy #1
     lda (W3),y
-    sta LSB+1,x
-    lda #0
-    sta MSB+1,x
+    rep #$20
+!al
+    and #$ff
+    sta LSB+2,x
+    stz MSB+2,x
     jmp .parse_done
 
+!as
+.parse_failed_sep
+    rep #$20
+!al
 .parse_failed
     pla
     sta _BASE
     inx
-    inx ; Z flag set
+    inx
+    inx
+    inx ; X is never zero here, so Z is clear: fail
     rts
 
 .chars_to_process
@@ -740,44 +804,42 @@ READ_NUMBER
     ; so that there is no distance between nt and the rest of the stack
     lda LSB,x
     sta .xt
-    lda MSB, x
-    sta .xt + 1
     inx
-    lda LATEST_LSB
+    inx
+    lda LATEST_PTR
     sta .dowords_nametoken
-    lda LATEST_MSB
-    sta .dowords_nametoken + 1
 
 .dowords_lambda
     lda .dowords_nametoken
     sta W
-    lda .dowords_nametoken + 1
-    sta W + 1
-    ldy #0
-    lda (W), y
+    sep #$20
+!as
+    lda (W)
+    rep #$20
+!al
+    and #$ff
     bne +
 -   rts
 +   and #STRLEN_MASK
     pha
     dex
+    dex
     lda .dowords_nametoken
     sta LSB, x
-    lda .dowords_nametoken + 1
+    lda #(BANK1 >> 16)
     sta MSB, x
 .xt = * + 1
     jsr PLACEHOLDER_ADDRESS
     inx
-    lda MSB-1, x
-    ora LSB-1, x
+    inx
+    lda MSB-2, x
+    ora LSB-2, x
     beq .cancel
     pla
     clc
     adc #3 ; guaranteed carry clear
     adc .dowords_nametoken
     sta .dowords_nametoken
-    lda .dowords_nametoken + 1
-    adc #0
-    sta .dowords_nametoken + 1
     jmp .dowords_lambda
 ; using a word here in case the lambda trashes Ws
 .dowords_nametoken

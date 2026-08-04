@@ -1,6 +1,11 @@
-; VIDEO - X16 video / screen / cursor (VERA + KERNAL)
-; VPOKE VPEEK VADDR V! V@ V!W SCREEN COLOR BORDER CLS
+; VIDEO - X816 video / screen / cursor (VERA + kernel console)
+; VPOKE VPEEK VADDR V! V@ V!W IOC@ BORDER CLS
 ; LOCATE CURSOR POS SCROLLX SCROLLY TILE TDATA TATTR
+;
+; Stage B: VERA registers are BYTE registers, so every register body runs
+; in a sep #$20 window between +VIO / +VIO_END. Plane access under sep
+; reads single bytes: a 16-bit value's low byte is LSB+2n and its high
+; byte LSB+2n+1 (the old MSB+n of the byte-plane era).
 
 ; VERA registers
 VERA_ADDR_L = $9f20
@@ -16,24 +21,27 @@ VERA_L0_HSCROLL_L = $9f30
 VERA_L0_HSCROLL_H = $9f31
 VERA_L0_VSCROLL_L = $9f32
 VERA_L0_VSCROLL_H = $9f33
-; X816: the I/O page is in bank $00 and the program's DBR is its own bank,
-; so every word touching VERA registers runs between +VIO / +VIO_END
-; (x816.asm). Word bodies use only VERA registers and the direct page, so
-; the whole body can run with DBR = $00.
 
     +BACKLINK "vpoke", 5
 VPOKE ; ( bank addr value -- )
     +VIO
+    sep #$20
+!as
     stz VERA_CTRL       ; ADDRSEL 0
-    lda LSB+1, x        ; addr lo
+    lda LSB+2, x        ; addr lo
     sta VERA_ADDR_L
-    lda MSB+1, x        ; addr hi
+    lda LSB+3, x        ; addr hi
     sta VERA_ADDR_M
-    lda LSB+2, x        ; bank
+    lda LSB+4, x        ; bank
     and #1
     sta VERA_ADDR_H     ; no auto-increment
     lda LSB, x          ; value
     sta VERA_DATA0
+    rep #$20
+!al
+    inx
+    inx
+    inx
     inx
     inx
     inx
@@ -43,16 +51,22 @@ VPOKE ; ( bank addr value -- )
     +BACKLINK "vpeek", 5
 VPEEK ; ( bank addr -- value )
     +VIO
+    sep #$20
+!as
     stz VERA_CTRL
     lda LSB, x          ; addr lo
     sta VERA_ADDR_L
-    lda MSB, x          ; addr hi
+    lda LSB+1, x        ; addr hi
     sta VERA_ADDR_M
-    lda LSB+1, x        ; bank
+    lda LSB+2, x        ; bank
     and #1
     sta VERA_ADDR_H
-    inx                 ; drop addr
     lda VERA_DATA0
+    rep #$20
+!al
+    inx
+    inx
+    and #$ff
     sta LSB, x
     stz MSB, x
     +VIO_END
@@ -61,15 +75,21 @@ VPEEK ; ( bank addr -- value )
     +BACKLINK "vaddr", 5
 VADDR ; ( bank addr -- ) point data port at VRAM, auto-increment 1
     +VIO
+    sep #$20
+!as
     stz VERA_CTRL
     lda LSB, x
     sta VERA_ADDR_L
-    lda MSB, x
+    lda LSB+1, x
     sta VERA_ADDR_M
-    lda LSB+1, x        ; bank
+    lda LSB+2, x        ; bank
     and #1
     ora #$10            ; auto-increment 1
     sta VERA_ADDR_H
+    rep #$20
+!al
+    inx
+    inx
     inx
     inx
     +VIO_END
@@ -78,8 +98,13 @@ VADDR ; ( bank addr -- ) point data port at VRAM, auto-increment 1
     +BACKLINK "v!", 2
 V_STORE ; ( byte -- )
     +VIO
+    sep #$20
+!as
     lda LSB, x
     sta VERA_DATA0
+    rep #$20
+!al
+    inx
     inx
     +VIO_END
     rts
@@ -88,7 +113,13 @@ V_STORE ; ( byte -- )
 V_FETCH ; ( -- byte )
     +VIO
     dex
+    dex
+    sep #$20
+!as
     lda VERA_DATA0
+    rep #$20
+!al
+    and #$ff
     sta LSB, x
     stz MSB, x
     +VIO_END
@@ -97,10 +128,15 @@ V_FETCH ; ( -- byte )
     +BACKLINK "v!w", 3
 V_STOREW ; ( w -- ) low byte first
     +VIO
+    sep #$20
+!as
     lda LSB, x
     sta VERA_DATA0
-    lda MSB, x
+    lda LSB+1, x
     sta VERA_DATA0
+    rep #$20
+!al
+    inx
     inx
     +VIO_END
     rts
@@ -109,28 +145,35 @@ V_STOREW ; ( w -- ) low byte first
 ; are gone - the kernel console owns the text mode and its attributes.
 
 ; ioc@ - fetch a byte from bank $00, where the I/O page lives. A plain C@
-; goes through DBR (bank $01, the program), so VERA register readbacks
-; need this word. General bank-0 read on purpose: the I/O page is just
-; the caller that needs it today.
+; goes through the cell's own bank byte; this word forces bank $00, which
+; is where VERA register readbacks live.
     +BACKLINK "ioc@", 4
 IOFETCHBYTE ; ( addr -- byte )
-    +VIO
     lda LSB, x
     sta KTMP
-    lda MSB, x
-    sta KTMP+1
-    lda (KTMP)          ; dp indirect without ,y: reads DBR = bank $00
+    +VIO
+    sep #$20
+!as
+    lda (KTMP)          ; DBR = $00 under +VIO
+    rep #$20
+!al
+    +VIO_END
+    and #$ff
     sta LSB, x
     stz MSB, x
-    +VIO_END
     rts
 
     +BACKLINK "border", 6
 BORDER ; ( color -- )
     +VIO
+    sep #$20
+!as
     stz VERA_CTRL       ; DCSEL 0
     lda LSB, x
     sta VERA_DC_BORDER
+    rep #$20
+!al
+    inx
     inx
     +VIO_END
     rts
@@ -141,10 +184,12 @@ CLS ; ( -- )
 
     +BACKLINK "locate", 6
 LOCATE ; ( row col -- )
-    lda LSB+1, x        ; row
+    lda LSB+2, x        ; row
     tay
     lda LSB, x          ; col
     jsr kern_gotoxy     ; A = column, Y = row
+    inx
+    inx
     inx
     inx
     rts
@@ -154,9 +199,11 @@ CURSOR ; ( -- row col )
     jsr kern_getxy      ; KTMP = column, KTMP2 = row
     dex
     dex
+    dex
+    dex
     lda KTMP2
-    sta LSB+1, x        ; row (deeper)
-    stz MSB+1, x
+    sta LSB+2, x        ; row (deeper)
+    stz MSB+2, x
     lda KTMP
     sta LSB, x          ; col on top
     stz MSB, x
@@ -165,20 +212,22 @@ CURSOR ; ( -- row col )
     +BACKLINK "pos", 3
 POS ; ( -- col )
     jsr kern_getxy
-    dex
     lda KTMP
-    sta LSB, x
-    stz MSB, x
-    rts
+    jmp PUSHA
 
     +BACKLINK "scrollx", 7
 SCROLLX ; ( n -- )
     +VIO
+    sep #$20
+!as
     lda LSB, x
     sta VERA_L0_HSCROLL_L
-    lda MSB, x
+    lda LSB+1, x
     and #$0f
     sta VERA_L0_HSCROLL_H
+    rep #$20
+!al
+    inx
     inx
     +VIO_END
     rts
@@ -186,11 +235,16 @@ SCROLLX ; ( n -- )
     +BACKLINK "scrolly", 7
 SCROLLY ; ( n -- )
     +VIO
+    sep #$20
+!as
     lda LSB, x
     sta VERA_L0_VSCROLL_L
-    lda MSB, x
+    lda LSB+1, x
     and #$0f
     sta VERA_L0_VSCROLL_H
+    rep #$20
+!al
+    inx
     inx
     +VIO_END
     rts
@@ -201,36 +255,47 @@ SCROLLY ; ( n -- )
     +BACKLINK "tile", 4
 TILE ; ( x y code attr -- )
     +VIO
-    lda LSB+3, x        ; x
+    sep #$20
+!as
+    stz VERA_CTRL
+    lda LSB+6, x        ; x
     asl                 ; x*2
     sta VERA_ADDR_L
-    lda LSB+2, x        ; y
+    lda LSB+4, x        ; y
     sta VERA_ADDR_M
     lda #$10            ; bank 0 + auto-increment 1
     sta VERA_ADDR_H
-    lda LSB+1, x        ; code
+    lda LSB+2, x        ; code
     sta VERA_DATA0
     lda LSB, x          ; attr
     sta VERA_DATA0
-    inx
-    inx
-    inx
-    inx
+    txa                 ; drop 4 cells
+    clc
+    adc #8
+    tax
+    rep #$20
+!al
     +VIO_END
     rts
 
     +BACKLINK "tdata", 5
 TDATA ; ( x y -- code )
     +VIO
-    lda LSB+1, x        ; x
+    sep #$20
+!as
+    stz VERA_CTRL
+    lda LSB+2, x        ; x
     asl
     sta VERA_ADDR_L
     lda LSB, x          ; y
     sta VERA_ADDR_M
-    lda #$00            ; bank 0, no increment
-    sta VERA_ADDR_H
-    inx
+    stz VERA_ADDR_H     ; bank 0, no increment
     lda VERA_DATA0
+    rep #$20
+!al
+    inx
+    inx
+    and #$ff
     sta LSB, x
     stz MSB, x
     +VIO_END
@@ -239,16 +304,22 @@ TDATA ; ( x y -- code )
     +BACKLINK "tattr", 5
 TATTR ; ( x y -- attr )
     +VIO
-    lda LSB+1, x        ; x
+    sep #$20
+!as
+    stz VERA_CTRL
+    lda LSB+2, x        ; x
     asl
     ora #1              ; attr byte at x*2+1
     sta VERA_ADDR_L
     lda LSB, x          ; y
     sta VERA_ADDR_M
-    lda #$00            ; bank 0, no increment
-    sta VERA_ADDR_H
-    inx
+    stz VERA_ADDR_H
     lda VERA_DATA0
+    rep #$20
+!al
+    inx
+    inx
+    and #$ff
     sta LSB, x
     stz MSB, x
     +VIO_END

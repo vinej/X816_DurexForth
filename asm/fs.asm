@@ -18,6 +18,11 @@
 ; nothing printed - the standard error report names the code, and a caller
 ; probing for an optional file (base.fs's autorun hook) can CATCH it
 ; silently.
+;
+; Stage B: cache counters stay bytes (the cache is 128 bytes) and are
+; touched in sep #$20 windows; the name copy reads the caller's string
+; through [W] long, because a Forth string can now live anywhere in the
+; 16 MB.
 
 ; NUL-terminated path staging for kern_fs_open (x816.asm). The kernel folds
 ; case itself (runtime/fat32.c does the 8.3 uppercase), so the name is
@@ -54,26 +59,37 @@ fs_cache !fill 128, 0
 fs_ccnt !byte 0             ; bytes in the cache
 fs_cpos !byte 0             ; next byte to serve
 
-; fs_getbyte - A = handle. Carry clear and A = byte, carry set at EOF.
-; Preserves X and Y (the shims it calls do too).
+; fs_getbyte - A = handle (low byte used). Returns carry clear and the
+; byte zero-extended in A, or carry set at EOF. Preserves X and Y.
 fs_getbyte
     sty fs_ysave
+    sep #$20
+!as
     ldy fs_cpos
     cpy fs_ccnt
     bcc .serve
-    jsr kern_fs_fill        ; A = handle -> A = fresh count
+    rep #$20
+!al
+    jsr kern_fs_fill        ; A = handle -> A = fresh count (16-bit clean)
+    sep #$20
+!as
     sta fs_ccnt
-    ldy #0
-    sty fs_cpos
+    stz fs_cpos
     cmp #0
     bne .serve
+    rep #$20
+!al
     ldy fs_ysave
     sec
     rts
+!as
 .serve
     ldy fs_cpos
     lda fs_cache, y
     inc fs_cpos
+    rep #$20
+!al
+    and #$ff
     ldy fs_ysave
     clc
     rts
@@ -86,19 +102,34 @@ fs_ysave !byte 0
 fs_flush
     lda SOURCE_ID_LSB
     beq .fs_drop            ; keyboard: nothing cached by contract
-    bit SOURCE_ID_MSB
     bmi .fs_drop            ; evaluate
+    sep #$20
+!as
     lda fs_ccnt
     sec
     sbc fs_cpos
-    beq .fs_drop            ; nothing unconsumed
-    tay
+    beq .fs_drop_sep        ; nothing unconsumed
+    rep #$20
+!al
+    and #$ff
+    tay                     ; hmm: Y is 8-bit; count 1..128 fits
     lda SOURCE_ID_LSB
     jsr kern_fs_seekback
+    sep #$20
+!as
+.fs_drop_sep
+    stz fs_ccnt
+    stz fs_cpos
+    rep #$20
+!al
+    rts
 .fs_drop
-    lda #0
-    sta fs_ccnt
-    sta fs_cpos
+    sep #$20
+!as
+    stz fs_ccnt
+    stz fs_cpos
+    rep #$20
+!al
     rts
 
     +BACKLINK "included", 8
@@ -106,31 +137,39 @@ INCLUDED ; ( addr u -- ) interpret a file as source
     ; Copy the name out of the parameter stack before anything moves it.
     lda LSB, x
     sta W2                  ; length
-    lda LSB+1, x
+    lda LSB+2, x
     sta W
-    lda MSB+1, x
-    sta W+1                 ; W = name
+    lda MSB+2, x
+    sta W+2                 ; W = name, flat
+    inx
+    inx
     inx
     inx
 
-    ldy W2
+    ldy W2                  ; 8-bit Y: names are short
     cpy #65
     bcc +
     ldy #64                 ; clamp - kernel paths are shorter anyway
-+   lda #0
++   sep #$20
+!as
+    lda #0
     sta fs_name, y          ; terminator
 -   dey
     bmi +
-    lda (W), y
+    lda [W], y
     sta fs_name, y
-    jmp -
-+
+    bra -
++   rep #$20
+!al
+
     jsr PUSH_INPUT_SOURCE
 
     ; TIB bookkeeping, upstream's shape: nested include lines stack upward
     ; in the TIB region so the parent's unconsumed text is not clobbered.
-    lda TIB_PTR+1
-    cmp #>TIB
+    ; (16-bit pointer math - the stage-A low-byte-only carry trap is gone.)
+    lda TIB_PTR
+    and #$fe00
+    cmp #TIB & $fe00
     bne .reset_tib_ptr
     lda TO_IN_W
     cmp TIB_SIZE
@@ -139,12 +178,10 @@ INCLUDED ; ( addr u -- ) interpret a file as source
     clc
     adc TIB_PTR
     sta TIB_PTR
-    jmp .open
+    bra .open
 .reset_tib_ptr
-    lda #<TIB
+    lda #TIB
     sta TIB_PTR
-    lda #>TIB
-    sta TIB_PTR+1
 
 .open
     jsr kern_fs_open
@@ -157,9 +194,12 @@ INCLUDED ; ( addr u -- ) interpret a file as source
     jmp throw_a
 +
     sta SOURCE_ID_LSB
-    lda #0
-    sta SOURCE_ID_MSB
-    sta fs_ccnt             ; a fresh file starts with an empty cache,
-    sta fs_cpos             ; whatever an aborted include left behind
+    stz SOURCE_ID_MSB
+    sep #$20
+!as
+    stz fs_ccnt             ; a fresh file starts with an empty cache,
+    stz fs_cpos             ; whatever an aborted include left behind
+    rep #$20
+!al
 
     jmp interpret_and_close

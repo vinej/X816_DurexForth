@@ -9,7 +9,7 @@ here to (includes) , , included ;
 
 : required ( addr u -- )
 2dup hash (includes) begin ?dup while
-2dup 2+ @ = if 2drop 2drop exit then
+2dup 4 + @ = if 2drop 2drop exit then
 @ repeat drop included ;
 
 : require parse-name required ;

@@ -5,8 +5,8 @@
 0 constant false
 
 : environment? 2drop 0 ;
-: cells 2* ;
-: cell+ 2+ ;
+: cells 4 * ; \ stage B: a cell is 32 bits
+: cell+ 4 + ;
 : char+ 1+ ;
 : chars ; : align ; : aligned ;
 

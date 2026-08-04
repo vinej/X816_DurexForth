@@ -13,3 +13,14 @@ Comparisons return TRUE (-1, all bits set) or FALSE (0).
 [x] U< ( u1 u2 -- flag ) - unsigned less-than.
 [x] U> ( u1 u2 -- flag ) - unsigned greater-than.
 [x] WITHIN ( n lo hi -- flag ) - is lo <= n < hi? 5 0 10 WITHIN  ->  -1
+
+--- more ---
+[ ] 0<= ( n -- flag ) - negative? -3 0<=  ->  -1
+[ ] 0>= ( n -- flag ) - positive?
+[ ] <= ( n1 n2 -- flag ) - signed less-than. 3 9 <=  ->  -1
+[ ] >= ( n1 n2 -- flag ) - signed greater-than.
+
+[ ] U<= ( u1 u2 -- flag ) - unsigned less-than or equal
+[ ] U>= ( u1 u2 -- flag ) - unsigned greater-than ro equal
+[ ] U<> ( u1 u2 -- flag ) - unsigned different
+[ ] U=  ( u1 u2 -- flag ) - unsigned equial

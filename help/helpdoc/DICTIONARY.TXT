@@ -33,3 +33,7 @@ MARKER, ...) are explained with examples in the [advanced
 [x] NAME>STRING ( nt -- caddr u ) - the text of a name token.
 [x] FIND-NAME ( caddr u -- nt | 0 ) - look up a name, returning its name token.
 [x] >XT ( nt -- xt ) - execution token from a name token.
+--- X816 stage B ---
+[x] W, ( x -- ) - compile the low 16 bits of x (jsr targets, branch operands:
+    the code generator's unit; plain , compiles a 4-byte cell).
+[x] W! ( x addr -- ) - store the low 16 bits of x at addr.

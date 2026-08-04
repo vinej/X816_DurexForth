@@ -10,7 +10,8 @@ T{ 12. -> 12 0 }T
 T{ -12. -> -12 -1 }T
 T{ 0. -> 0 0 }T
 T{ -1. -> -1 -1 }T
-T{ 65536. -> 0 1 }T                       \ 32-bit accumulation
+T{ 65536. -> 65536 0 }T                   \ fits the low cell now
+T{ 4294967296. -> 0 1 }T                  \ 64-bit accumulation
 T{ hex ff. decimal -> 255 0 }T            \ respects BASE
 T{ hex -ff. decimal -> -255 -1 }T
 : dl123 123. ;

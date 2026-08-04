@@ -1,38 +1,51 @@
 ; DROP SWAP DUP ?DUP NIP OVER 2DUP 1+ 1- + = 0= AND ! @ C! C@ COUNT < > MAX MIN
 ; TUCK >R R> R@ BL PICK DEPTH WITHIN ERASE FILL BASE 2* ROT +! SPLIT
+;
+; Stage B: 32-bit cells in two WORD planes (durexforth.asm header). Every
+; word here is entered and left with M=0/X=1. The stage-A byte tricks that
+; used Y as a temporary are gone - Y is 8-bit, so word swaps go through
+; pha/pla instead. @/! and friends dereference [W] long: cells carry flat
+; 24-bit addresses, and a cell in memory is 4 bytes little-endian.
 
     +BACKLINK "drop", 4 | F_IMMEDIATE
 DROP
     lda STATE
     bne +
     inx
+    inx
     rts
 +   lda #OP_INX
-compile_a
-    dex
-    sta LSB, x
+    jsr compile_a
+    lda #OP_INX
+compile_a ; compile the byte in A (falls through on the tail call)
+    jsr PUSHA
     jmp CCOMMA
 
     +BACKLINK "swap", 4
 SWAP
-    ldy	MSB, x
-    lda	MSB + 1, x
+    lda MSB, x
+    pha
+    lda MSB + 2, x
     sta MSB, x
-    sty	MSB + 1, x
+    pla
+    sta MSB + 2, x
 
-    ldy	LSB, x
-    lda	LSB + 1, x
+    lda LSB, x
+    pha
+    lda LSB + 2, x
     sta LSB, x
-    sty	LSB + 1, x
+    pla
+    sta LSB + 2, x
     rts
 
     +BACKLINK "dup", 3
 DUP
     dex
-    lda	MSB + 1, x
-    sta	MSB, x
-    lda	LSB + 1, x
-    sta	LSB, x
+    dex
+    lda MSB + 2, x
+    sta MSB, x
+    lda LSB + 2, x
+    sta LSB, x
     rts
 
     +BACKLINK "?dup", 4
@@ -46,15 +59,17 @@ QDUP
 NIP ; ( a b -- b )
     jsr SWAP
     inx
+    inx
     rts
 
     +BACKLINK "over", 4
 OVER
     dex
-    lda	MSB + 2, x
-    sta	MSB, x
-    lda	LSB + 2, x
-    sta	LSB, x
+    dex
+    lda MSB + 4, x
+    sta MSB, x
+    lda LSB + 4, x
+    sta LSB, x
     rts
 
     +BACKLINK "2dup", 4
@@ -79,55 +94,59 @@ ONEMINUS
 
     +BACKLINK "+", 1
 PLUS
-    lda	LSB, x
+    lda LSB, x
     clc
-    adc LSB + 1, x
-    sta	LSB + 1, x
+    adc LSB + 2, x
+    sta LSB + 2, x
 
-    lda	MSB, x
-    adc MSB + 1, x
-    sta MSB + 1, x
+    lda MSB, x
+    adc MSB + 2, x
+    sta MSB + 2, x
 
+    inx
     inx
     rts
 
     +BACKLINK "=", 1
 EQUAL
-    ldy #0
-    lda	LSB, x
-    cmp	LSB + 1, x
-    bne	+
-    lda	MSB, x
-    cmp	MSB + 1, x
-    bne	+
-    dey
-+   inx
-    sty MSB, x
-    sty	LSB, x
+    lda LSB, x
+    cmp LSB + 2, x
+    bne +
+    lda MSB, x
+    cmp MSB + 2, x
+    bne +
+    lda #$ffff
+    bra ++
++   lda #0
+++  inx
+    inx
+    sta MSB, x
+    sta LSB, x
     rts
 
 ; 0=
     +BACKLINK "0=", 2
 ZEQU
-    ldy #0
     lda LSB, x
-    bne +
-    lda MSB, x
-    bne +
-    dey
-+   sty MSB, x
-    sty LSB, x
+    ora MSB, x
+    beq +
+    lda #0
+    bra ++
++   lda #$ffff
+++  sta MSB, x
+    sta LSB, x
     rts
 
     +BACKLINK "and", 3
-    lda	MSB, x
-    and MSB + 1, x
-    sta MSB + 1, x
+    lda MSB, x
+    and MSB + 2, x
+    sta MSB + 2, x
 
-    lda	LSB, x
-    and LSB + 1, x
-    sta LSB + 1, x
+    lda LSB, x
+    and LSB + 2, x
+    sta LSB + 2, x
 
+    inx
     inx
     rts
 
@@ -136,54 +155,66 @@ STORE
     lda LSB, x
     sta W
     lda MSB, x
-    sta W + 1
+    sta W + 2 ; bank byte (bits 24-31 land in the pad, [W] ignores them)
 
-    ldy #0
-    lda	LSB+1, x
-    sta (W), y
-    iny
-    lda	MSB+1, x
-    sta	(W), y
+    lda LSB + 2, x
+    sta [W]
+    ldy #2
+    lda MSB + 2, x
+    sta [W], y
 
+    inx
+    inx
     inx
     inx
     rts
 
     +BACKLINK "@", 1
 FETCH
-    lda LSB,x
+    lda LSB, x
     sta W
-    lda MSB,x
-    sta W+1
+    lda MSB, x
+    sta W + 2
 
-    ldy #0
-    lda	(W),y
-    sta LSB,x
-    iny
-    lda	(W),y
-    sta MSB,x
+    lda [W]
+    sta LSB, x
+    ldy #2
+    lda [W], y
+    sta MSB, x
     rts
 
     +BACKLINK "c!", 2
 STOREBYTE
-    ldy LSB,x
-    lda MSB,x
-    sta + + 2
-    lda	LSB+1,x
-+   sta PLACEHOLDER_ADDRESS,y ; replaced with addr
+    lda LSB, x
+    sta W
+    lda MSB, x
+    sta W + 2
+    sep #$20
+!as
+    lda LSB + 2, x
+    sta [W]
+    rep #$20
+!al
+    inx
+    inx
     inx
     inx
     rts
 
     +BACKLINK "c@", 2
 FETCHBYTE
-    ldy LSB,x
-    lda MSB,x
-    sta + + 2
-+   lda PLACEHOLDER_ADDRESS,y ; replaced with addr
-    sta LSB,x
-    lda #0
-    sta MSB,x
+    lda LSB, x
+    sta W
+    lda MSB, x
+    sta W + 2
+    sep #$20
+!as
+    lda [W]
+    rep #$20
+!al
+    and #$ff
+    sta LSB, x
+    stz MSB, x
     rts
 
     +BACKLINK "count", 5
@@ -195,19 +226,21 @@ COUNT
 
     +BACKLINK "<", 1
 LESS_THAN
-    ldy #0
     sec
-    lda LSB+1,x
-    sbc LSB,x
-    lda MSB+1,x
-    sbc MSB,x
+    lda LSB + 2, x
+    sbc LSB, x
+    lda MSB + 2, x
+    sbc MSB, x
     bvc +
-    eor #$80
+    eor #$8000
 +   bpl +
-    dey
-+   inx
-    sty LSB,x
-    sty MSB,x
+    lda #$ffff
+    bra ++
++   lda #0
+++  inx
+    inx
+    sta LSB, x
+    sta MSB, x
     rts
 
     +BACKLINK ">", 1
@@ -223,6 +256,7 @@ MAX
     !word +
     jsr SWAP
 +   inx
+    inx
     rts
 
     +BACKLINK "min", 3
@@ -233,6 +267,7 @@ MIN
     !word +
     jsr SWAP
 +   inx
+    inx
     rts
 
     +BACKLINK "tuck", 4
@@ -241,20 +276,19 @@ TUCK ; ( x y -- y x y )
     jmp OVER
 
     ; Exempt from TCE as top of return stack must contain a return address.
+    ; M=0 makes the return-address juggling one pull: pla is 16-bit. A cell
+    ; on the return stack is TWO words, high word pushed first (so the low
+    ; word is at the lower address, like a cell in memory).
     +BACKLINK ">r", 2 | F_NO_TAIL_CALL_ELIMINATION
 TO_R
     pla
+    inc
     sta W
-    pla
-    sta W+1
-    inc W
-    bne +
-    inc W+1
-+
-    lda MSB,x
+    lda MSB, x
     pha
-    lda LSB,x
+    lda LSB, x
     pha
+    inx
     inx
     jmp (W)
 
@@ -262,31 +296,27 @@ TO_R
     +BACKLINK "r>", 2 | F_NO_TAIL_CALL_ELIMINATION
 R_TO
     pla
+    inc
     sta W
-    pla
-    sta W+1
-    inc W
-    bne +
-    inc W+1
-+
+    dex
     dex
     pla
-    sta LSB,x
+    sta LSB, x
     pla
-    sta MSB,x
+    sta MSB, x
     jmp (W)
 
     ; Exempt from TCE as top of return stack must contain a return address.
-    ; X816: stack-relative addressing replaces the tsx / $103,x dance -
-    ; lda n,s always reads bank $00, independent of DBR, and the cell sits
-    ; above this word's own return address (1,s/2,s).
+    ; X816: stack-relative addressing - the cell sits above this word's own
+    ; return address (1,s..2,s): low word at 3,s, high word at 5,s.
     +BACKLINK "r@", 2 | F_NO_TAIL_CALL_ELIMINATION
 R_FETCH
     dex
-    lda 3,s
-    sta LSB,x
-    lda 4,s
-    sta MSB,x
+    dex
+    lda 3, s
+    sta LSB, x
+    lda 5, s
+    sta MSB, x
     rts
 
     +BACKLINK "bl", 2
@@ -294,32 +324,41 @@ BL
     +VALUE	K_SPACE
 
     +BACKLINK "pick", 4
+    ; ( xu .. x0 u -- xu .. x0 xu ) - replace u (the top slot) with xu.
+    stx W3
+    lda LSB, x
+    asl ; u * 2 = plane offset
+    sep #$20
+!as
+    sta W
     txa
-    sta + + 1
     clc
-    adc LSB,x
-    tax
-    inx
-    lda LSB,x
-    ldy MSB,x
-+   ldx #0
-    sta LSB,x
-    sty MSB,x
+    adc W
+    tax ; X indexes u's slot as if the stack topped at xu's cell
+    rep #$20
+!al
+    lda LSB + 2, x
+    pha
+    lda MSB + 2, x
+    ldx W3
+    sta MSB, x
+    pla
+    sta LSB, x
     rts
 
     +BACKLINK "depth", 5
-    ; depth = X_INIT - X (the empty sentinel is no longer 0 - see
-    ; durexforth.asm on the 65816 direct-page wrap)
+    ; depth = (X_INIT - X) / 2 - X steps by two per cell now
+    sep #$20
+!as
     txa
     eor #$ff
     clc
-    adc #X_INIT+1
-    tay
-    dex
-    sty LSB,x
-    lda #0
-    sta MSB,x
-    rts
+    adc #X_INIT + 1
+    lsr
+    rep #$20
+!al
+    and #$ff
+    jmp PUSHA
 
     +BACKLINK "within", 6
 WITHIN ; ( test low high -- flag )
@@ -332,49 +371,58 @@ WITHIN ; ( test low high -- flag )
 
 ; ERASE ( start len -- )
     +BACKLINK "erase", 5
-    ldy #0
-    jmp FILL_Y
+    jsr ZERO
+    ; falls into FILL
 
 ; FILL ( start len char -- )
     +BACKLINK "fill", 4
 FILL
-    lda	LSB, x
-    tay
-    inx
-FILL_Y
-    lda	LSB + 1, x
-    sta	.fdst
-    lda	MSB + 1, x
-    sta	.fdst + 1
-    lda	LSB, x
-    eor	#$ff
-    sta	W
-    lda	MSB, x
-    eor	#$ff
-    sta	W + 1
-    inx
-    inx
--
-    inc	W
-    bne	+
-    inc	W + 1
-    bne	+
-    rts
-+
-.fdst = * + 1
-    sty	PLACEHOLDER_ADDRESS ; replaced with start
-
-    ; advance
-    inc	.fdst
-    bne	-
-    inc	.fdst + 1
-    jmp	-
+    sep #$20
+!as
+    lda LSB, x ; char
+    sta W3
+    rep #$20
+!al
+    lda LSB + 2, x ; len, 32-bit
+    sta W2
+    lda MSB + 2, x
+    sta W2 + 2
+    lda LSB + 4, x ; start, flat
+    sta W
+    lda MSB + 4, x
+    sta W + 2
+    sep #$20
+!as
+    txa ; drop all three cells
+    clc
+    adc #6
+    tax
+    rep #$20
+!al
+-   lda W2
+    ora W2 + 2
+    beq +
+    sep #$20
+!as
+    lda W3
+    sta [W]
+    rep #$20
+!al
+    inc W
+    bne ++
+    inc W + 2
+++  lda W2
+    bne +++
+    dec W2 + 2
++++ dec W2
+    bra -
++   rts
 
     +BACKLINK "base", 4
 BASE
-    +VALUE	_BASE
+    +VALUE	BANK1 + _BASE
 _BASE
-    !word 16
+    !word 16, 0
 
     +BACKLINK "2*", 2
     asl LSB, x
@@ -383,44 +431,49 @@ _BASE
 
     +BACKLINK "rot", 3 ; ( a b c -- b c a )
 ROT
-    ldy MSB+2, x
-    lda MSB+1, x
-    sta MSB+2, x
-    lda MSB  , x
-    sta MSB+1, x
-    sty MSB  , x
-    ldy LSB+2, x
-    lda LSB+1, x
-    sta LSB+2, x
-    lda LSB  , x
-    sta LSB+1, x
-    sty LSB  , x
+    lda MSB + 4, x
+    pha
+    lda MSB + 2, x
+    sta MSB + 4, x
+    lda MSB, x
+    sta MSB + 2, x
+    pla
+    sta MSB, x
+    lda LSB + 4, x
+    pha
+    lda LSB + 2, x
+    sta LSB + 4, x
+    lda LSB, x
+    sta LSB + 2, x
+    pla
+    sta LSB, x
     rts
 
     +BACKLINK "+!", 2 ; ( num addr -- )
 PLUS_STORE
-    lda LSB,x
+    lda LSB, x
     sta W
-    lda MSB,x
-    sta W+1
-    ldy #0
+    lda MSB, x
+    sta W + 2
     clc
-    lda (W),y
-    adc LSB+1,x
-    sta (W),y
-    iny
-    lda (W),y
-    adc MSB+1,x
-    sta (W),y
+    lda [W]
+    adc LSB + 2, x
+    sta [W]
+    ldy #2
+    lda [W], y
+    adc MSB + 2, x
+    sta [W], y
+    inx
+    inx
     inx
     inx
     rts
 
-    +BACKLINK "split", 5 ; ( n -- lsb msb )
-    lda MSB,x
-    sta LSB-1,x
-    lda #0
-    sta MSB,x
-    sta MSB-1,x
+    +BACKLINK "split", 5 ; ( n -- low16 high16 )
+    lda MSB, x
+    sta LSB - 2, x
+    stz MSB, x
+    stz MSB - 2, x
+    dex
     dex
     rts

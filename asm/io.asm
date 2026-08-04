@@ -1,8 +1,14 @@
 ; EMIT PAGE RVS CR TYPE KEY? KEY REFILL SOURCE SOURCE-ID >IN CHAR IOABORT
+;
+; Stage B: TIB_PTR / TIB_SIZE / TO_IN_W / the evaluate-string cursor are
+; 16-bit words, bank-1-implicit (interpreter.asm's note: every input
+; buffer lives in this bank). Byte work - reading characters, filling the
+; TIB - runs in sep #$20 windows; everything at a word boundary is M=0.
 
     +BACKLINK "emit", 4
 EMIT
     lda	LSB, x
+    inx
     inx
     jmp	PUTCHR
 
@@ -26,18 +32,16 @@ TYPE ; ( caddr u -- )
     ; Guard: TYPE needs two cells. A bare TYPE, or "12 TYPE", would spray
     ; garbage-length memory to the screen before the interpreter's
     ; post-word underflow check could fire; refuse up front instead.
-    ; (Content can't be validated - Forth is untyped - only the depth.
-    ; X = X_INIT is empty, X_INIT-1 has one item; deeper wraps below.)
-    cpx #X_INIT
-    beq .type_underflow
-    cpx #X_INIT-1
-    bne +
-.type_underflow
+    ; (X = X_INIT is empty, X_INIT-2 holds one cell.)
+    cpx #X_INIT-2
+    bcc +
     lda #-4 ; throws "stack" (stack underflow)
     jmp throw_a
 -   lda LSB,x
     ora MSB,x
     bne +
+    inx
+    inx
     inx
     inx
     rts
@@ -55,9 +59,13 @@ TYPE ; ( caddr u -- )
     sta .key_pending
     beq +
 .pushtrue
-    lda #$ff
-+   tay
-    jmp pushya
+    lda #$ffff
+    dex
+    dex
+    sta LSB, x
+    sta MSB, x
+    rts
++   jmp PUSHA ; A = 0: false
 
     +BACKLINK "key", 3
     lda .key_pending
@@ -65,40 +73,37 @@ TYPE ; ( caddr u -- )
 -   jsr kern_getin
     cmp #0
     beq -
-+   ldy #0
-    sty .key_pending
-    ldy #0
-    jmp pushya
++   stz .key_pending
+    jmp PUSHA
 
 .key_pending
-    !byte 0
+    !word 0
 
 CLOSE_INPUT_SOURCE
     ; X816: SOURCE_ID above zero is a kernel file handle - close it, then
     ; pop the input state. There is no channel to re-select afterwards:
     ; REFILL reads whatever handle SOURCE_ID holds. The read-ahead cache
     ; belongs to the closing file, so it is discarded, not seeked back.
-    stx W
-    lda #0
-    sta fs_ccnt
-    sta fs_cpos
+    stx W3
+    sep #$20
+!as
+    stz fs_ccnt
+    stz fs_cpos
+    rep #$20
+!al
     lda SOURCE_ID_LSB
     beq +                   ; 0 = keyboard
-    bit SOURCE_ID_MSB
     bmi +                   ; -1 = evaluate
     jsr kern_fs_close
 +   jsr POP_INPUT_SOURCE
-    ldx W
+    ldx W3
     rts
 
     +BACKLINK "refill", 6
 REFILL ; ( -- flag )
 
-    ldy #0
-    sty TO_IN_W
-    sty TO_IN_W + 1
-    sty TIB_SIZE
-    sty TIB_SIZE + 1
+    stz TO_IN_W
+    stz TIB_SIZE
 
     lda SOURCE_ID_LSB
     bmi .getLineFromEvaluateString
@@ -109,7 +114,6 @@ REFILL ; ( -- flag )
     ; kernel console and edit the line here. CON_PUTC interprets $08 as
     ; backspace, so echoing the key IS the screen edit.
 
-    stx W          ; save forth stack pointer
     ldy #0         ; TIB index (kern_getc/PUTCHR preserve X and Y)
 -   jsr kern_getc
     cmp #$d
@@ -118,39 +122,44 @@ REFILL ; ( -- flag )
     beq .backspace
     cpy #$58       ; line-length limit
     beq -
+    sep #$20
+!as
     sta TIB,y
+    rep #$20
+!al
     jsr PUTCHR     ; echo
     iny
-    jmp -
+    bra -
 .backspace
     cpy #0
     beq -
     dey
     jsr PUTCHR     ; echo the $08: the console steps back and blanks
-    jmp -
+    bra -
 .gotReturn
     ; Set TIB_SIZE to number of chars fetched.
+    sep #$20
+!as
     sty TIB_SIZE
+    rep #$20
+!al
     jsr PUTCHR
-    ldx W
 .return_true
     dex
-    lda #$ff
+    dex
+    lda #$ffff
     sta LSB,x
     sta MSB,x
     rts
 
 .getLineFromDisk
     ; X816: SOURCE_ID is a kernel file handle; read it a byte at a time
-    ; through kern_fs_getbyte (which preserves X and Y). NUL, $0D and $0A
-    ; all end a line - a CR-LF file just yields a harmless empty line, and
-    ; mkcard-era $00 $00 headers read as blanks, exactly as upstream.
+    ; through fs_getbyte (which preserves X and Y). NUL, $0D and $0A
+    ; all end a line - a CR-LF file just yields a harmless empty line.
     lda TIB_PTR
     sta W
-    lda TIB_PTR + 1
-    sta W+1
 -   lda SOURCE_ID_LSB
-    jsr fs_getbyte
+    jsr fs_getbyte ; byte in A (16-bit clean), carry set at EOF
     bcs .disk_eof
     ora #0
     beq .return_true
@@ -159,9 +168,13 @@ REFILL ; ( -- flag )
     cmp #$0a
     beq .return_true
     ldy TIB_SIZE
+    sep #$20
+!as
     sta (W),y
+    rep #$20
+!al
     inc TIB_SIZE
-    jmp -
+    bra -
 .disk_eof
     ; End of file: deliver a final unterminated line if one accumulated,
     ; else report the source exhausted.
@@ -170,87 +183,73 @@ REFILL ; ( -- flag )
 
 .return_false
     dex
-    lda #0
-    sta MSB,x
-    sta LSB,x
+    dex
+    stz MSB,x
+    stz LSB,x
     rts
 
 .getLineFromEvaluateString
-    lda EVALUATE_STRING_SIZE_LSB
-    ora EVALUATE_STRING_SIZE_MSB
+    lda EVALUATE_STRING_SIZE
     beq .return_false
 
-EVALUATE_STRING_PTR_LSB = * + 1
-    lda #0
+    lda EVALUATE_STRING_PTR
     sta TIB_PTR
-EVALUATE_STRING_PTR_MSB = * + 1
-    lda #0
-    sta TIB_PTR + 1
-
-.grow_tib_to_end_of_line
-    lda EVALUATE_STRING_PTR_LSB
-    sta + + 1
-    lda EVALUATE_STRING_PTR_MSB
-    sta + + 2
-+   lda PLACEHOLDER_ADDRESS
-    tay
-
-    inc EVALUATE_STRING_PTR_LSB
-    bne +
-    inc EVALUATE_STRING_PTR_MSB
-+
-    lda EVALUATE_STRING_SIZE_LSB
-    bne +
-    dec EVALUATE_STRING_SIZE_MSB
-+   dec EVALUATE_STRING_SIZE_LSB
-
-    tya
+    sta W
+-   lda EVALUATE_STRING_SIZE
+    beq .eval_line_done
+    sep #$20
+!as
+    lda (W)
+    rep #$20
+!al
+    and #$ff
     cmp #$d
-    beq .return_true
-
+    beq .eval_cr
+    inc W
     inc TIB_SIZE
-    bne +
-    inc TIB_SIZE + 1
-+
-EVALUATE_STRING_SIZE_LSB = * + 1
-    lda #0
-EVALUATE_STRING_SIZE_MSB = * + 1
-    ora #0
-    bne .grow_tib_to_end_of_line
+    dec EVALUATE_STRING_SIZE
+    bra -
+.eval_cr
+    inc W ; consume the CR; it is not part of the line
+    dec EVALUATE_STRING_SIZE
+.eval_line_done
+    lda W
+    sta EVALUATE_STRING_PTR
     jmp .return_true
 
+EVALUATE_STRING_PTR
+    !word 0
+EVALUATE_STRING_SIZE
+    !word 0
 
     +BACKLINK "source", 6
 SOURCE
     dex
     dex
+    dex
+    dex
     lda TIB_PTR
-    sta LSB+1, x
-    lda TIB_PTR + 1
-    sta MSB+1, x
+    sta LSB+2, x
+    lda #(BANK1 >> 16)
+    sta MSB+2, x
     lda TIB_SIZE
     sta LSB, x
-    lda TIB_SIZE + 1
-    sta MSB, x
+    stz MSB, x
     rts
 
 TIB_PTR
     !word 0
 TIB_SIZE
-    !word 0
+    !word 0, 0 ; padded to a cell: #tib hands this address to @
 
     +BACKLINK "#tib", 4
     ; ( -- addr ) the cell holding the number of characters in TIB
-    dex
-    lda #<TIB_SIZE
-    sta LSB, x
-    lda #>TIB_SIZE
-    sta MSB, x
-    rts
+    lda #TIB_SIZE
+    jmp pushbank1
 
     +BACKLINK "source-id", 9
-SOURCE_ID_LSB = * + 1
-SOURCE_ID_MSB = * + 3
+SOURCE_ID_LSB = * + 3
+SOURCE_ID_MSB = * + 8
     ; -1 : string (via evaluate)
     ; 0 : keyboard
     ; 1+ : file id
@@ -258,44 +257,45 @@ SOURCE_ID_MSB = * + 3
 
     +BACKLINK ">in", 3
 TO_IN
-    +VALUE TO_IN_W
+    +VALUE BANK1 + TO_IN_W
 TO_IN_W
-    !word 0
+    !word 0, 0 ; padded to a cell: >IN is fetched and stored with @/!
 
     +BACKLINK "char", 4
 CHAR ; ( name -- char )
     jsr PARSE_NAME
+    inx
     inx
     jmp FETCHBYTE
 
 SAVE_INPUT_STACK
     ; Forth standard 11.3.3 "Input Source":
     ; "Input [...] shall be nestable in any order to at least eight levels."
-    ; X816: SIXTEEN levels, not the C64's eight, and the overflow is
-    ; CHECKED. The suite runs five levels deep before a single test runs
-    ; (keyboard > base > autorun > test > suite), and testcore's nested
-    ; EVALUATE tests stack more - upstream's ninth push landed on the
-    ; depth byte just past the array, and every pop after that was
-    ; misaligned: SOURCE_ID came back garbage and the interpreter fell
-    ; silently back to the keyboard mid-suite.
-    !fill 16*12
+    ; X816: SIXTEEN levels, and the overflow is CHECKED (the ninth push on
+    ; the C64 corrupted the depth byte; see stage A's history). Seven
+    ; 16-bit words per level.
+    !fill 16*14
 SAVE_INPUT_STACK_DEPTH
     !byte 0
 
-push_input_stack
+push_input_stack ; A(16) -> the save stack
     ldy SAVE_INPUT_STACK_DEPTH
-    cpy #16*12
+    cpy #16*14
     bcs .input_stack_overflow
     sta SAVE_INPUT_STACK, y
-    inc SAVE_INPUT_STACK_DEPTH
+    iny
+    iny
+    sty SAVE_INPUT_STACK_DEPTH
     rts
 .input_stack_overflow
     lda #-8 ; dictionary/structure overflow - loud, never silent corruption
     jmp throw_a
 
-pop_input_stack
-    dec SAVE_INPUT_STACK_DEPTH
+pop_input_stack ; -> A(16)
     ldy SAVE_INPUT_STACK_DEPTH
+    dey
+    dey
+    sty SAVE_INPUT_STACK_DEPTH
     lda SAVE_INPUT_STACK, y
     rts
 
@@ -305,52 +305,32 @@ PUSH_INPUT_SOURCE
     jsr fs_flush
     lda TO_IN_W
     jsr push_input_stack
-    lda TO_IN_W+1
-    jsr push_input_stack
     lda SOURCE_ID_LSB
     jsr push_input_stack
-    lda SOURCE_ID_MSB
+    lda SOURCE_ID_MSB ; only the low byte is meaningful
     jsr push_input_stack
     lda TIB_PTR
     jsr push_input_stack
-    lda TIB_PTR+1
-    jsr push_input_stack
     lda TIB_SIZE
     jsr push_input_stack
-    lda TIB_SIZE+1
+    lda EVALUATE_STRING_PTR
     jsr push_input_stack
-    lda EVALUATE_STRING_PTR_LSB
-    jsr push_input_stack
-    lda EVALUATE_STRING_PTR_MSB
-    jsr push_input_stack
-    lda EVALUATE_STRING_SIZE_LSB
-    jsr push_input_stack
-    lda EVALUATE_STRING_SIZE_MSB
+    lda EVALUATE_STRING_SIZE
     jmp push_input_stack
 
 POP_INPUT_SOURCE
     jsr pop_input_stack
-    sta EVALUATE_STRING_SIZE_MSB
+    sta EVALUATE_STRING_SIZE
     jsr pop_input_stack
-    sta EVALUATE_STRING_SIZE_LSB
-    jsr pop_input_stack
-    sta EVALUATE_STRING_PTR_MSB
-    jsr pop_input_stack
-    sta EVALUATE_STRING_PTR_LSB
-    jsr pop_input_stack
-    sta TIB_SIZE+1
+    sta EVALUATE_STRING_PTR
     jsr pop_input_stack
     sta TIB_SIZE
-    jsr pop_input_stack
-    sta TIB_PTR+1
     jsr pop_input_stack
     sta TIB_PTR
     jsr pop_input_stack
     sta SOURCE_ID_MSB
     jsr pop_input_stack
     sta SOURCE_ID_LSB
-    jsr pop_input_stack
-    sta TO_IN_W+1
     jsr pop_input_stack
     sta TO_IN_W
     rts
@@ -362,27 +342,35 @@ POP_INPUT_SOURCE
     +BACKLINK "ioabort", 7
 IOABORT ; ( ioresult -- )
     inx
-    lda MSB-1,x
+    inx
+    lda MSB-2,x
     bne .print_ioerr
-    lda LSB-1,x
+    lda LSB-2,x
     bne .print_ioerr
     rts
 
 .print_ioerr
-    lda #<.ioerr
+    lda #.ioerr
     sta W
-    lda #>.ioerr
-    sta W+1
 
     jsr RVS
 
     ldy #0
--   lda (W),y
+-   sep #$20
+!as
+    lda (W),y
     pha
     and #$7f
+    rep #$20
+!al
+    and #$ff
     jsr PUTCHR
     iny
+    sep #$20
+!as
     pla
+    rep #$20
+!al
     bpl -
 
     lda #-37 ; file i/o exception

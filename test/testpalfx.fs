@@ -15,10 +15,11 @@ T{ 5 dcsel $9f25 ioc@ -> 10 }T
 0 dcsel
 
 cr .( testpalfx: FX-MULT ) cr
-T{ 1000 1000 fx-mult -> 16960 15 }T      \ 1,000,000
-T{ 3 4 fx-mult -> 12 0 }T
-T{ -1 2 fx-mult -> -2 -1 }T              \ signed: -2 = $fffffffe
-T{ 3 4 fx* -> 12 0 }T                     \ fx* alias
+\ Stage B: the 32-bit product is ONE cell.
+T{ 1000 1000 fx-mult -> 1000000 }T
+T{ 3 4 fx-mult -> 12 }T
+T{ -1 2 fx-mult -> -2 }T                 \ signed
+T{ 3 4 fx* -> 12 }T                       \ fx* alias
 
 cr .( testpalfx: FX-FILL / FX-CLEAR ) cr
 \ scratch VRAM at bank0 $8000 (unused in 80x60 text mode)
