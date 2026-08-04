@@ -19,15 +19,15 @@ Built-in native words:
       FX-DCSEL: not a separate word - use DCSEL ( n -- ) to pick the FX register bank.
 
 Affine helper (rotozoom / mode-7) - in the ADVGFX module (NEEDS ADVGFX):
-[x]   AFFINE-ON   ( tbank taddr mbank maddr size clip -- )
+[ ]   AFFINE-ON   ( tbank taddr mbank maddr size clip -- )
       describe the texture: 8-bpp tile data + an 8x8-texel tile map (both
       VRAM, 2 KB aligned); size 0=2x2 1=8x8 2=32x32 3=128x128 tiles;
       clip 0 = wrap at the edges.
-[x]   AFFINE-RAY  ( x y dx dy -- )   aim the sampler: start texel 0-1023,
+[ ]   AFFINE-RAY  ( x y dx dy -- )   aim the sampler: start texel 0-1023,
       signed step per read in 1/512 texels (512 = one texel).
-[x]   AFFINE-SPAN ( n -- )           n texels DATA1 -> DATA0 (aim port 0 first)
-[x]   AFFINE-LINE ( bank addr n -- ) sample n texels to a VRAM dest, +1 step
-[x]   AFFINE-OFF  ( -- )             back to normal port-1 reads
+[ ]   AFFINE-SPAN ( n -- )           n texels DATA1 -> DATA0 (aim port 0 first)
+[ ]   AFFINE-LINE ( bank addr n -- ) sample n texels to a VRAM dest, +1 step
+[ ]   AFFINE-OFF  ( -- )             back to normal port-1 reads
 
 A rotated, zoomed scanline y is one AFFINE-RAY (dx=cos, dy=sin, scaled) +
 one AFFINE-LINE; feed SIN8/COS8 from NEEDS ADVANCED.

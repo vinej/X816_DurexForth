@@ -20,7 +20,7 @@ These are IMMEDIATE and used inside : definitions.
 [x] OF ( x y -- | x ) - selector; runs its clause to ENDOF when x = y.
 [x] ENDOF ( -- ) - end an OF clause (jump past ENDCASE).
 [x] ENDCASE ( x -- ) - end a CASE (drops the selector).
-[x] AHEAD ( -- ) - compile an unconditional forward branch (advanced).
+[ ] AHEAD ( -- ) - compile an unconditional forward branch (advanced).
 [x] RECURSE ( -- ) - call the definition currently being compiled.
 [x] EXIT ( -- ) - return from the current word.
 [x] EXECUTE ( xt -- ) - call the word given by its xt. ' CR EXECUTE

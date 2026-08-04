@@ -15,7 +15,7 @@ VERA layer configuration (either layer 0 or 1):
 [x]   TILEBASE   ( layer bank addr -- )  set tile-data base (2 KB aligned)
 [x]   LAYER-MODE ( layer cfg -- )        write the layer config byte (map size,
                                      T256C, bitmap mode, colour depth)
-[x] TMAPSAVE ( c-addr u -- ) - save the layer-1 tilemap (self-sizing).
-[x] TMAPLOAD ( c-addr u -- ) - load the layer-1 tilemap back to its VRAM address.
-[x] TILESAVE ( c-addr u vaddr len -- ) - save len bytes of a bank-1 tileset.
-[x] TILELOAD ( c-addr u vaddr -- ) - load a tileset into bank-1 VRAM at vaddr.
+[ ] TMAPSAVE ( c-addr u -- ) - save the layer-1 tilemap (self-sizing).
+[ ] TMAPLOAD ( c-addr u -- ) - load the layer-1 tilemap back to its VRAM address.
+[ ] TILESAVE ( c-addr u vaddr len -- ) - save len bytes of a bank-1 tileset.
+[ ] TILELOAD ( c-addr u vaddr -- ) - load a tileset into bank-1 VRAM at vaddr.

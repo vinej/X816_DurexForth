@@ -5,25 +5,25 @@ Two synths: the VERA PSG (16 voices 0-15) and the YM2151 FM chip (8 channels
 For raw YM register writes see HELP AUDIOYM; for sampled sound HELP AUDIOPCM.
 
 VERA PSG:
-[x]   PSGINIT  ( -- )              reset all PSG voices
-[x]   PSGFREQ  ( freq voice -- )   set raw frequency
-[x]   PSGNOTE  ( note voice -- )   play a packed note (0 = release)
-[x]   PSGVOL   ( vol voice -- )    volume 0-63 (both channels)
-[x]   PSGWAV   ( wave voice -- )   waveform 0-3 (pulse/saw/triangle/noise)
-[x]   PSGPAN   ( pan voice -- )    stereo pan (1=left 2=right 3=both)
-[x]   PSGPLAY  ( c-addr u voice -- )   play a play-string (blocking)
-[x]   PSGCHORD ( c-addr u voice -- )   play a chord string (blocking)
+[ ]   PSGINIT  ( -- )              reset all PSG voices
+[ ]   PSGFREQ  ( freq voice -- )   set raw frequency
+[ ]   PSGNOTE  ( note voice -- )   play a packed note (0 = release)
+[ ]   PSGVOL   ( vol voice -- )    volume 0-63 (both channels)
+[ ]   PSGWAV   ( wave voice -- )   waveform 0-3 (pulse/saw/triangle/noise)
+[ ]   PSGPAN   ( pan voice -- )    stereo pan (1=left 2=right 3=both)
+[ ]   PSGPLAY  ( c-addr u voice -- )   play a play-string (blocking)
+[ ]   PSGCHORD ( c-addr u voice -- )   play a chord string (blocking)
 
 YM2151 FM:
-[x]   FMINIT   ( -- )              init the chip + load default patches
-[x]   FMINST   ( inst channel -- ) select an instrument patch 0-162
-[x]   FMVOL    ( vol channel -- )  channel volume 0-63
-[x]   FMNOTE   ( note channel -- ) play a packed note (0 = off)
-[x]   FMFREQ   ( freq channel -- ) play a raw frequency in Hz (17-4434)
-[x]   FMDRUM   ( drum channel -- ) play a drum sound (25-87)
-[x]   FMVIB    ( speed depth -- )  global vibrato (0-127)
-[x]   FMPAN    ( pan channel -- )  stereo pan (1=left 2=right 3=both)
-[x]   FMPLAY   ( c-addr u channel -- )  play a play-string (blocking)
-[x]   FMCHORD  ( c-addr u channel -- )  play a chord string (blocking)
+[ ]   FMINIT   ( -- )              init the chip + load default patches
+[ ]   FMINST   ( inst channel -- ) select an instrument patch 0-162
+[ ]   FMVOL    ( vol channel -- )  channel volume 0-63
+[ ]   FMNOTE   ( note channel -- ) play a packed note (0 = off)
+[ ]   FMFREQ   ( freq channel -- ) play a raw frequency in Hz (17-4434)
+[ ]   FMDRUM   ( drum channel -- ) play a drum sound (25-87)
+[ ]   FMVIB    ( speed depth -- )  global vibrato (0-127)
+[ ]   FMPAN    ( pan channel -- )  stereo pan (1=left 2=right 3=both)
+[ ]   FMPLAY   ( c-addr u channel -- )  play a play-string (blocking)
+[ ]   FMCHORD  ( c-addr u channel -- )  play a chord string (blocking)
 
 Example:  FMINIT  0 0 FMINST  63 0 FMVOL  S" CDEFG" 0 FMPLAY

@@ -4,41 +4,41 @@ Ported from C:\quartus\projects\x16_library (see that tree for the
 assembly originals and their names).
 
 System / IRQ (in the core - see SYSTEM)
-[x] LINE-IRQ ( xt line -- ) - run xt each frame at a raster line.
-[x] SPRCOL-IRQ ( xt -- ) / COLLISIONS - sprite-collision interrupt.
+[ ] LINE-IRQ ( xt line -- ) - run xt each frame at a raster line.
+[ ] SPRCOL-IRQ ( xt -- ) / COLLISIONS - sprite-collision interrupt.
     Register save/restore words are not needed: the core IRQ dispatcher
     saves W/W2/W3, the RAM bank, VERA CTRL and both data-port addresses
     around every armed word.
 
 Game math (NEEDS ADVANCED)
-[x] RND-SEED RND16 RND8 - 16-bit xorshift PRNG (zero seed nudged off).
-[x] SIN8 COS8 SIN8U COS8U - 256-entry sine table, result -127..127 / 0..255.
-[x] ATAN2 ( dx dy -- angle ) - 0-255, 0 = east, 64 = down.
-[x] LERP ( a b t -- n ) - t = 0-255.
-[x] RING RING> >RING RING# - power-of-2 ring buffers.
-[x] ZX0-DECOMPRESS / MEM-DECOMPRESS - ZX0 and LZSA2 depackers.
+[ ] RND-SEED RND16 RND8 - 16-bit xorshift PRNG (zero seed nudged off).
+[ ] SIN8 COS8 SIN8U COS8U - 256-entry sine table, result -127..127 / 0..255.
+[ ] ATAN2 ( dx dy -- angle ) - 0-255, 0 = east, 64 = down.
+[ ] LERP ( a b t -- n ) - t = 0-255.
+[ ] RING RING> >RING RING# - power-of-2 ring buffers.
+[ ] ZX0-DECOMPRESS / MEM-DECOMPRESS - ZX0 and LZSA2 depackers.
 
 Graphics (NEEDS ADVGFX, after GRAPHIC)
-[x] CLIP-RECT CLIP-LINE CLINE - Cohen-Sutherland line clipping.
-[x] FLOOD ( x y color -- ) - scanline flood fill, 128-span seed stack.
-[x] FX-COPY ( sbank saddr dbank daddr u -- ) - cached 4-byte copies.
-[x] AFFINE-ON AFFINE-RAY AFFINE-SPAN AFFINE-LINE AFFINE-OFF - rotozoom /
+[ ] CLIP-RECT CLIP-LINE CLINE - Cohen-Sutherland line clipping.
+[ ] FLOOD ( x y color -- ) - scanline flood fill, 128-span seed stack.
+[ ] FX-COPY ( sbank saddr dbank daddr u -- ) - cached 4-byte copies.
+[ ] AFFINE-ON AFFINE-RAY AFFINE-SPAN AFFINE-LINE AFFINE-OFF - rotozoom /
     mode-7 sampling (see VERAFX).
 [ ] circle / disc - GRAPHIC's OVAL/OVALF cover these (unclipped).
 [ ] text onto the bitmap - not ported.
 
 Audio (NEEDS ADVSND)
-[x] ENV-START ENV-RELEASE ENV-STOP ENV-TICK - per-frame ASR envelopes on
+[ ] ENV-START ENV-RELEASE ENV-STOP ENV-TICK - per-frame ASR envelopes on
     all 16 PSG voices; arm with ' ENV-TICK IRQ.
-[x] PCM-PLAY ( bank addr ud rate -- ) PCM-STOP PCM-PLAYING? PCM-LOOP -
+[ ] PCM-PLAY ( bank addr ud rate -- ) PCM-STOP PCM-PLAYING? PCM-LOOP -
     background FIFO streaming from banked RAM off the AFLOW interrupt,
     auto-disarm, looping.
-[x] ADPCM-INIT ADPCM! ADPCM>PCM ( src dst u -- dst' ) - IMA ADPCM, low
+[ ] ADPCM-INIT ADPCM! ADPCM>PCM ( src dst u -- dst' ) - IMA ADPCM, low
     nibble first, 8-bit signed out. Offline only: decode whole banks up
     front, then PCM-PLAY the result (Forth is too slow to feed the DAC
     live).
 
 Storage / util
-[x] DOS words - in the core (see DICTIONARY: DOS).
-[x] BMX-LOAD BMX-SAVE + header vars (NEEDS BMX) - BMX bitmap files.
+[ ] DOS words - in the core (see DICTIONARY: DOS).
+[ ] BMX-LOAD BMX-SAVE + header vars (NEEDS BMX) - BMX bitmap files.
 [ ] TSCrunch decompression - not ported.

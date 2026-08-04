@@ -1,9 +1,9 @@
 === STRUCTURE - Structures ===
 
-[x] BEGIN-STRUCTURE ( "name" -- addr 0 ) - begin a structure definition.
+[ ] BEGIN-STRUCTURE ( "name" -- addr 0 ) - begin a structure definition.
     BEGIN-STRUCTURE POINT
-[x] END-STRUCTURE ( addr n -- ) - end it; name then pushes the total size.
-[x] FIELD: ( u1 "name" -- u2 ) - declare a cell-sized field. FIELD: P.X  FIELD:
+[ ] END-STRUCTURE ( addr n -- ) - end it; name then pushes the total size.
+[ ] FIELD: ( u1 "name" -- u2 ) - declare a cell-sized field. FIELD: P.X  FIELD:
     P.Y
-[x] CFIELD: ( u1 "name" -- u2 ) - declare a byte-sized field.
-[x] +FIELD ( u1 n "name" -- u2 ) - declare a field of n bytes.
+[ ] CFIELD: ( u1 "name" -- u2 ) - declare a byte-sized field.
+[ ] +FIELD ( u1 n "name" -- u2 ) - declare a field of n bytes.

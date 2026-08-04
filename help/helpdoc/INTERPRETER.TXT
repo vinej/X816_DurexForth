@@ -1,6 +1,6 @@
 === INTERPRETER - Interpreter and input source ===
 
-[x] TIB ( -- addr ) - the terminal input buffer.
+[ ] TIB ( -- addr ) - the terminal input buffer.
 [x] #TIB ( -- addr ) - variable: number of characters in TIB.
 [x] >IN ( -- addr ) - variable: current parse offset into the input.
 [x] SOURCE ( -- addr len ) - the current input buffer and its length.

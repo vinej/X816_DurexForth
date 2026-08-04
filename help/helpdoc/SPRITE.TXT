@@ -14,5 +14,5 @@
     BASIC SPRMEM num,bank,addr).
 [x] SPRITE ( num zdepth -- ) - set Z-depth and enable the sprite layer (BASIC
     SPRITE num,zdepth).
-[x] SPRITE-SAVE ( c-addr u sprite -- ) - save a sprite's image pixel data to disk.
-[x] SPRITE-LOAD ( c-addr u sprite -- ) - load pixel data into a sprite's image area.
+[ ] SPRITE-SAVE ( c-addr u sprite -- ) - save a sprite's image pixel data to disk.
+[ ] SPRITE-LOAD ( c-addr u sprite -- ) - load pixel data into a sprite's image area.

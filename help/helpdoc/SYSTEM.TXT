@@ -1,28 +1,32 @@
 === SYSTEM - System and environment ===
 
 [x] ENVIRONMENT? ( addr len -- false | i*x true ) - query a system attribute.
-[x] HELP ( "topic" -- ) - always resident. HELP alone shows the topic index;
+[ ] HELP ( "topic" -- ) - always resident. HELP alone shows the topic index;
     HELP STRING shows one page (the .TXT pages ship on the SD card), paged
     with MORE.
-[x] AUTORUN - if a file named AUTORUN exists on the SD card, it is INCLUDEd
+[ ] AUTORUN - if a file named AUTORUN exists on the SD card, it is INCLUDEd
     at every boot before the banner (create it with EDIT; delete it to
     disable). Errors in it abort to the prompt.
-[x] BYE ( -- ) - leave Forth (ROM build restarts the cold boot).
-[x] VER ( -- n ) - version number, high byte x 256 + low. VER .
-[x] X16 / C64 / F256 ( -- flag ) - build/platform flags (true for the current
+[ ] BYE ( -- ) - leave Forth (ROM build restarts the cold boot).
+[ ] VER ( -- n ) - version number, high byte x 256 + low. VER .
+[ ] X16 / C64 / F256 ( -- flag ) - build/platform flags (true for the current
     target).
-[x] USR ( i*x addr -- j*x ) - call machine code at addr (X16), passing/returning
+[ ] USR ( i*x addr -- j*x ) - call machine code at addr (X16), passing/returning
     the stack.
-[x] RANDOM ( -- n ) - a 16-bit pseudo-random number (KERNAL entropy).
-[x] RND ( u -- n ) - pseudo-random number in 0..u-1 (BASIC-style). 6 RND 1+  ->  a
+[ ] RANDOM ( -- n ) - a 16-bit pseudo-random number (KERNAL entropy).
+[ ] RND ( u -- n ) - pseudo-random number in 0..u-1 (BASIC-style). 6 RND 1+  ->  a
     die roll.
-[x] IRQ ( xt -- ) - arm a Forth word to run once per 60 Hz frame; 0 IRQ disarms.
+[ ] IRQ ( xt -- ) - arm a Forth word to run once per 60 Hz frame; 0 IRQ disarms.
     Callback must be short and stack-neutral. ' TICK IRQ
-[x] FREE ( -- ) - print the free dictionary space. On the wide-dictionary builds
+[ ] FREE ( -- ) - print the free dictionary space. On the wide-dictionary builds
   it shows the near + far (RAM-bank) pools; on all other builds, the single
   low-RAM pool (the UNUSED value).
 [x] WORDS ( -- ) - list the words in the context wordlist.
 --- durexForth ---
 [x] NOTFOUND ( caddr u -- ) - handler for an unrecognised word (prints the name + "?").
 [x] IOABORT ( ioresult -- ) - if ioresult is nonzero, print a message and THROW -37.
-[x] STOP ( clk -- ) - print the time elapsed since TI (TIMER.FTH; pairs with TI ( -- clk ); named like BASIC TI - not START, which is the turnkey boot cell).
+--- X816 ---
+[x] EMU-EXIT ( status -- ) - stop the X816 EMULATOR with an exit status, so a
+    test harness gets its verdict instantly. Open bus on real hardware: the
+    word is a harmless no-op there (callers put a hardware fallback after it).
+[ ] STOP ( clk -- ) - print the time elapsed since TI (TIMER.FTH; pairs with TI ( -- clk ); named like BASIC TI - not START, which is the turnkey boot cell).
