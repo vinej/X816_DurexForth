@@ -164,24 +164,20 @@ INCLUDED ; ( addr u -- ) interpret a file as source
 
     jsl BANK1 + PUSH_INPUT_SOURCE
 
-    ; TIB bookkeeping, upstream's shape: nested include lines stack upward
-    ; in the TIB region so the parent's unconsumed text is not clobbered.
-    ; (16-bit pointer math - the stage-A low-byte-only carry trap is gone.)
-    lda TIB_PTR
-    and #$fe00
-    cmp #TIB & $fe00
-    bne .reset_tib_ptr
-    lda TO_IN_W
-    cmp TIB_SIZE
-    beq .open               ; current line fully consumed: reuse in place
-    lda TIB_SIZE
-    clc
-    adc TIB_PTR
-    sta TIB_PTR
-    bra .open
-.reset_tib_ptr
-    lda #TIB
-    sta TIB_PTR
+    ; TIB bookkeeping: this file's lines load at TIB_TOP - the first byte
+    ; above every line a suspended file still owns (io.asm). Deriving the
+    ; slot from TIB_PTR is WRONG under EVALUATE (it points into the
+    ; evaluated string; the old page-check then "reset" to TIB base and
+    ; loaded this file's lines over the OUTERMOST file's half-consumed
+    ; line - the crashed-after-the-suite bug of 2026-08-04). Overflow is
+    ; loud: past this ceiling a 255-byte line could leave the region.
+    lda TIB_TOP
+    cmp #TIB + $1c0
+    bcc +
+    jsl BANK1 + POP_INPUT_SOURCE
+    lda #-8                 ; dictionary overflow, the input-stack code
+    jmp throw_a
++   sta TIB_PTR
 
 .open
     jsl BANK1 + kern_fs_open

@@ -106,8 +106,9 @@ REFILL ; ( -- flag )
     stz TIB_SIZE
 
     lda SOURCE_ID_LSB
-    bmi .getLineFromEvaluateString
-    bne .getLineFromDisk
+    bpl +                   ; (the eval arm outgrew a bmi's reach)
+    jmp .getLineFromEvaluateString
++   bne .getLineFromDisk
 
     ; getLineFromConsole
     ; X816: the KERNAL BASIN screen editor is gone; read keys from the
@@ -145,7 +146,16 @@ REFILL ; ( -- flag )
 !al
     jsl BANK1 + PUTCHR
 .return_true
-    dex
+    ; A fresh line is in the TIB region (keyboard and file sources; an
+    ; evaluate line lives in its string) - raise TIB_TOP over it, so a
+    ; nested INCLUDED stacks its own lines above, never on top of it.
+    lda SOURCE_ID_LSB
+    bmi +
+    lda TIB_PTR
+    clc
+    adc TIB_SIZE
+    sta TIB_TOP
++   dex
     dex
     lda #$ffff
     sta LSB,x
@@ -239,6 +249,15 @@ SOURCE
 
 TIB_PTR
     !word 0
+; First TIB byte above every line a suspended (or the current) file
+; source still owns. INCLUDED stacks the next nested file's lines here;
+; REFILL raises it per line; the input-source frames save and restore it,
+; so closing a nest hands the space back. TIB_PTR cannot serve this role:
+; under EVALUATE it points into the evaluated string, and deriving the
+; slot from it once made INCLUDED "reset" onto the outermost file's
+; half-consumed line (the post-suite crash of 2026-08-04).
+TIB_TOP
+    !word TIB
 TIB_SIZE
     !word 0, 0 ; padded to a cell: #tib hands this address to @
 
@@ -271,16 +290,16 @@ CHAR ; ( name -- char )
 SAVE_INPUT_STACK
     ; Forth standard 11.3.3 "Input Source":
     ; "Input [...] shall be nestable in any order to at least eight levels."
-    ; X816: SIXTEEN levels, and the overflow is CHECKED (the ninth push on
-    ; the C64 corrupted the depth byte; see stage A's history). Seven
-    ; 16-bit words per level.
-    !fill 16*14
+    ; X816: FIFTEEN levels (16 would push the 8-bit depth index to 256),
+    ; and the overflow is CHECKED (the ninth push on the C64 corrupted the
+    ; depth byte; see stage A's history). Eight 16-bit words per level.
+    !fill 15*16
 SAVE_INPUT_STACK_DEPTH
     !byte 0
 
 push_input_stack ; A(16) -> the save stack
     ldy SAVE_INPUT_STACK_DEPTH
-    cpy #16*14
+    cpy #15*16
     bcs .input_stack_overflow
     sta SAVE_INPUT_STACK, y
     iny
@@ -316,9 +335,13 @@ PUSH_INPUT_SOURCE
     lda EVALUATE_STRING_PTR
     jsl BANK1 + push_input_stack
     lda EVALUATE_STRING_SIZE
+    jsl BANK1 + push_input_stack
+    lda TIB_TOP
     jmp push_input_stack
 
 POP_INPUT_SOURCE
+    jsl BANK1 + pop_input_stack
+    sta TIB_TOP
     jsl BANK1 + pop_input_stack
     sta EVALUATE_STRING_SIZE
     jsl BANK1 + pop_input_stack

@@ -44,8 +44,7 @@ decimal cr cr
 .( ============================) cr
 
 \ In the emulator, exit right away so the harness gets its verdict; on
-\ hardware that write is open bus, so fall through to a halt loop that
-\ keeps the banner on screen for the person at the monitor.
+\ hardware that write is open bus and the word simply returns, so fall
+\ through to the prompt - the banner stays in the scrollback and the
+\ machine stays usable after a green run.
 0 emu-exit
-: ---halt--- begin again ;
----halt---

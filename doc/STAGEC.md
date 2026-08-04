@@ -123,3 +123,31 @@ Approach for next session: run with the VSYNC cursor disarmed (ccur_off
 or comment the IRQ_SET install) to confirm the IRQ theory, then bisect
 which juggling window is unsafe. The trace emulator's X816_TRACE_SKIP
 arming on PUTCHR (skip ~67) reaches the failure window directly.
+
+## Post-stage-C fix, 2026-08-04: usable after the suite
+
+On hardware, `include test` finished green but left the machine dead.
+Two independent causes, both found by simulating the hardware path in
+the emulator (patch the card's TEST so `emu-exit` is a comment, the way
+open bus behaves, then probe afterwards):
+
+1. test.fs deliberately ended in `begin again` to hold the banner -
+   stage-A behavior, wrong ever since the suite stopped being the only
+   thing a board could do. It now falls through to the prompt.
+
+2. The real bug: INCLUDED derived a nested file's TIB slot from
+   TIB_PTR, but under EVALUATE TIB_PTR points into the evaluated
+   string, so the old page-check "reset" loaded the new file's lines
+   over the OUTERMOST file's half-consumed line at $600. Any
+   `include` inside an `evaluate` inside an include chain (the suite's
+   own smoke test `s" include 1 2" evaluate`) spliced BASE's pending
+   `' (autorun) catch (autorun-report)` line into garbage; the words
+   defined latest in BASE then "vanished" (the parse resumed over the
+   splice) while everything the probes touched still worked - a
+   corruption that only detonates on RETURN to each ancestor line.
+   Fix: TIB_TOP (io.asm) - the first byte above every line a
+   suspended file still owns; REFILL raises it per line, the
+   input-source frames (now eight words, FIFTEEN levels) save and
+   restore it, INCLUDED stacks new files there and throws -8 loudly
+   past TIB+$1C0 instead of wrapping. Proven: the failing card now
+   runs suite -> arithmetic -> tick -> NEW DEFINITION, exit 0.

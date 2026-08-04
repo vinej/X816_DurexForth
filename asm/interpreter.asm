@@ -35,6 +35,7 @@ quit_reset
 !al
     lda #TIB
     sta TIB_PTR
+    sta TIB_TOP
 
 ; X816: close every kernel file handle. QUIT lands here after aborts that
 ; bypassed the include unwinding - and after a boot-time include chain
