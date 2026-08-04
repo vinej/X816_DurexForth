@@ -9,14 +9,14 @@ access set the address once with VADDR then stream with V!/V@.
 [x] VADDR ( bank addr -- ) - point the VERA data port at VRAM (auto-increment 1).
     bank is the 17th address bit.
 [x] V! ( byte -- ) - store a byte through the data port (address auto-increments).
-[ ] synonym VSTORE V!
+[x] synonym VSTORE V!
 [x] V@ ( -- byte ) - read a byte through the data port (address auto-increments).
-[ ] synonym VREAD V@
+[x] synonym VREAD V@
 [x] V!W ( w -- ) - store a 16-bit word through the data port, low byte first.
-[ ] synonym VWSTORE V!
-[x] SCREEN ( mode -- ) - set the video mode. 0=80x60, 1=80x30, 2=40x60, 3=40x30,
+[x] synonym VWSTORE V!
+[ ] SCREEN ( mode -- ) - set the video mode. 0=80x60, 1=80x30, 2=40x60, 3=40x30,
     128=320x240x256. 0 SCREEN
-[x] COLOR ( fg bg -- ) - set text foreground/background (0-15). 1 6 COLOR
+[ ] COLOR ( fg bg -- ) - set text foreground/background (0-15). 1 6 COLOR
 [x] BORDER ( color -- ) - set the display border color (0-15).
 [x] CLS ( -- ) - clear the text screen.
 [x] LOCATE ( row col -- ) - move the text cursor (BASIC LOCATE row,col).
@@ -27,3 +27,7 @@ access set the address once with VADDR then stream with V!/V@.
 [x] TILE ( x y code attr -- ) - set a tile cell (BASIC TILE x,y,code,attr).
 [x] TDATA ( x y -- code ) - read a tile's code (BASIC TDATA(x,y)).
 [x] TATTR ( x y -- attr ) - read a tile's attribute (BASIC TATTR(x,y)).
+--- X816 ---
+[x] IOC@ ( addr -- byte ) - fetch a byte from bank $00, where the I/O page
+    lives. VERA register readbacks need this: a plain C@ reads the program
+    bank. 7 BORDER $9F2C IOC@ -> 7

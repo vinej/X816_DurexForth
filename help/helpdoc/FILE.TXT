@@ -9,43 +9,43 @@ File access methods combine with BIN: e.g. R/O BIN.
 [x] INCLUDE ( "name" -- ) - load and interpret a file by name. INCLUDE GAME.FTH
 [x] INCLUDED ( addr len -- ) - load and interpret the file named by a string. S"
     GAME.FTH" INCLUDED
-[x] INCLUDE-FILE ( fileid -- ) - interpret the rest of an already-open file
+[ ] INCLUDE-FILE ( fileid -- ) - interpret the rest of an already-open file
     (max 8 KB; staged in the highest RAM bank; do not nest).
 [x] REQUIRE ( "name" -- ) - include a file only once, by name.
 [x] REQUIRED ( addr len -- ) - include a file only once, by string.
-[x] OPEN-FILE ( addr len fam -- fileid ior ) - open a file; ior 0 = success.
-[x] CLOSE-FILE ( fileid -- ior ) - close a file.
-[x] CREATE-FILE ( addr len fam -- fileid ior ) - create/overwrite a file (R/W
+[ ] OPEN-FILE ( addr len fam -- fileid ior ) - open a file; ior 0 = success.
+[ ] CLOSE-FILE ( fileid -- ior ) - close a file.
+[ ] CREATE-FILE ( addr len fam -- fileid ior ) - create/overwrite a file (R/W
     creates, then reopens in CBDOS modify mode).
-[x] DELETE-FILE ( addr len -- ior ) - delete a file (DOS S: command).
-[x] RENAME-FILE ( a1 u1 a2 u2 -- ior ) - rename a1/u1 to a2/u2 (DOS R:new=old).
-[x] RESIZE-FILE ( ud fileid -- ior ) - unsupported on CBDOS: always ior -1.
-[x] READ-FILE ( addr u fileid -- u2 ior ) - read up to u bytes.
-[x] WRITE-FILE ( addr u fileid -- ior ) - write u bytes.
-[x] READ-LINE ( addr u fileid -- u2 flag ior ) - read a line (ends at CR or LF;
+[ ] DELETE-FILE ( addr len -- ior ) - delete a file (DOS S: command).
+[ ] RENAME-FILE ( a1 u1 a2 u2 -- ior ) - rename a1/u1 to a2/u2 (DOS R:new=old).
+[ ] RESIZE-FILE ( ud fileid -- ior ) - unsupported on CBDOS: always ior -1.
+[ ] READ-FILE ( addr u fileid -- u2 ior ) - read up to u bytes.
+[ ] WRITE-FILE ( addr u fileid -- ior ) - write u bytes.
+[ ] READ-LINE ( addr u fileid -- u2 flag ior ) - read a line (ends at CR or LF;
     flag false only at end of file).
-[x] WRITE-LINE ( addr u fileid -- ior ) - write u bytes + CR.
-[x] FILE-POSITION ( fileid -- ud ior ) / REPOSITION-FILE ( ud fileid -- ior ) -
+[ ] WRITE-LINE ( addr u fileid -- ior ) - write u bytes + CR.
+[ ] FILE-POSITION ( fileid -- ud ior ) / REPOSITION-FILE ( ud fileid -- ior ) -
     get/set position (CBDOS T / P commands).
-[x] FILE-SIZE ( fileid -- ud ior ) - size in bytes (CBDOS T command).
-[x] FILE-STATUS ( addr len -- x ior ) - query a named file (x = 0; ior 0 =
+[ ] FILE-SIZE ( fileid -- ud ior ) - size in bytes (CBDOS T command).
+[ ] FILE-STATUS ( addr len -- x ior ) - query a named file (x = 0; ior 0 =
     the file exists).
-[x] FLUSH-FILE ( fileid -- ior ) - no-op (CBDOS flushes on close).
-[x] R/O ( -- fam ) read-only, W/O write-only, R/W read/write (CBDOS modify
+[ ] FLUSH-FILE ( fileid -- ior ) - no-op (CBDOS flushes on close).
+[ ] R/O ( -- fam ) read-only, W/O write-only, R/W read/write (CBDOS modify
     mode - the file must exist), BIN ( fam -- fam ) binary modifier (no-op).
 
 --- X16 directory navigation (device 8) ---
-[x] CD  ( c-addr u -- )   change directory (sends "CD:<name>" to the DOS).
+[ ] CD  ( c-addr u -- )   change directory (sends "CD:<name>" to the DOS).
                       S" .." CD goes up;  S" /" CD goes to the root.
-[x] DIR ( -- )            list the current directory.
+[ ] DIR ( -- )            list the current directory.
 
 --- durexForth: disk / DOS command channel ---
-[x] DEVICE ( n -- ) - set the current disk device number (default 8).
-[x] DOS ( "cmd<cr>" -- ) - send the rest of the line to the drive command channel, print the reply.
-[x] SEND-CMD ( addr len -- ) - send a command string to the drive and print its response.
-[x] RDERR ( -- ) - read and print the drive's error channel.
-[x] LS ( "pattern" -- ) - list the directory (optional match pattern).
-[x] RDIR ( addr -- ) - print a directory previously loaded at addr.
+[ ] DEVICE ( n -- ) - set the current disk device number (default 8).
+[ ] DOS ( "cmd<cr>" -- ) - send the rest of the line to the drive command channel, print the reply.
+[ ] SEND-CMD ( addr len -- ) - send a command string to the drive and print its response.
+[ ] RDERR ( -- ) - read and print the drive's error channel.
+[ ] LS ( "pattern" -- ) - list the directory (optional match pattern).
+[ ] RDIR ( addr -- ) - print a directory previously loaded at addr.
 
-[x] OPEN ( c-addr u fam -- fileid ior ) - open a file (like OPEN-FILE).
-[x] CLOSE ( fileid -- ior ) - close a file.
+[ ] OPEN ( c-addr u fam -- fileid ior ) - open a file (like OPEN-FILE).
+[ ] CLOSE ( fileid -- ior ) - close a file.

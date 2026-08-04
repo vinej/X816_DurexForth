@@ -3,9 +3,9 @@
 Low-level access to the YM2151 FM chip's 256 registers. For the easy
 note-playing API use HELP AUDIOFM instead.
 
-[x]   YM!     ( value reg -- )   write value to YM2151 register reg, directly.
+[ ]   YM!     ( value reg -- )   write value to YM2151 register reg, directly.
                              Always safe (writes the chip registers).
-[x]   FMPOKE  ( value reg -- )   write a YM2151 register THROUGH the ROM audio
+[ ]   FMPOKE  ( value reg -- )   write a YM2151 register THROUGH the ROM audio
                              API, so the driver's volume shadows stay in sync
                              (use this if you also use FMVOL/FMNOTE).
 
@@ -14,4 +14,4 @@ YM2151 datasheet. Raw YM! is handy for effects the high-level API does not
 expose (e.g. LFO, per-operator envelopes).
 
 --- durexForth ---
-[x] YM@ ( reg -- value ) - read a YM2151 register shadow (via ym_read).
+[ ] YM@ ( reg -- value ) - read a YM2151 register shadow (via ym_read).

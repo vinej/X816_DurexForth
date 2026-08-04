@@ -25,8 +25,8 @@ Cells are 16-bit (2 bytes). Addresses are byte addresses.
 [x] CELLS ( n -- n*2 ) - n cells in bytes. 3 CELLS  ->  6
 [x] CHAR+ ( addr -- addr+1 ) - advance one char.
 [x] CHARS ( n -- n ) - n chars in bytes (1 byte/char here).
-[x] ALIGN ( -- ) - align HERE (no-op on this byte-addressed CPU).
-[x] ALIGNED ( addr -- addr ) - align an address (no-op here).
+[ ] ALIGN ( -- ) - align HERE (no-op on this byte-addressed CPU).
+[ ] ALIGNED ( addr -- addr ) - align an address (no-op here).
 
 --- durexForth ---
 [x] DUMP ( addr -- ) - hex + ASCII dump of 8 lines starting at addr.

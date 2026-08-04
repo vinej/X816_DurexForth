@@ -6,15 +6,15 @@ pulling the active one into low RAM on demand. All four preserve the $00 bank
 register, so they are safe alongside the dictionary. 'off'/'boff' is 0..8191
 into the $A000 window; loads and copies auto-advance across bank boundaries.
 
-[x]   BANKLOAD ( c-addr u dev bank -- )        load a PRG file into RAM starting at
+[ ]   BANKLOAD ( c-addr u dev bank -- )        load a PRG file into RAM starting at
         bank:$A000. A file bigger than 8K spills into bank+1, bank+2, ...
-[x]   BANKSAVE ( c-addr u dev bank off len -- ) save a 'len'-byte slice of a bank
+[ ]   BANKSAVE ( c-addr u dev bank off len -- ) save a 'len'-byte slice of a bank
         (starting at bank:off) to a file.
-[x]   BANK>MEM ( bank boff addr u -- )         copy u bytes from bank:boff to low
+[ ]   BANK>MEM ( bank boff addr u -- )         copy u bytes from bank:boff to low
         RAM at addr (fast).
-[x]   MEM>BANK ( addr bank boff u -- )         copy u bytes from low RAM addr to
+[ ]   MEM>BANK ( addr bank boff u -- )         copy u bytes from low RAM addr to
         bank:boff (fast).
-[x]   DATABANK ( -- bank )                     the highest RAM bank present (via
+[ ]   DATABANK ( -- bank )                     the highest RAM bank present (via
         KERNAL MEMTOP). The dictionary lives in low RAM, so banks 1..DATABANK
         are all free for your data (bank 0 is KERNAL-reserved).
 

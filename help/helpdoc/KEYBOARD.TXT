@@ -2,9 +2,9 @@
 
 [x]   KEY    ( -- char )   wait for a key, return its code (standard Forth; echoes).
 [x]   KEY?   ( -- flag )   true if a key is waiting (non-destructive peek).
-[x]   GETKEY ( -- char )   block until a key is pressed, return its PETSCII code.
-[x]   KEYMAP ( c-addr u -- )   set the keyboard layout (core).  S" DE-DE" KEYMAP
-[x]   CHARSET ( n -- )     select an 8x8 charset (see HELP KERNAL).
+[ ]   GETKEY ( -- char )   block until a key is pressed, return its PETSCII code.
+[ ]   KEYMAP ( c-addr u -- )   set the keyboard layout (core).  S" DE-DE" KEYMAP
+[ ]   CHARSET ( n -- )     select an 8x8 charset (see HELP KERNAL).
 
 Poll without blocking:
   : POLL  KEY? IF GETKEY ... THEN ;

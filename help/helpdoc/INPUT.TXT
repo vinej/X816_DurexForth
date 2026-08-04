@@ -1,10 +1,10 @@
 === INPUT - X16 input devices ===
 
-[x] JOY ( n -- buttons ) - read joystick/gamepad n (0 = keyboard, 1-4 = gamepads);
+[ ] JOY ( n -- buttons ) - read joystick/gamepad n (0 = keyboard, 1-4 = gamepads);
     button bits active-high, 0 if absent.
-[x] MOUSE ( mode -- ) - configure the mouse pointer (0 = off, 1 = on, -1 =
+[ ] MOUSE ( mode -- ) - configure the mouse pointer (0 = off, 1 = on, -1 =
     auto-scale).
-[x] MX ( -- x ) - mouse X position.
-[x] MY ( -- y ) - mouse Y position.
-[x] MB ( -- buttons ) - mouse buttons (bit0 left, bit1 right, bit2 middle).
-[x] MWHEEL ( -- delta ) - signed mouse-wheel movement since the last read.
+[ ] MX ( -- x ) - mouse X position.
+[ ] MY ( -- y ) - mouse Y position.
+[ ] MB ( -- buttons ) - mouse buttons (bit0 left, bit1 right, bit2 middle).
+[ ] MWHEEL ( -- delta ) - signed mouse-wheel movement since the last read.

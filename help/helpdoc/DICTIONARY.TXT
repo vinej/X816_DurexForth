@@ -7,28 +7,28 @@ MARKER, ...) are explained with examples in the [advanced
 [x] ' ( "name" -- xt ) - find a word's execution token. ' DUP EXECUTE
 [x] ['] ( "name" -- ) - compile a word's xt (in a definition).
 [x] COMPILE, ( xt -- ) - append a call to xt to the current definition.
-[x] COMPILE ( -- ) - (legacy) compile the following word into the definition.
+[ ] COMPILE ( -- ) - (legacy) compile the following word into the definition.
 [x] [ ( -- ) - switch to interpret state inside a definition (IMMEDIATE).
 [x] ] ( -- ) - switch back to compile state.
 [x] LITERAL ( x -- ) - compile x as a literal (IMMEDIATE). [ 2 3 + ] LITERAL
 [x] 2LITERAL ( d -- ) - compile a double literal.
 [x] POSTPONE ( "name" -- ) - compile the compilation behaviour of a word
     (IMMEDIATE).
-[x] [COMPILE] ( "name" -- ) - (legacy) force-compile an immediate word.
+[ ] [COMPILE] ( "name" -- ) - (legacy) force-compile an immediate word.
 [x] IMMEDIATE ( -- ) - mark the most recent definition immediate.
 [x] MARKER ( "name" -- ) - create a word that, when run, forgets everything
     defined after it. MARKER SANDBOX
-[x] FORGET ( "name" -- ) - remove a word and all words defined after it.
+[ ] FORGET ( "name" -- ) - remove a word and all words defined after it.
 [x] >BODY ( xt -- addr ) - data-field address of a CREATEd word.
-[x] ?COMP ( -- ) - abort unless currently compiling.
-[x] ?STACK ( -- ) - check the data stack for under/overflow.
-[x] ," ( "ccc\"" -- ) - compile a counted string into the dictionary.
+[ ] ?COMP ( -- ) - abort unless currently compiling.
+[ ] ?STACK ( -- ) - check the data stack for under/overflow.
+[ ] ," ( "ccc\"" -- ) - compile a counted string into the dictionary.
 
 --- durexForth ---
 [x] LATEST ( -- nt ) - name token of the most recently defined word.
 [x] HIDE ( "name" -- ) - remove a word from the dictionary search order.
 [x] SIZE ( "name" -- ) - print the byte length of a word's definition.
-[x] SEE ( "name" -- ) - decompile a word to source-like text (SEE.FTH).
+[ ] SEE ( "name" -- ) - decompile a word to source-like text (SEE.FTH).
 [x] DOWORDS ( xt -- ) - call xt ( nt -- flag ) for each word; walk the dictionary.
 [x] NAME>STRING ( nt -- caddr u ) - the text of a name token.
 [x] FIND-NAME ( caddr u -- nt | 0 ) - look up a name, returning its name token.

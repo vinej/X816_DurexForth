@@ -1,11 +1,11 @@
 === KERNAL - call any KERNAL / ROM routine ===
 
-[x]   SYSCALL ( a x y addr -- a' x' y' )   call the routine at addr in KERNAL bank
+[ ]   SYSCALL ( a x y addr -- a' x' y' )   call the routine at addr in KERNAL bank
      0 with .A/.X/.Y loaded, returning the callee's .A/.X/.Y. Reaches the whole
      KERNAL API (GRAPH_*, console_*, MEMTOP, ...). ROM-safe (routes via jsrfar).
      Example:  65 0 0 $FFD2 SYSCALL   prints "A" (CHROUT).
 
-[x]   CHARSET ( n -- )   activate a built-in 8x8 charset: 1 = ISO, 2 = PET
+[ ]   CHARSET ( n -- )   activate a built-in 8x8 charset: 1 = ISO, 2 = PET
      upper/graphics, 3 = PET upper/lower, ... 12 = Katakana.
 
 Common KERNAL entry points for SYSCALL: CHROUT $FFD2, CHRIN $FFCF,
@@ -13,11 +13,11 @@ GETIN $FFE4, PLOT $FFF0, SCREEN_MODE $FF5F. See the X16 Programmer's
 Reference for the full jump table.
 
 --- durexForth: low-level channel I/O (IO.FTH) ---
-[x] CHKIN ( file# -- ioresult ) - make an open logical file the input device (KERNAL CHKIN).
-[x] CHKOUT ( file# -- ioresult ) - make an open logical file the output device (KERNAL CHKOUT).
-[x] CHRIN ( -- char ) - read one byte from the current input (KERNAL CHRIN/BASIN).
-[x] CLRCHN ( -- ) - restore input/output to the console (KERNAL CLRCHN).
-[x] READST ( -- status ) - read the I/O status byte (KERNAL READST).
+[ ] CHKIN ( file# -- ioresult ) - make an open logical file the input device (KERNAL CHKIN).
+[ ] CHKOUT ( file# -- ioresult ) - make an open logical file the output device (KERNAL CHKOUT).
+[ ] CHRIN ( -- char ) - read one byte from the current input (KERNAL CHRIN/BASIN).
+[ ] CLRCHN ( -- ) - restore input/output to the console (KERNAL CLRCHN).
+[ ] READST ( -- status ) - read the I/O status byte (KERNAL READST).
 
 --- durexForth ---
-[x] BCALL ( a x y bank addr -- a3 x3 y3 ) - call the routine at addr in ROM/RAM bank, passing/returning .A/.X/.Y.
+[ ] BCALL ( a x y bank addr -- a3 x3 y3 ) - call the routine at addr in ROM/RAM bank, passing/returning .A/.X/.Y.
