@@ -38,4 +38,22 @@ deploy
 !release/*
 release/*.nvram
 
+# ...with ONE exception, added when the MiSTer tree arrived. The rule above
+# was written for the C64 artifacts, which are ~200 KB and change when the
+# Forth does. release/mister/ is 68 MB - a 64 MB FAT32 card image plus a
+# 4 MB bitstream - and CLAUDE.md says to regenerate it after EVERY change,
+# so tracking it would add 68 MB to history per refresh and git never
+# forgets. Both are pure outputs of ../X816_core/tools/mkrelease.sh.
+#
+# The two ROMs stay: they are 54 KB together, they are what actually gets
+# flashed when only the kernel or shell moved, and having them in history
+# tells you which kernel a given Forth commit was proven against.
+!release/mister/
+!release/mister/*
+release/mister/games/X816/boot0.img
+release/mister/_Computer/
+!release/mister/games/
+!release/mister/games/X816/
+!release/mister/games/X816/*.rom
+
 

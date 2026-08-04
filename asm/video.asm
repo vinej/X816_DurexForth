@@ -163,6 +163,26 @@ IOFETCHBYTE ; ( addr -- byte )
     stz MSB, x
     rtl
 
+; ioc! - the store half of ioc@: put a byte in bank $00. Exists for the
+; writable SYSCTL bits ($9F80 TURBO); VERA writes have their own words.
+    +BACKLINK "ioc!", 4
+IOSTOREBYTE ; ( byte addr -- )
+    lda LSB, x
+    sta KTMP
+    +VIO
+    lda LSB+2, x
+    sep #$20
+!as
+    sta (KTMP)          ; DBR = $00 under +VIO
+    rep #$20
+!al
+    +VIO_END
+    inx
+    inx
+    inx
+    inx
+    rtl
+
     +BACKLINK "border", 6
 BORDER ; ( color -- )
     +VIO

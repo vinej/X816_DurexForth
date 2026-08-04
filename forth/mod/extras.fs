@@ -28,7 +28,10 @@ decimal
 \ --- compiler helpers -------------------------------------------------------------
 \ forward branch, close with THEN.  $4C c, = jmp opcode: base's jmp, is
 \ SHADOWED by the assembler's jmp, ( addr -- ) once asm.fs is loaded!
-: ahead ( -- orig ) $4c c, here 0 , ; immediate
+\ w, not , : a jmp operand is 16 bits and THEN patches two bytes. A 4-byte
+\ cell left two zeros in the code stream, which the CPU reads as BRK - the
+\ same stage-B leftover base.fs's OF had.
+: ahead ( -- orig ) $4c c, here 0 w, ; immediate
 : ?comp  ( -- ) state @ 0= if -14 throw then ;  \ abort unless compiling
 : ?stack ( -- ) depth 0< if -4 throw then ;     \ abort on stack underflow
 : compile ( "name" -- ) postpone postpone ; immediate   \ legacy COMPILE

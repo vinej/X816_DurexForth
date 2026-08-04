@@ -12,14 +12,26 @@
     $A000). Preserves the $00 bank register.
 [ ] B! ( byte bank off -- ) - store a byte into banked RAM. Preserves $00.
 [x] SLEEP ( jiffies -- ) - wait jiffies 1/60-second ticks. 60 SLEEP waits ~1 s.
-[x] MS ( u -- ) - wait ~u milliseconds (calibrated 8 MHz busy loop; approximate
-    but >= u ms). 1000 MS ~ 1 s.
+[x] MS ( u -- ) - wait u milliseconds on the free-running ms timer ($9F90,
+    1 kHz wall clock at either CPU speed - exact at 8 and 14 MHz alike).
+    1000 MS ~ 1 s.
 [x] REBOOT ( -- ) - soft reboot through the reset vector.
 [ ] KEYMAP ( c-addr u -- ) - set the keyboard layout by name (core; case does
     not matter; unknown names abort). S" DE-DE" KEYMAP ; the ROM layouts are
     ABC/X16 (default) EN-US/INT EN-GB EN-CA EN-US/DVO SV-SE DE-DE DE-CH DA-DK
     IT-IT PL-PL NB-NO HU-HU ES-ES FI-FI PT-BR PT-PT CS-CZ JA-JP FR-FR FR-BE
     IS-IS HR-HR SK-SK SL-SI ET-EE LV-LV LT-LT.
+
+--- CPU speed (X816 SYSCTL $9F80 bit 2) ---
+[x] TURBO?  ( -- flag )  true when the machine is EFFECTIVELY at 14 MHz. The
+    MiSTer OSD's CPU Turbo option ORs over the software bit, so this reads
+    the truth whichever side set it.
+[x] TURBO   ( flag -- )  TRUE TURBO releases the domain's full 14 MHz; FALSE
+    TURBO drops the software bit back to the exact 8 MHz average (the OSD
+    may still hold the machine fast). Safe to flip at any time.
+[x] CPU-MHZ ( -- u )     the effective CPU speed: 8 or 14.
+[x] IOC! ( byte addr -- ) store a byte in bank $00 (the store half of IOC@;
+    exists for the writable SYSCTL bits).
 
 --- clock (battery RTC / jiffy timer) ---
 [x] TICKS   ( -- ud )      the 24-bit jiffy counter (1/60 s) as an unsigned double.
@@ -30,6 +42,15 @@
 --- I2C bus (SMC, RTC, and other I2C devices) ---
 [ ] I2CPEEK ( dev reg -- byte )   read a byte from I2C device dev, register reg.
 [ ] I2CPOKE ( dev reg val -- )    write val to I2C device dev, register reg.
+
+--- break (X816 SMC NMI) ---
+[x] Ctrl+Alt+PrtScr - the RUN/STOP-RESTORE of this machine: raises an NMI
+    that aborts Forth code back to the interpreter with -28 (a CATCH in
+    flight receives it). An NMI landing in Forth code (a runaway loop)
+    aborts on the spot; one landing inside the kernel (an idle prompt,
+    an SD transfer) is parked and delivered as the same -28 the next
+    time KEY polls - so at the prompt it prints the abort and returns a
+    fresh prompt. Not a word; it works BECAUSE the loop is stuck.
 
 --- power / debug ---
 [ ] MONITOR  ( -- )   enter the built-in machine-language monitor (exit with X;

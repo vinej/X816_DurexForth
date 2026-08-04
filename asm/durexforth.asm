@@ -208,6 +208,37 @@ COLD
 
     jsl BANK1 + quit_reset
 
+    ; Platform hook: brk aborts to the interpreter instead of running off
+    ; into whatever the trap left behind. Installed before load_base, so a
+    ; brk compiled by the boot include chain is already caught.
+    ;
+    ; The body lives beside brk_handler in interpreter.asm rather than here.
+    ; Referring to that label from COLD - which assembles long before it -
+    ; made ACME take an extra pass, and it came out of that pass resolving
+    ; DIRECT-PAGE operands as absolute in files that had been clean:
+    ; nineteen "oversized addressing mode" warnings across x816/video/
+    ; coreadd, none of them in code that had changed. Absolute is not
+    ; equivalent here - these shims run with DBR = $01, so an absolute $00E0
+    ; is bank $01, not the direct page. A fixed-width jsl costs nothing and
+    ; the forward reference disappears.
+    jsl BANK1 + install_brk
+    jsl BANK1 + install_nmi
+
+    ; The kernel armed its own prompt cursor at boot; quiet it until the
+    ; first key wait (kern_getc brackets every wait with CON_CURSOR), so
+    ; the boot-time compile of base.fs runs without a blinking chase.
+    ; The kernel preserves nothing but D/DBR - X is the data stack pointer.
+    phx
+    phy
+    rep #$30
+!rl
+    lda #0
+    jsl KERN_CURSOR
+    sep #$10
+!rs
+    ply
+    plx
+
     jsl BANK1 + PAGE
 
 _START = * + 1

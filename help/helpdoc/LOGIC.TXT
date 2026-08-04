@@ -15,12 +15,17 @@ Comparisons return TRUE (-1, all bits set) or FALSE (0).
 [x] WITHIN ( n lo hi -- flag ) - is lo <= n < hi? 5 0 10 WITHIN  ->  -1
 
 --- more ---
-[ ] 0<= ( n -- flag ) - negative? -3 0<=  ->  -1
-[ ] 0>= ( n -- flag ) - positive?
-[ ] <= ( n1 n2 -- flag ) - signed less-than. 3 9 <=  ->  -1
-[ ] >= ( n1 n2 -- flag ) - signed greater-than.
+Each is the negation of one above, so they cost nothing and read better
+than 0= after a comparison.
+[x] 0<= ( n -- flag ) - zero or negative? -3 0<=  ->  -1 ;  0 0<=  ->  -1
+[x] 0>= ( n -- flag ) - zero or positive?
+[x] <= ( n1 n2 -- flag ) - signed less-than-or-equal. 9 9 <=  ->  -1
+[x] >= ( n1 n2 -- flag ) - signed greater-than-or-equal.
 
-[ ] U<= ( u1 u2 -- flag ) - unsigned less-than or equal
-[ ] U>= ( u1 u2 -- flag ) - unsigned greater-than ro equal
-[ ] U<> ( u1 u2 -- flag ) - unsigned different
-[ ] U=  ( u1 u2 -- flag ) - unsigned equial
+[x] U<= ( u1 u2 -- flag ) - unsigned less-than or equal.
+[x] U>= ( u1 u2 -- flag ) - unsigned greater-than or equal.
+[x] U<> ( u1 u2 -- flag ) - unsigned not-equal.
+[x] U=  ( u1 u2 -- flag ) - unsigned equal.
+    U<> and U= are ALIASES of <> and = - equality does not care about
+    signedness, since the bits either match or they do not. They exist
+    because this page names them; there is no separate behaviour to learn.

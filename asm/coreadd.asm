@@ -177,26 +177,30 @@ SLEEP ; ( jiffies -- ) wait n VSYNC frames (kernel IRQ_FRAMES; 60 Hz)
     rtl
 
     +BACKLINK "ms", 2
-MS ; ( u -- ) wait ~u milliseconds (calibrated 8 MHz busy loop)
--   lda LSB, x
-    ora MSB, x
-    beq +++                     ; u = 0 -> done
-    lda LSB, x
-    sec
-    sbc #1
-    sta LSB, x
-    lda MSB, x
-    sbc #0
-    sta MSB, x
-    lda #8
+MS ; ( u -- ) wait u milliseconds (SYSCTL ms timer $9F90)
+; The timer ticks 1 kHz in BOTH SYSCTL[2] CPU speeds, so this is exact at
+; 8 and 14 MHz alike - the old calibrated busy loop was 8 MHz-only. The
+; $9F90 byte must be read FIRST: it latches bits 31:8, and $9F91-$9F93
+; return that latch (a 16-bit lda reads $9F90 then $9F91 - right order).
+    +VIO                        ; DBR = $00; planes and W are dp, still fine
+    lda $9f90                   ; snapshot start, low word (latches 31:8)
     sta W
---  ldy #200
---- dey
-    bne ---
-    dec W
-    bne --
-    bra -
-+++ inx
+    lda $9f92                   ; high word, from that latch
+    sta W+2
+-   lda $9f90
+    sec
+    sbc W                       ; elapsed = now - start, wrap-safe 32-bit
+    tay
+    lda $9f92
+    sbc W+2
+    cmp MSB, x                  ; elapsed vs u, high word first
+    bcc -
+    bne +
+    tya
+    cmp LSB, x
+    bcc -
++   +VIO_END
+    inx
     inx
     rtl
 

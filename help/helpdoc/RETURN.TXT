@@ -9,8 +9,16 @@
 [x] 2R@ ( -- x1 x2 ) - copy a pair.
 [x] I ( -- n ) - index of the innermost DO loop.
 [x] J ( -- n ) - index of the next-outer DO loop.
---- X816 stage B ---
-[x] RW> ( -- w ) - pull one 16-bit RETURN ADDRESS word from the return stack
-    (bank-extended). >R cells are 32 bits but rts consumes 16: words that
-    juggle return addresses (LITS, DOES>, custom (?DO)s) use these.
-[x] W>R ( w -- ) - push the cell's low 16 bits as a return-address word.
+--- X816 return-ADDRESS juggling (stage C) ---
+A return address on this machine is THREE bytes, not two: stage C threads
+every call as jsl/rtl across banks $01-$04. >R and R> move whole 32-bit
+cells and are wrong for addresses, so the "R> ... >R ;" idiom - LITS,
+DOES>, (?DO), (+LOOP), UNLOOP - uses the pair below instead. They replace
+stage B's RW>/W>R, which moved 16 bits and dropped the bank.
+[x] RL> ( -- addr ) (R: ret24 -- ) - pull the caller's return address as a
+    flat cell; the bank rides in bits 16-23, so it is an ordinary address.
+[x] L>R ( addr -- ) (R: -- ret24 ) - push a flat cell back as a 3-byte
+    return address. Pair every RL> with one, in the same word.
+    A stray RTS ($60) where an RTL ($6B) belongs leaks the bank byte and
+    detonates one return later, at a distance that looks like anything
+    except its cause.

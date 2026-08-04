@@ -1,5 +1,13 @@
 === INPUT - X16 input devices ===
 
+NONE OF THIS PAGE IS IN THE MACHINE. asm/input.asm still holds the C64/X16
+shapes below, but durexforth.asm does not assemble it - every word here
+reached a KERNAL entry that the X816 has no equivalent for. The core does
+carry joystick and mouse data (the SMC serves both over I2C, X816_core
+rtl/smc_x16.sv), so these can come back; each needs rewriting against the
+SMC rather than unparking. Same for asm/irq.asm, asm/clock.asm and
+asm/sysx.asm - see ADVANCED, CONTROL and KEYBOARD.
+
 [ ] JOY ( n -- buttons ) - read joystick/gamepad n (0 = keyboard, 1-4 = gamepads);
     button bits active-high, 0 if absent.
 [ ] MOUSE ( mode -- ) - configure the mouse pointer (0 = off, 1 = on, -1 =

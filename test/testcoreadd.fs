@@ -121,6 +121,76 @@ T{ dval -> 100 200 }T
 : cdlit [ 21 22 ] 2literal ;
 T{ cdlit -> 21 22 }T
 
+cr .( testcoreadd: the helpdoc-promised core words ) cr
+\ Each of these was ticked [x] in help/helpdoc with no definition
+\ behind it until the 2026-08-04 probe pass; keep them honest.
+T{ true -> -1 }T
+T{ false -> 0 }T
+T{ 5 0> -> true }T
+T{ 0 0> -> false }T
+T{ -5 0> -> false }T
+T{ 3 cell+ -> 7 }T
+T{ 3 cells -> 12 }T
+T{ 3 char+ -> 4 }T
+T{ 3 chars -> 3 }T
+T{ align -> }T
+T{ 42 aligned -> 42 }T
+create (cb) 55 ,
+T{ ' (cb) >body @ -> 55 }T                      \ >body = xt+7, CREATE shape
+T{ s" X:deferred" environment? -> false }T
+
+cr .( testcoreadd: defer and friends ) cr
+defer (dtest)
+T{ ' dup ' (dtest) defer! 7 (dtest) -> 7 7 }T
+T{ ' (dtest) defer@ -> ' dup }T
+T{ ' + is (dtest) 3 4 (dtest) -> 7 }T           \ IS, interpreting
+T{ action-of (dtest) -> ' + }T                  \ ACTION-OF, interpreting
+: (dset) ['] negate is (dtest) ;                \ IS, compiling
+: (dget) action-of (dtest) ;                    \ ACTION-OF, compiling
+(dset)
+T{ 9 (dtest) -> -9 }T
+T{ (dget) -> ' negate }T
+
+cr .( testcoreadd: sm/rem - symmetric, all four sign cases ) cr
+T{ 10 s>d 7 sm/rem -> 3 1 }T
+T{ -10 s>d 7 sm/rem -> -3 -1 }T
+T{ 10 s>d -7 sm/rem -> 3 -1 }T
+T{ -10 s>d -7 sm/rem -> -3 1 }T
+
+cr .( testcoreadd: the rest of LOGIC.TXT - boundary cases both ways ) cr
+\ The equal case is the whole point of these, so every one is tested AT
+\ the boundary as well as either side of it.
+T{ -3 0<= -> true }T   T{ 0 0<= -> true }T   T{ 3 0<= -> false }T
+T{ 3 0>= -> true }T    T{ 0 0>= -> true }T   T{ -3 0>= -> false }T
+T{ 3 9 <= -> true }T   T{ 9 9 <= -> true }T  T{ 9 3 <= -> false }T
+T{ 9 3 >= -> true }T   T{ 9 9 >= -> true }T  T{ 3 9 >= -> false }T
+T{ 3 9 u<= -> true }T  T{ 9 9 u<= -> true }T T{ 9 3 u<= -> false }T
+T{ 9 3 u>= -> true }T  T{ 9 9 u>= -> true }T T{ 3 9 u>= -> false }T
+T{ 3 9 u<> -> true }T  T{ 9 9 u<> -> false }T
+T{ 9 9 u= -> true }T   T{ 3 9 u= -> false }T
+\ -1 is the largest UNSIGNED value: the unsigned words must not read it
+\ as less than 1, which is exactly what the signed pair would do.
+T{ -1 1 u>= -> true }T
+T{ -1 1 >= -> false }T
+
+cr .( testcoreadd: ut* ut/ - the triple intermediate under m*/ ) cr
+\ The ARITHMETIC.TXT example, and the reason the pair exists: 1000000*3
+\ overflows nothing here, but the triple is what lets m*/ divide before
+\ rounding. Round-trip x*n/n = x is the property that catches a lost limb.
+T{ 1000000. 3 ut* 7 ut/ -> 428571. }T
+T{ 1000000. 3 ut* 3 ut/ -> 1000000. }T
+T{ 123456789. 1000 ut* 1000 ut/ -> 123456789. }T
+T{ 5. 4 ut* 1 ut/ -> 20. }T
+
+cr .( testcoreadd: >number ) cr
+T{ 0. s" 123" >number swap drop -> 123 0 0 }T   \ full convert, u' = 0
+T{ 0. s" 12x4" >number swap drop -> 12 0 2 }T   \ stops at the x
+T{ 0. s" ff" >number swap drop -> 0 0 2 }T      \ hex digits refuse in decimal
+hex
+T{ 0. s" ff" >number swap drop -> ff 0 0 }T     \ ...and convert in hex
+decimal
+T{ 5. s" 9" >number swap drop -> 59 0 0 }T      \ accumulates into ud1
+
 cr .( testcoreadd ok ) cr
 
 ---testcoreadd---

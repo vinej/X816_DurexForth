@@ -8,11 +8,131 @@
 ; walk in FIND_NAME is byte logic through and through, so it runs inside
 ; one sep #$20 window with the stage-A code shape intact.
 
+; install_brk - point the kernel's KIRQ_BRK slot at brk_handler. Called
+; once from COLD. The previous handler (the kernel's, or none) is discarded
+; on purpose: this one does not chain, it terminates.
+install_brk
+    lda #brk_handler
+    sta KTMP
+    lda #^(BANK1 + brk_handler)
+    sta KTMP2
+    lda #KIRQ_BRK
+    jsl BANK1 + kern_irq_set
+    rtl
+
+; install_nmi - point the kernel's KIRQ_NMI slot at nmi_handler. Called once
+; from COLD, right after install_brk. Same non-chaining policy.
+install_nmi
+    lda #nmi_handler
+    sta KTMP
+    lda #^(BANK1 + nmi_handler)
+    sta KTMP2
+    lda #KIRQ_NMI
+    jsl BANK1 + kern_irq_set
+    rtl
+
+nmi_handler
+    ; The RUN/STOP-RESTORE of this machine. The SMC raises an NMI for
+    ; Ctrl+Alt+PrtScr (X816_core rtl/smc_x16.sv) or for I2C command $03,
+    ; and like BRK the slot has nothing to acknowledge (kirq.s: the edge is
+    ; already stretched and released) - so the abandon-the-frame abort is
+    ; legitimate here for the same reason it is in brk_handler below.
+    ;
+    ; But unlike BRK, an NMI is asynchronous: it can land inside the kernel
+    ; - mid keyboard I2C transaction, mid SD transfer, or inside the VSYNC
+    ; IRQ - and unwinding from THERE abandons kernel state half done. So
+    ; abort only if the interrupted code is Forth: program space is banks
+    ; $01-$04 (doc/STAGEC.md), a runaway loop is by definition executing
+    ; there, and everything else returns and lets the rti resume. A combo
+    ; pressed while the machine sits in a kernel wait is simply ignored -
+    ; at an idle prompt there is nothing to abort - and a word looping on
+    ; KEY may need a second press to be hit inside its own bank.
+    ;
+    ; The interrupted bank comes from the dispatcher's frame. THIS IS A
+    ; DELIBERATE COUPLING to kirq.s's internals (KPROLOGUE + kirq_call,
+    ; X816_Calypsi runtime/kirq.s) - there is no other place the bank
+    ; exists. Entered M=0/X=0 by a synthesised jsl: 1-3,s rtl return,
+    ; 4-5,s jsr return, 6-7,s D, 8,s B, 9-10,s Y, 11-12,s X, 13-14,s A,
+    ; then the CPU frame: 15,s P, 16-17,s PC, 18,s PBR. If kirq.s changes
+    ; shape, testnmi goes red on the resumed-instead-of-aborted case.
+    lda 17, s           ; PCH in the low byte, PBR in the high
+    and #$ff00
+    beq +               ; bank $00: the kernel's trampolines and bank-0 code
+    cmp #$0500
+    bcs +               ; bank $05 up: kernel firmware, not program space
+    jmp brk_handler     ; Forth code: same abort, same -28 user interrupt
++   ; Declined - but not dropped. At an idle prompt the machine IS inside
+    ; the kernel's key poll, so a combo pressed there lands here ~always.
+    ; Park the request; kern_getc's poll loop (x816.asm) consumes it and
+    ; throws the same -28 from safe ground. DBR is $00 here and the flag
+    ; is bank-$01 data; clobbering DBR is fine - KEPILOGUE restores it.
+    phk
+    plb
+    lda #1
+    sta nmi_pending
+    rtl
+
 brk_handler
-    ; brk instructions (and NMI) abort back to the interpreter. On X816 this
-    ; gets installed in the kernel's KIRQ_BRK/KIRQ_NMI slots via IRQ_SET in
-    ; the platform-hooks phase; the X16 NMINV/CBINV vector stores are gone
-    ; ($316-$319 is inside the X816 stack region, and there is no KERNAL).
+    ; brk aborts back to the interpreter. Installed in the kernel's KIRQ_BRK
+    ; slot by COLD (durexforth.asm); the X16 NMINV/CBINV vector stores are
+    ; gone ($316-$319 is inside the X816 stack region, and there is no
+    ; KERNAL).
+    ;
+    ; THIS HANDLER NEVER RETURNS, and KERNEL.md 5.6 says a handler is
+    ; reached by jsl and must finish with rtl. Abandoning the frame is
+    ; legitimate for THIS SLOT ONLY: kirq_brk has nothing to acknowledge
+    ; (X816_Calypsi runtime/kirq.s - brk is a software trap), so there is no
+    ; kernel state left half-done. The IRQ path DOES acknowledge, and a
+    ; handler that walked out of it would wedge the source. Do not copy this
+    ; shape to KIRQ_VSYNC.
+    ;
+    ; A handler is entered M=0/X=0, D=$0000, DBR=$00. Only D is already what
+    ; the Forth wants; the other two have to be rebuilt before any compiled
+    ; code or dp-plane access is legal.
+    sep #$10
+!rs
+    phk
+    plb                 ; DBR = $01: what every absolute data ref assumes
+
+    ; A direct abort supersedes any parked one (an NMI that got declined
+    ; in a kernel window and was then re-pressed into Forth code): clear
+    ; the flag so one press cannot deliver a second abort at the prompt.
+    stz nmi_pending
+
+    ; X - the Forth's data stack pointer - is the hard part. The interrupted
+    ; value is gone: the dispatcher spent X on its slot index and saved the
+    ; original inside a frame whose layout KERNEL.md does not make ABI, so
+    ; reading it back would couple this file to the kernel's internals.
+    ;
+    ; ldx #X_INIT is WRONG here, and the suite catches it: THROW pushes a
+    ; couple of cells of its own before it restores the depth CATCH saved,
+    ; and from an empty stack those land exactly on the caller's live data.
+    ; `11 22 ['] (brk) catch` came back as garbage.
+    ;
+    ; So take the depth from the CATCH frame instead - our own layout, in
+    ; exception.asm, not somebody else's. EXCEPTION_HANDLER holds the CPU
+    ; stack pointer as of CATCH, and CATCH pushed the data stack pointer as
+    ; a cell just above the previous-handler cell. >R pushes MSB word first,
+    ; so a cell's low byte is at its own offset: prev handler at 1..4, the
+    ; saved pointer's byte at 5. Anything THROW pushes then lands BELOW live
+    ; data, which is exactly where scratch belongs.
+    lda _EXCEPTION_HANDLER
+    beq .brk_no_catch
+    tcs                 ; abandon the interrupt frame - that IS the abort
+    sep #$20
+!as
+    lda 5, s
+    rep #$20
+!al
+    tax                 ; 8-bit X: the high byte of A is B and is ignored
+    bra .brk_throw
+.brk_no_catch
+    ldx #X_INIT         ; nothing to preserve: THROW prints and QUIT resets
+.brk_throw
+    cli                 ; the BRK sequence set I and we never rti. Without
+                        ; this, interrupts stay off for good: dead cursor,
+                        ; stopped clock, and a machine that looks hung after
+                        ; an abort that otherwise worked.
     lda #-28 ; user interrupt
     jsl BANK1 + throw_a
 

@@ -30,6 +30,10 @@ cr .( >> testsprite) cr parse-name testspr included
 cr .( >> testtile) cr parse-name testtile included
 cr .( >> testpalfx) cr parse-name testpal included
 cr .( >> testcoreadd) cr parse-name coreadd included
+cr .( >> testfar) cr parse-name testfar included
+cr .( >> testbrk) cr parse-name testbrk included
+cr .( >> testturbo) cr parse-name turbo included
+cr .( >> testnmi) cr parse-name testnmi included
 
 \ include-mechanism smoke test (loads the file "1")
 :noname s" include 1 2" evaluate

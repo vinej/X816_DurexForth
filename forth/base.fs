@@ -84,7 +84,16 @@ rot 1+ tuck - rot drop (qlit) ;
 : case 0 ; immediate
 : (of) over = if drop r> 2+ >r exit
 then branch ;
-: of postpone (of) here 0 , ; immediate
+( w, not comma - the operand is a 16-bit branch target and THEN patches
+  exactly two bytes. With a 4-byte cell here, two spare bytes stayed ZERO
+  in the instruction stream, and the runtime helper's matched path returns
+  right onto them: $00 $00 is BRK plus its signature byte. The kernel's
+  default for an unhandled brk is to resume at PC+2, which skipped
+  precisely those two bytes - so CASE worked, the suite was green, and
+  every OF that matched was taking a trap and coming back. Installing a
+  real brk handler is what finally made it audible. A stage-B leftover:
+  comma compiled two bytes back when cells were 16-bit. )
+: of postpone (of) here 0 w, ; immediate
 : endof postpone else ; immediate
 : endcase postpone drop
 begin ?dup while postpone then
@@ -278,6 +287,16 @@ state @ if swap
 postpone literal postpone literal then ;
 ' (dnum) 'notfound !
 
+( ANS >NUMBER over the same digit converter the dot-literal parser
+  uses: accumulate ud*base+digit until the first char that is no
+  digit in BASE, and hand back where it stopped. NUMBER.TXT promised
+  it; the loop is the dot-literal one, minus dot-and-sign dressing. )
+: >number ( ud1 c-addr1 u1 -- ud2 c-addr2 u2 )
+begin dup while
+over c@ (dig) 0= if exit then
+>r 2swap base @ ud* r> m+ 2swap
+1 /string repeat ;
+
 ( number output: right-justified fields + helpers - NUMERIC.TXT )
 : holds ( addr u -- ) begin dup while 1- 2dup + c@ hold repeat 2drop ;
 : d.r ( d w -- ) >r tuck dabs <# #s rot sign #> r> over - 0 max spaces type ;
@@ -293,15 +312,102 @@ dup pick . 1- repeat ;
 postpone s" postpone (abort")
 postpone then ; immediate
 
+( ANS core words the helpdoc pages promised - each was ticked [x] with
+  no definition behind it, found by probing every documented word
+  against the live dictionary. NOTE: this part of the file is still in
+  HEX - only single-digit literals below. )
+-1 constant true
+0 constant false
+: 0> 0 swap < ;
+: cell+ 4 + ;
+: cells 4 * ;
+: char+ 1+ ;
+: chars ;
+: align ;
+: aligned ;
+( CREATE shape: jsl dodoes = 4 bytes, then the DOES> pointer as lo16 +
+  bank byte - so the data field starts at xt+7, same offset the VALUE
+  shape uses. DOES> patches +4 and +6; keep the three in step. )
+: >body 7 + ;
+: defer ( "name" -- ) create ['] abort , does> @ execute ;
+: defer! ( xt2 xt1 -- ) >body ! ;
+: defer@ ( xt1 -- xt2 ) >body @ ;
+: is ( xt "name" -- ) state @
+if postpone ['] postpone defer! else ' defer! then ; immediate
+: action-of ( "name" -- xt ) state @
+if postpone ['] postpone defer@ else ' defer@ then ; immediate
+( no queries answered - false for everything is ANS-conformant )
+: environment? ( c-addr u -- false ) 2drop false ;
+( the rest of LOGIC.TXT's comparisons - each is the negation of one
+  that already exists, because on a total order "a <= b" is exactly
+  "not a > b", and the operand is already reduced to a flag. )
+: 0<= 0> 0= ;
+: 0>= 0< 0= ;
+: <= > 0= ;
+: >= < 0= ;
+: u<= u> 0= ;
+: u>= u< 0= ;
+( equality does not care about signedness - the bits are equal or they
+  are not - so these two are honest aliases, kept because the page
+  names them and someone porting code will type them. )
+: u<> <> ;
+: u= = ;
+
+( symmetric division: remainder takes the dividend's sign, the
+  quotient truncates toward zero - FM/MOD's floor is in math.asm )
+: sm/rem ( d1 n1 -- n2 n3 )
+2dup xor >r over >r abs >r dabs r> um/mod
+swap r> 0< if negate then
+swap r> 0< if negate then ;
+
+( FAR DATA SPACE - the SDRAM behind the four fast banks.
+
+  The dictionary - HERE and ALLOT - stays in single-cycle BRAM, banks
+  $01-$04, because every instruction fetch there pays SDRAM's ~6
+  cycles. Bulk DATA has no such reason to live in the expensive
+  banks, so it gets its own bump pointer, FAR-HERE, walking
+  $05:0000-$DF:FFFF. Cells already carry flat 24-bit addresses and
+  @ ! c@ c! move fill erase are all long-addressed, so a far block
+  is an ordinary address everywhere a near one is.
+
+  The idiom is CREATE and ALLOT's - far-here 1000 far-allot - or name
+  the block with far-buffer:. There is no far FREE: the pointer
+  only goes up, MARKER puts it back where it was, and FAR-EMPTY
+  drops the lot.
+
+  NOT the kernel heap. MEM_ALLOC's arena starts at $20:0000 -
+  KERNEL.md 5.5 - and overlaps this space, including the block
+  table in its first page. Nothing in this Forth calls MEM_ALLOC -
+  no binding exists, and the kernel's own FS does not allocate -
+  so the arena is dormant and this pointer owns the space.
+  Whoever binds MEM_ALLOC has to carve the two apart first. )
+$50000 constant sdram ( first data address in SDRAM, flat )
+$e00000 sdram - constant sdram-size
+sdram value far-here
+: far-unused ( -- u ) sdram sdram-size + far-here - ;
+( -8, dictionary overflow: far space IS data space. Refusing
+  loudly matters more here than in the dictionary - the addresses
+  just above are the VERA2 window and the kernel firmware, and a
+  silent bump into them writes to the screen or worse. )
+: far-allot ( u -- )
+dup far-unused u> if -8 throw then
+far-here + to far-here ;
+: far-buffer: ( u "name" -- ) far-here swap far-allot constant ;
+: far-empty ( -- ) sdram to far-here ;
+
 ( linked list. each element contains
   backlink + hashed file name )
 0 value (includes)
 
+( unwinding a marker returns the far pointer too - a module that
+  claims SDRAM gives it back when it is forgotten, or every
+  reload of it would leak a block. )
 : marker ( -- )
-(includes) latest here create , , ,
+far-here (includes) latest here create , , , ,
 does> dup @ to here
    4 + dup @ to latest
-   4 +     @ to (includes) ;
+   4 + dup @ to (includes)
+   4 +     @ to far-here ;
 
 : include parse-name included ;
 
@@ -326,16 +432,26 @@ hide dodoes hide (abort")
 
 decimal
 
-cr
-( the machine's two spaces: program in the four single-cycle banks,
-  data in SDRAM from bank $05 up to $DF - the top 2 MB, banks $E0-$FF,
-  belong to the VERA2 window and the kernel firmware. )
-$50000 constant sdram ( first data address in SDRAM, flat )
-$e00000 sdram - constant sdram-size
+( SYSCTL $9F80: bit 0 the boot overlay - dropped long before this
+  runs - bit 1 the live E flag, bit 2 TURBO: 0 paces the CPU to an
+  exact 8 MHz average, 1 releases the domain's full 14 MHz. The bit
+  flips safely at any time. Reads return the EFFECTIVE speed - the
+  MiSTer OSD's CPU Turbo option ORs over the software bit - so after
+  0 turbo the machine may truthfully still say it is fast. )
+: turbo? ( -- flag ) $9f80 ioc@ 4 and 0<> ;
+: turbo ( flag -- ) 0<> 4 and $9f80 ioc! ;
+: cpu-mhz ( -- u ) turbo? if 14 else 8 then ;
 
+cr
+( the machine's two spaces: program in the four single-cycle banks
+  via HERE/ALLOT, data in SDRAM from bank $05 up to $DF via
+  FAR-HERE/FAR-ALLOT - the top 2 MB, banks $E0-$FF, belong to the
+  VERA2 window and the kernel firmware. )
+cpu-mhz
+0 u.r space .( MHz cpu.) cr
 unused
 0 u.r space .( bytes program, fast ram.) cr
-sdram-size
+far-unused
 0 u.r space .( bytes data, sdram.) cr
 
 ( boot hook: if an AUTORUN file exists on the card, include it before the

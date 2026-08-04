@@ -1,21 +1,31 @@
 ======================  ForthX16 HELP  ======================
 Type  HELP <topic>   e.g.  HELP STACK
+
+Every entry on these pages carries [x] or [ ]. [x] means the word IS in
+this machine and [ ] means it is not yet - and as of 2026-08-04 that is
+not a hand-kept promise: each page was probed word by word against the
+live dictionary, so the two lists agree with what FIND-NAME can see.
+339 of 567 are present. The unticked remainder is mostly whole modules
+(FLOAT, GRAPHIC, AUDIO*, LOADSAVE) plus the four files durexforth.asm
+does not assemble - INPUT, KEYBOARD's last three, CONTROL's clock and
+I2C - each of which says so on its own page.
+
  STACK       data-stack juggling (DUP DROP SWAP ROT ...)
  ARITHMETIC  + - * / MOD */ ABS MIN MAX ...
  DOUBLE      double-cell (32-bit) math  D+ D. 2CONSTANT ...
- LOGIC       comparison & flags  =  <  >  0=  AND OR ...
+ LOGIC       comparison & flags  =  <  >  <=  >=  0=  U< ...
  BITWISE     AND OR XOR INVERT LSHIFT RSHIFT
  CONSTANTS   0 1 2 -1 BL TRUE FALSE literals
- MEMORY      @ ! C@ C! MOVE FILL ALLOT HERE ...
+ MEMORY      @ ! C@ C! MOVE FILL ALLOT HERE  + FAR-ALLOT (SDRAM)
  NUMERIC     pictured numeric output  <# # #S #> HOLD SIGN
  NUMBER      number/text parsing  >NUMBER WORD PARSE
  STRING      COUNT TYPE COMPARE /STRING CMOVE ...
  TERMINAL    KEY EMIT CR SPACE TYPE ACCEPT
  INTERPRETER EVALUATE SOURCE REFILL STATE ...
  DEFINING    : ; CREATE DOES> VARIABLE CONSTANT VALUE DEFER
- DICTIONAY   ' ['] POSTPONE IMMEDIATE LITERAL MARKER
+ DICTIONARY  ' ['] POSTPONE IMMEDIATE LITERAL MARKER
  FLOW        IF ELSE THEN BEGIN DO LOOP CASE CATCH ...
- RETURN      >R R> R@ I J  (return stack & loop index)
+ RETURN      >R R> R@ I J  RL> L>R  (return stack & 3-byte addrs)
  FILE        OPEN-FILE READ-LINE INCLUDE R/O W/O  CD DIR
  STRUCTURE   BEGIN-STRUCTURE FIELD: +FIELD  (records)
  SYSTEM      BYE VER ENVIRONMENT? UNUSED IRQ FREE
@@ -35,7 +45,7 @@ Type  HELP <topic>   e.g.  HELP STACK
  BANK        bulk RAM-bank I/O  BANKLOAD BANK>MEM ...
  IMAGE       SAVE-IMAGE LOAD-IMAGE  (fast turnkey reload)
  KERNAL      SYSCALL  (call any KERNAL routine)
- CONTROL     EDIT SETBANK B@ B! SLEEP MS REBOOT clock I2C ...
+ CONTROL     EDIT SETBANK B@ B! SLEEP MS TURBO REBOOT clock ...
  FLOAT       S>F F+ F* FSQRT FSIN F. ...   (FLOAT.FTH)
  BIT         SPLIT CATNIB SBIT CBIT FBIT
  ASSEMBLER   inline 6502 assembler  CODE ... END-CODE

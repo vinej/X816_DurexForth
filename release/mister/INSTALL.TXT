@@ -1,0 +1,28 @@
+X816 for MiSTer
+===============
+
+Copy the two folders in here onto the root of your MiSTer SD card, merging
+with what is already there:
+
+    _Computer/   ->  /media/fat/_Computer/
+    games/       ->  /media/fat/games/
+
+Then pick X816 from the Computer menu.
+
+The core comes up at the X816 prompt with no further action -- boot2.rom
+(the resident kernel) is auto-loaded into the firmware region, and boot1.rom
+(the same prompt as a loadable program) rides along as a fallback. Type HELP.
+
+Colour bands instead of a prompt mean no program was loaded, not a broken
+core. In that case open the OSD (F12), choose "Load Image" and pick
+games/X816/boot1.rom by hand.
+
+The supplied card is NOT mounted automatically. Mount it once:
+
+    open the OSD (F12) -> "Mount SD" -> games/X816/boot0.img
+
+MiSTer remembers that choice and re-mounts it at every core start from then
+on, including across power cycles, so this is a one-time step.
+
+Then type LS at the prompt. LS reporting NO CARD just means nothing is
+mounted yet.

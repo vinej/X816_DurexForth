@@ -1,6 +1,7 @@
 === MEMORY - Memory ===
 
-Cells are 16-bit (2 bytes). Addresses are byte addresses.
+X816: cells are 32-bit (4 bytes) and hold flat 24-bit byte addresses, so
+every word below reaches all 16 MB - there is no banking and no window.
 
 [x] @ ( addr -- x ) - fetch a cell. X @
 [x] ! ( x addr -- ) - store a cell. 42 X !
@@ -21,13 +22,32 @@ Cells are 16-bit (2 bytes). Addresses are byte addresses.
 [x] MOVE ( src dst u -- ) - copy u bytes, handling overlap correctly.
 [x] CMOVE ( src dst u -- ) - copy u bytes low -> high.
 [x] CMOVE> ( src dst u -- ) - copy u bytes high -> low.
-[x] CELL+ ( addr -- addr+2 ) - advance one cell.
-[x] CELLS ( n -- n*2 ) - n cells in bytes. 3 CELLS  ->  6
+[x] CELL+ ( addr -- addr+4 ) - advance one cell.
+[x] CELLS ( n -- n*4 ) - n cells in bytes. 3 CELLS  ->  12
 [x] CHAR+ ( addr -- addr+1 ) - advance one char.
 [x] CHARS ( n -- n ) - n chars in bytes (1 byte/char here).
-[ ] ALIGN ( -- ) - align HERE (no-op on this byte-addressed CPU).
-[ ] ALIGNED ( addr -- addr ) - align an address (no-op here).
+[x] ALIGN ( -- ) - align HERE (no-op on this byte-addressed CPU).
+[x] ALIGNED ( addr -- addr ) - align an address (no-op here).
 
 --- durexForth ---
 [x] DUMP ( addr -- ) - hex + ASCII dump of 8 lines starting at addr.
 [x] N ( -- ) - dump the next block (continues the previous DUMP).
+
+--- X816 far data space ---
+The dictionary lives in the four single-cycle BRAM banks $01-$04, where an
+instruction fetch costs one cycle. Bulk DATA belongs behind it, in SDRAM:
+a second bump pointer, FAR-HERE, hands out $05:0000-$DF:FFFF. A far block
+is an ordinary address - @ ! C@ C! MOVE FILL ERASE all reach it.
+
+[x] SDRAM ( -- addr ) - first address of the far data space, $50000.
+[x] SDRAM-SIZE ( -- u ) - its size in bytes, 14352384.
+[x] FAR-HERE ( -- addr ) - next free far address. A VALUE: save and restore
+    it with TO to release a block by hand.
+[x] FAR-UNUSED ( -- u ) - far bytes remaining. FAR-HERE + FAR-UNUSED is
+    always the top of the space.
+[x] FAR-ALLOT ( u -- ) - claim u far bytes, THROWing -8 if the space cannot
+    cover it. FAR-HERE 1000 FAR-ALLOT
+[x] FAR-BUFFER: ( u "name" -- ) - claim u far bytes and name their address.
+    $10000 FAR-BUFFER: SCREENBUF
+[x] FAR-EMPTY ( -- ) - release the whole far space; every address handed out
+    before it becomes garbage. MARKER also restores FAR-HERE.
