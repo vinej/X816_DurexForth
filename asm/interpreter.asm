@@ -31,9 +31,19 @@ quit_reset
     stx     SOURCE_ID_MSB
     stx     SAVE_INPUT_STACK_DEPTH
 
-; X816: the CLRCHN/CLOSE-all loop went with the CBM channel model; open
-; kernel file handles will be closed here once the FS_* words exist.
+; X816: close every kernel file handle. QUIT lands here after aborts that
+; bypassed the include unwinding - and after a boot-time include chain
+; that never returns (base.fs's `start @ execute`). Handles the kernel
+; never opened refuse with KERR_BADARG, which kern_fs_close ignores.
 close_all_logical_files:
+    lda #8
+-   pha
+    jsr kern_fs_close
+    pla
+    sec
+    sbc #1
+    bne -
+
     pla
     tax
     rts

@@ -218,6 +218,7 @@ MINUS_ONE
 !src "control.asm"
 !src "io.asm"
 !src "lowercase.asm"
+!src "fs.asm"
 !src "exception.asm"
 !src "format.asm"
 !src "video.asm"
@@ -254,13 +255,31 @@ LATEST_MSB = * + 3
 
 HERE_POSITION ; everything following this will be overwritten!
 
-; X816: the disk INCLUDED of the "base" sources is gone with disk.asm.
-; Until the kernel FS_* file words exist (PORTING plan phase 7), boot goes
-; straight to the prompt with the assembled words only; base.fs and friends
-; will be embedded in the image first, then loaded from FAT32.
+; Boot: INCLUDE the "base" sources off the card through the kernel FS_*
+; API (asm/fs.asm). If BASE is missing the include throws -37, the error
+; prints, and QUIT still delivers a working prompt with the assembled
+; words only - a card problem must not cost the machine its REPL.
 load_base
     lda #<PRINT_BOOT_MESSAGE
     sta _START
     lda #>PRINT_BOOT_MESSAGE
     sta _START+1
-    jmp PRINT_BOOT_MESSAGE
+    dex
+    dex
+    lda #<basename
+    sta LSB+1, x
+    lda #>basename
+    sta MSB+1, x
+    lda #(basename_end - basename)
+    sta LSB, x
+    lda #0
+    sta MSB, x
+    lda #>(QUIT-1)
+    pha
+    lda #<(QUIT-1)
+    pha
+    jmp INCLUDED
+
+basename
+!text	"base"
+basename_end

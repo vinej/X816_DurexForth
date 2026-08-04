@@ -1,50 +1,36 @@
-\ durexForth X16 test runner.
-\ Booted by build/run-tests.sh (which makes the kernel `include test`
-\ instead of saving the turnkey image). On the first failed assertion the
-\ Hayes tester prints "INCORRECT RESULT" / "WRONG NUMBER" and QUITs, so
-\ reaching the banner below means every test passed.
-\
-\ testsee.fs (the C64 screen-scraping decompiler test) is intentionally
-\ omitted: it compares VIC-II screen RAM at $0400, which the X16 does not
-\ have (text lives in VERA). `see` is instead smoke-tested by testx16.
+\ durexForth X816 stage-A test runner.
+\ Included by an AUTORUN of "include test" (run-tests.sh writes one onto the
+\ card) or by hand from the prompt. On the first failed assertion the Hayes
+\ tester prints "INCORRECT RESULT" / "WRONG NUMBER" and QUITs, so reaching
+\ the banner below means every test passed.
+\ Stage A scope (16-bit cells, kernel console, kernel FS_*): the ANS core
+\ suites, exceptions, doubles, and the VERA words. Omitted until their
+\ words return: testbank/testromdisk/testvramdisk (no banking, no romdisk),
+\ testfile/testloadsave (fs words beyond INCLUDED), testfloat and the
+\ mod/*.fs suites (modules load via require from disk), testx16 (charset
+\ and friends are parked), testinput (no joystick/mouse on the core),
+\ testaudio (audio module), testsee (C64 screen scraping).
 
 marker ---test---
 
-page parse-name compat included
-page parse-name tester included
+page cr .( >> compat) cr parse-name compat included
+cr .( >> tester) cr parse-name tester included
 \ The ANS core tests define helper constants without a marker - including MSB,
 \ which SHADOWS the assembler's stack-page constant and silently breaks every
-\ CODE word compiled afterwards (sta $8000,x instead of the high-byte stack).
-\ Bracket them so all that leaks away before the X16 tests run.
+\ CODE word compiled afterwards. Bracket them so all that leaks away before
+\ the later suites run.
 marker ---coretests---
-page parse-name testcore included
-page parse-name testcoreplus included
-page parse-name testcoreext included
+cr .( >> testcore) cr parse-name testcore included
+cr .( >> testcoreplus) cr parse-name coreplus included
+cr .( >> testcoreext) cr parse-name coreext included
 ---coretests---
-page parse-name testexception included
-page parse-name testx16 included
-page parse-name testdouble included
-page parse-name testvideo included
-page parse-name testsprite included
-page parse-name testtile included
-page parse-name testpalfx included
-page parse-name testinput included
-page parse-name testcoreadd included
-page parse-name testaudio included
-page parse-name testbank included
-page parse-name testvramdisk included
-page parse-name testloadsave included
-page parse-name testgraphic included
-page parse-name testromdisk included
-page parse-name testfloat included
-page parse-name testfile included
-page parse-name teststring included
-page parse-name testsystem included
-page parse-name testextras included
-page parse-name testadv included
-page parse-name testadvgfx included
-page parse-name testbmx included
-page parse-name testadvsnd included
+cr .( >> testexception) cr parse-name testexc included
+cr .( >> testdouble) cr parse-name testdbl included
+cr .( >> testvideo) cr parse-name testvid included
+cr .( >> testsprite) cr parse-name testspr included
+cr .( >> testtile) cr parse-name testtile included
+cr .( >> testpalfx) cr parse-name testpal included
+cr .( >> testcoreadd) cr parse-name coreadd included
 
 \ include-mechanism smoke test (loads the file "1")
 :noname s" include 1 2" evaluate
@@ -57,9 +43,10 @@ decimal cr cr
 .( ============================) cr
 .( +++ ALL TESTS PASSED +++) cr
 .( ============================) cr
-0 1 s" ok" saveb
 
-\ Stop here instead of dropping into the REPL, so the emulator's -run
-\ autostart keystroke residue is never interpreted (the trailing "ç?").
+\ In the emulator, exit right away so the harness gets its verdict; on
+\ hardware that write is open bus, so fall through to a halt loop that
+\ keeps the banner on screen for the person at the monitor.
+0 emu-exit
 : ---halt--- begin again ;
 ---halt---

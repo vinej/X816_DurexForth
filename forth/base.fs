@@ -121,9 +121,10 @@ $500 constant pad ( X16 golden RAM )
 : spaces ( n -- )
 begin ?dup while space 1- repeat ;
 
-8b value w
-8d value w2
-9e value w3
+( X816: W moved out of the relocated MSB stack plane - asm/durexforth.asm )
+a8 value w
+aa value w2
+ac value w3
 
 : hex 10 base ! ;
 : decimal a base ! ;
@@ -133,11 +134,8 @@ postpone drop postpone drop ; immediate
 
 : unused ( -- u ) latest here - $20 - ;
 : blank ( addr u -- ) bl fill ;
-: reset ( -- ) $42 2 0 i2cpoke ;          \ SMC reset (does not return)
-: poweroff ( -- ) $42 1 0 i2cpoke ;       \ SMC power-off
-
-: save-forth ( strptr strlen -- )
-801 $9f00 d word count saveb ;
+\ X816: reset/poweroff (SMC i2cpoke) and save-forth (saveb) are gone with
+\ the parked sysx/disk modules; they return with the platform-hooks phase.
 
 code 2/
 msb lda,x 80 cmp,# msb ror,x lsb ror,x
@@ -317,31 +315,22 @@ hide dodoes hide (abort")
 .( labels..) include labels
 .( doloop..) include doloop
 .( debug..) include debug
-.( ls..) include ls
 .( require..) include require
-.( open..) include open
 .( accept..) include accept
-.( help..) include help
+\ X816: ls (CBM directory channel), open (KERNAL device variable), help
+\ (loadb) and turnkey (saveb) wait on their kernel replacements.
 
 decimal
 
-( boot hook: if an AUTORUN file exists on the card, include it before the
-  banner shows. Probed with the silent kload - a missing file prints
-  nothing. Defined BEFORE turnkey so its marker keeps it across boots. )
-start @ constant (boot0)
-: (autorun)
-  s" autorun" 2dup 2 0 $a000 (kload)
-  if included else 2drop then ;
-: (boot) (autorun) (boot0) execute ;
-' (boot) start !
-
-include turnkey
 cr
 ( free RAM = gap between here, growing up,
   and the dictionary, growing down. )
 latest here - $20 -
 . .( bytes free.) cr
 
-.( save new durexforth..)
-save-pack durexfth
-.( ok!) cr
+( boot hook: if an AUTORUN file exists on the card, include it before the
+  prompt. INCLUDED throws -37 silently for a missing file, so the probe is
+  one CATCH - and a THROW from inside a real autorun script surfaces the
+  same way instead of being swallowed. )
+: (autorun) s" autorun" included ;
+' (autorun) catch drop

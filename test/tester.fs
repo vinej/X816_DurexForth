@@ -15,6 +15,8 @@ VARIABLE #ERRORS 0 #ERRORS !
    CR TYPE SOURCE TYPE       \ DISPLAY LINE CORRESPONDING TO ERROR
    EMPTY-STACK               \ THROW AWAY EVERY THING ELSE
    #ERRORS @ 1 + #ERRORS !
+   1 EMU-EXIT  \ X816: stop the emulator with the failure on screen; a
+               \ no-op (open bus) on hardware, where QUIT shows the prompt
    QUIT  \ *** Uncomment this line to QUIT on an error
 ;
 

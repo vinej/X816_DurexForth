@@ -25,6 +25,10 @@ KERN_GOTOXY = $00fe14               ; C = column, X = row
 KERN_GETXY  = $00fe18               ; -> C = column, X = row
 KERN_EXIT   = $00fe84               ; C = status; does not return
 KERN_FRAMES = $00fed0               ; -> C = VSYNC frames, 16-bit, wraps
+KERN_FS_OPEN  = $00fe40             ; C:X = path, Y = mode -> C = handle
+KERN_FS_CLOSE = $00fe44             ; C = handle
+KERN_FS_READ  = $00fe48             ; C:X = parameter block -> C = bytes read
+KERN_FS_SEEK  = $00fe50             ; C:X = parameter block
 
 ; Direct-page staging for the width crossing. $E0-$EF is unclaimed by the
 ; Forth core (stacks $09-$78, W/W2/W3 $9C-$A1).
@@ -197,6 +201,118 @@ kern_frames
 !rs
     ply
     plx
+    rts
+
+; kern_fs_open - open the NUL-terminated path staged in fs_name (fs.asm),
+; read-only. Out: carry clear and A = handle, or carry set and A = KERR_*.
+; Pulls and sep do not touch carry, so the kernel's verdict survives.
+kern_fs_open
+    phx
+    phy
+    rep #$30
+!al
+!rl
+    ldx #1                          ; path bank = this bank
+    lda #fs_name
+    ldy #0                          ; mode 0 = read (KFS_READ)
+    jsl KERN_FS_OPEN
+    sta KTMP
+    sep #$30
+!as
+!rs
+    ply
+    plx
+    lda KTMP
+    rts
+
+; kern_fs_close - A = handle. Best-effort: a refused close (handle not
+; open) is the common case for close_all_logical_files and is ignored.
+kern_fs_close
+    phx
+    phy
+    sta KTMP
+    stz KTMP+1
+    rep #$30
+!al
+!rl
+    lda KTMP
+    jsl KERN_FS_CLOSE
+    sep #$30
+!as
+!rs
+    ply
+    plx
+    rts
+
+; kern_fs_fill - A = handle. Reads up to 128 bytes into fs_cache (fs.asm)
+; with ONE kernel crossing and returns the count in A (0 = end of file, and
+; a device error reads as end of file). fs.asm's fs_getbyte serves single
+; bytes out of the cache; reading source a byte per jsl cost the test
+; suite whole minutes.
+kern_fs_fill
+    phx
+    phy
+    sta fs_blk+0                    ; handle (block +0); dest and count are
+                                    ; assembled constants in fs.asm
+    rep #$30
+!al
+!rl
+    ldx #1                          ; block pointer bank
+    lda #fs_blk
+    jsl KERN_FS_READ
+    sta KTMP                        ; bytes read
+    sep #$30
+!as
+!rs
+    ply
+    plx
+    bcs +                           ; kernel error: report as EOF
+    lda KTMP
+    rts
++   lda #0
+    rts
+
+; kern_fs_seekback - A = handle, Y = bytes to step back (1..128). Rewinds
+; the kernel's file position over cached-but-unconsumed bytes when a nested
+; source takes over. Best-effort: a refused seek leaves the position wrong
+; in a situation (broken handle) that is already failing louder elsewhere.
+kern_fs_seekback
+    phx
+    phy
+    sta fs_skblk+0
+    tya
+    eor #$ff
+    clc
+    adc #1                          ; two's complement low byte
+    sta fs_skblk+4                  ; offset = -Y, sign-extended $FF above
+    rep #$30
+!al
+!rl
+    ldx #1
+    lda #fs_skblk
+    jsl KERN_FS_SEEK
+    sep #$30
+!as
+!rs
+    ply
+    plx
+    rts
+
+; emu-exit ( status -- ) - stop the EMULATOR with an exit code, so a test
+; harness gets its verdict the moment the suite finishes instead of waiting
+; out a timeout. $9FBC is the emulator-only control page; on real hardware
+; it is open bus, the store does nothing, and the word simply returns -
+; callers put their hardware fallback (a halt loop) right after it.
+    +BACKLINK "emu-exit", 8
+EMU_EXIT
+    phb
+    lda #0
+    pha
+    plb                             ; the I/O page lives in bank 0
+    lda LSB, x                      ; direct page: readable under any DBR
+    sta $9fbc
+    inx
+    plb
     rts
 
 ; kern_exit - back to the kernel prompt. Does not return.

@@ -32,11 +32,10 @@ cr .( testcoreadd: timing runs ) cr
 1 ms
 ticks 2drop
 
-cr .( testcoreadd: real-time clock ) cr
-\ time and month/day round-trip through settime; the RTC year epoch differs
-\ between set/get in the emulator, so it is not asserted here.
-T{ 2025 7 8 9 30 45 settime  time@ -> 9 30 45 }T
-T{ date@ rot drop -> 7 8 }T                       \ month day
+\ X816: no real-time clock - settime/time@/date@ went with the parked
+\ clock.asm (there is no RTC on the machine; see X816_core doc/KERNEL.md
+\ on the two clocks it has instead). sleep/ticks above now count VSYNC
+\ frames via the kernel's IRQ_FRAMES, which these smoke lines still cover.
 
 cr .( testcoreadd: 2 / unused / blank ) cr
 T{ 2 -> 2 }T

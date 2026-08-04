@@ -74,11 +74,20 @@ TYPE ; ( caddr u -- )
     !byte 0
 
 CLOSE_INPUT_SOURCE
-    ; X816: no file input sources until the kernel FS_* words exist, so
-    ; SOURCE_ID is only ever 0 (keyboard) or -1 (evaluate) - there is no
-    ; channel to close or re-select, just the input state to pop.
+    ; X816: SOURCE_ID above zero is a kernel file handle - close it, then
+    ; pop the input state. There is no channel to re-select afterwards:
+    ; REFILL reads whatever handle SOURCE_ID holds. The read-ahead cache
+    ; belongs to the closing file, so it is discarded, not seeked back.
     stx W
-    jsr POP_INPUT_SOURCE
+    lda #0
+    sta fs_ccnt
+    sta fs_cpos
+    lda SOURCE_ID_LSB
+    beq +                   ; 0 = keyboard
+    bit SOURCE_ID_MSB
+    bmi +                   ; -1 = evaluate
+    jsr kern_fs_close
++   jsr POP_INPUT_SOURCE
     ldx W
     rts
 
@@ -93,7 +102,7 @@ REFILL ; ( -- flag )
 
     lda SOURCE_ID_LSB
     bmi .getLineFromEvaluateString
-    bne .return_false ; X816: file sources return with the FS_* words
+    bne .getLineFromDisk
 
     ; getLineFromConsole
     ; X816: the KERNAL BASIN screen editor is gone; read keys from the
@@ -131,8 +140,33 @@ REFILL ; ( -- flag )
     sta MSB,x
     rts
 
-; X816: .getLineFromDisk (READST/CHRIN over a CBM channel) was deleted with
-; disk.asm; its successor reads through FS_READ when the file words return.
+.getLineFromDisk
+    ; X816: SOURCE_ID is a kernel file handle; read it a byte at a time
+    ; through kern_fs_getbyte (which preserves X and Y). NUL, $0D and $0A
+    ; all end a line - a CR-LF file just yields a harmless empty line, and
+    ; mkcard-era $00 $00 headers read as blanks, exactly as upstream.
+    lda TIB_PTR
+    sta W
+    lda TIB_PTR + 1
+    sta W+1
+-   lda SOURCE_ID_LSB
+    jsr fs_getbyte
+    bcs .disk_eof
+    ora #0
+    beq .return_true
+    cmp #K_RETURN
+    beq .return_true
+    cmp #$0a
+    beq .return_true
+    ldy TIB_SIZE
+    sta (W),y
+    inc TIB_SIZE
+    jmp -
+.disk_eof
+    ; End of file: deliver a final unterminated line if one accumulated,
+    ; else report the source exhausted.
+    lda TIB_SIZE
+    bne .return_true
 
 .return_false
     dex
@@ -257,6 +291,9 @@ pop_input_stack
     rts
 
 PUSH_INPUT_SOURCE
+    ; X816: hand cached read-ahead back to the kernel before another
+    ; source becomes current (fs.asm).
+    jsr fs_flush
     lda TO_IN_W
     jsr push_input_stack
     lda TO_IN_W+1
