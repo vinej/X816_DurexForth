@@ -135,9 +135,10 @@ dc value w3
 : 2drop ( a b -- )
 postpone drop postpone drop ; immediate
 
-( program space left: inside bank 1 it is the gap to the headers;
-  above, everything to the end of bank 4. )
-: unused ( -- u ) here $10000 < if latest here - $20 -
+( program space left, ALL of it: while HERE is in bank 1, the gap to
+  the headers plus the three empty banks above; afterwards, everything
+  to the end of bank 4. )
+: unused ( -- u ) here $10000 < if latest here - $20 - $30000 +
 else $50000 here - then ;
 : blank ( addr u -- ) bl fill ;
 \ X816: reset/poweroff (SMC i2cpoke) and save-forth (saveb) are gone with
@@ -326,9 +327,8 @@ hide dodoes hide (abort")
 decimal
 
 cr
-( free RAM = gap between here, growing up,
-  and the dictionary, growing down. )
-latest here - $20 -
+( free program space, across all four fast banks - see UNUSED )
+unused
 0 u.r space .( bytes free.) cr
 
 ( boot hook: if an AUTORUN file exists on the card, include it before the
