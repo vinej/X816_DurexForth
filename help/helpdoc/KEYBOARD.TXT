@@ -4,14 +4,15 @@
 [x]   KEY?   ( -- flag )   true if a key is waiting (non-destructive peek).
 [ ]   GETKEY ( -- char )   block until a key is pressed, return its PETSCII code.
 [ ]   KEYMAP ( c-addr u -- )   set the keyboard layout (core).  S" DE-DE" KEYMAP
-[ ]   CHARSET ( n -- )     select an 8x8 charset (see HELP KERNAL).
 
-The three unticked words are in asm/sysx.asm, which durexforth.asm does NOT
-assemble: each called a KERNAL entry ($FF62 for CHARSET, $FED2 for KEYMAP)
-and there is no KERNAL here. KEY and KEY? go through the kernel console
-instead and are the two that work. CHARSET is the live one of the three -
-the kernel uploads its CP437 font from runtime/font_cp437.s, so a rewrite
-means pointing VERA's tile base at a second font in VRAM, not calling a ROM.
+GETKEY and KEYMAP are in asm/sysx.asm, which durexforth.asm does NOT
+assemble: each called a KERNAL entry ($FED2 for KEYMAP) and there is no
+KERNAL here. KEY and KEY? go through the kernel console instead, and are
+the two that work.
+
+CHARSET used to sit here as a third. It is DONE, but it moved to VIDEO
+and changed shape on the way: there is no charset ROM, so it takes a VRAM
+address rather than a ROM number. HELP VIDEO.
 
 Poll without blocking:
   : POLL  KEY? IF GETKEY ... THEN ;

@@ -85,6 +85,22 @@ user-confirmed on the MiSTer:
   VIA1, mirroring runtime/smc.s's exact edges; both the RTL and the
   emulator pulse the NMI at the value byte's ACK, so the test's
   post-catch `(i2c-stop)` is what resyncs the abandoned bus.
+- **CHARSET is DONE** (2026-08-04) — and it could not be a port. The
+  X16's `charset ( n -- )` picked one of a dozen ROM fonts; there is
+  no charset ROM here. The console is VERA layer 0 and its font is
+  ordinary VRAM the kernel filled from `runtime/font_cp437.s`, so the
+  word takes an ADDRESS: base.fs adds `font` ($4000, the live CP437),
+  `font2` ($4800, next free 2 KB slot), `charset ( vaddr -- )`,
+  `glyph-addr`, `font-copy`, `glyph!`, `glyph@` — all pure Forth over
+  vpoke/vpeek/vaddr/v!/v@ and `tilebase`, which already existed.
+  `test/testfont.fs` asserts the LAYOUT, not just the words: glyph 65
+  really is CP437 "A" at FONT+520 with no $20 bias. Two traps paid
+  for: durexForth's `I` is literally `R@` at a fixed offset, so a
+  `>r` parked inside a DO loop makes `I` read the wrong cell (a copy
+  that runs and moves the wrong bytes) — juggle on the data stack;
+  and the "A" bitmap is `$38 $6C $C6...`, not the more familiar
+  `$30 $78 $CC...` of a different public-domain 8x8 font. Read glyph
+  bytes out of font_cp437.s, never from memory.
 - **28 documented-but-missing words implemented** (2026-08-04, the
   helpdoc pass): probing every page against the live dictionary found
   entries ticked `[x]` with nothing behind them. base.fs now defines
@@ -181,7 +197,13 @@ user-confirmed on the MiSTer:
 
 ## Next steps (the backlog, in rough order)
 
-1. **Platform hooks**: charset. (BRK and NMI are DONE — see State.)
+1. **Platform hooks: all DONE** — BRK, NMI and charset (see State).
+   Nothing is left in this line item; the next platform-shaped gaps
+   are the four unassembled files, `asm/input.asm` `asm/irq.asm`
+   `asm/clock.asm` `asm/sysx.asm`, whose words all reached KERNAL
+   entries. The SMC already serves joystick and mouse over I2C, so
+   INPUT is the tractable one — rewrite against the SMC, do not
+   unpark.
 2. **Board run**: the turbo/MS/NMI batch is emulator-green only; the
    user takes `release/mister/` to the MiSTer (the card already
    carries TURBO and TESTNMI in `include test`).
@@ -189,14 +211,17 @@ user-confirmed on the MiSTer:
    words beyond INCLUDED, replacements for the parked C64 words
    (`ls`, `open`, `help`, `turnkey` — see base.fs comments).
 4. **helpdoc tracker: DONE and machine-verified (2026-08-04)** —
-   339/567 ticked, and the checkboxes are no longer a hand-kept
+   346/572 ticked, and the checkboxes are no longer a hand-kept
    promise: a generated probe card runs `find-name` over every entry,
    both directions, so `[x]`-but-absent and `[ ]`-but-present are both
    empty. Re-run it after any word changes (the generator is a few
    lines of python over `^\[( |x)\]\s+(\S+)` plus an AUTORUN of `chk`
    lines). **Watch the regex**: `\] ` with one space silently skips
    every indented entry — TILE/VERAFX use `[x]   NAME` — which is how
-   a first pass "proved" 57 entries that it had never looked at.
+   a first pass "proved" 57 entries that it had never looked at. And
+   never begin a PROSE line with a bracket pair: a wrapped sentence
+   starting "[ ] here" became an entry claiming HERE was missing (the
+   probe caught it, which is the point of running it).
    Remaining unticked is honest: whole modules (FLOAT, GRAPHIC,
    AUDIO*, LOADSAVE, FILE) plus the four files durexforth.asm does
    NOT assemble — `irq.asm`, `input.asm`, `clock.asm`, `sysx.asm`

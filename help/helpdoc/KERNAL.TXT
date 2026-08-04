@@ -5,8 +5,18 @@
      KERNAL API (GRAPH_*, console_*, MEMTOP, ...). ROM-safe (routes via jsrfar).
      Example:  65 0 0 $FFD2 SYSCALL   prints "A" (CHROUT).
 
-[ ]   CHARSET ( n -- )   activate a built-in 8x8 charset: 1 = ISO, 2 = PET
-     upper/graphics, 3 = PET upper/lower, ... 12 = Katakana.
+The X16's CHARSET ( n -- ) selected one of a dozen 8x8 fonts in ROM
+(1 = ISO, 2 = PET upper/graphics, ... 12 = Katakana). It is deliberately
+NOT listed here as a checkbox entry: this machine has no charset ROM, so
+that word cannot exist - while a CHARSET that DOES exist lives in VIDEO,
+and an unticked box under this name would read as a lie either way. The
+X816 keeps the name for the same job done the way the hardware works:
+CHARSET ( vaddr -- ) points VERA layer 0 at 2 KB of tile data, with the
+font words beside it. HELP VIDEO.
+
+(Do not start a prose line in these files with a bracket pair. The
+checkbox tracker is parsed, and a wrapped sentence beginning "[ ] here"
+became an entry claiming HERE was missing.)
 
 Common KERNAL entry points for SYSCALL: CHROUT $FFD2, CHRIN $FFCF,
 GETIN $FFE4, PLOT $FFF0, SCREEN_MODE $FF5F. See the X16 Programmer's

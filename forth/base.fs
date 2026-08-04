@@ -442,6 +442,51 @@ decimal
 : turbo ( flag -- ) 0<> 4 and $9f80 ioc! ;
 : cpu-mhz ( -- u ) turbo? if 14 else 8 then ;
 
+( THE CONSOLE FONT - the X816's answer to the X16's CHARSET.
+
+  There is no charset ROM to select from, so the X16 word cannot port:
+  its n picked one of a dozen banked ROM fonts. Here the console is
+  VERA layer 0 and its font is ordinary VRAM the kernel filled at boot
+  from runtime/font_cp437.s, so "select a charset" is "point the layer
+  at 2 KB of tile data" - and anything you can write is a charset.
+
+  VRAM layout the kernel establishes: the tilemap is 128x64 cells of
+  two bytes at $00000-$03FFF, and the font is 256 glyphs of 8 bytes at
+  FONT. A font must start on a 2 KB boundary - the tile-base register
+  holds addr>>11 - so FONT2 is simply the next slot up, and the first
+  free VRAM after the console's own.
+
+  A glyph is 8 bytes, one per scanline, top first, bit 7 leftmost.
+  Codes are CP437 and the tile index IS the character code: no $20
+  bias, so 65 GLYPH-ADDR is the "A" the kernel prints. )
+$4000 constant font   ( the kernel's CP437, live at boot )
+$4800 constant font2  ( the next 2 KB slot - free VRAM, yours )
+
+: charset ( vaddr -- ) 0 0 rot tilebase ;
+: glyph-addr ( base n -- vaddr ) 8 * + ;
+
+( FONT-COPY moves 2 KB VRAM to VRAM a byte at a time, through the CPU.
+  VERA has two data ports and a copy could stream both, but VADDR here
+  only drives port 0 - and this runs once, so re-addressing per byte
+  costs milliseconds nobody waits for. Copy before you edit: writing
+  over FONT itself edits the font the kernel is drawing with, which is
+  legal and immediate but leaves no way back short of a reboot.
+
+  No >R inside the loop, and that is not a style preference: I is
+  literally R@ at a fixed stack offset, so ANY cell parked on the
+  return stack makes I read the wrong one. It looks like a copy that
+  runs but moves the wrong bytes. Juggle on the data stack instead. )
+: font-copy ( src dst -- )
+  2048 0 do
+    over i + 0 swap vpeek       ( src dst byte )
+    over i + swap 0 -rot vpoke  ( src dst )
+  loop 2drop ;
+
+: glyph! ( c-addr base n -- ) glyph-addr 0 swap vaddr
+  8 0 do dup i + c@ v! loop drop ;
+: glyph@ ( base n c-addr -- ) >r glyph-addr 0 swap vaddr r>
+  8 0 do dup i + v@ swap c! loop drop ;
+
 cr
 ( the machine's two spaces: program in the four single-cycle banks
   via HERE/ALLOT, data in SDRAM from bank $05 up to $DF via

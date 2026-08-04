@@ -31,3 +31,32 @@ access set the address once with VADDR then stream with V!/V@.
 [x] IOC@ ( addr -- byte ) - fetch a byte from bank $00, where the I/O page
     lives. VERA register readbacks need this: a plain C@ reads the program
     bank. 7 BORDER $9F2C IOC@ -> 7
+
+--- the console font (the X816's CHARSET) ---
+The console is VERA layer 0 and its font is ordinary VRAM the kernel filled
+at boot. There is no charset ROM here, so unlike the X16's CHARSET these
+take an ADDRESS, not a ROM number - and anything you can write is a
+charset. A font is 256 glyphs x 8 bytes = 2 KB and must start on a 2 KB
+boundary (the tile-base register holds addr>>11). A glyph is 8 bytes, one
+per scanline, top first, bit 7 leftmost. Codes are CP437 and the tile index
+IS the character code - no $20 bias, so 65 is the "A" the machine prints.
+
+[x] FONT ( -- vaddr ) - $4000, the kernel's CP437, live at boot. The
+    tilemap sits below it at $00000-$03FFF (128x64 cells of two bytes).
+[x] FONT2 ( -- vaddr ) - $4800, the next 2 KB slot up. Free VRAM, yours.
+[x] CHARSET ( vaddr -- ) - point layer 0 at a font. FONT CHARSET restores.
+[x] GLYPH-ADDR ( base n -- vaddr ) - where glyph n of that font lives.
+[x] FONT-COPY ( src dst -- ) - duplicate 2 KB of tile data.
+[x] GLYPH! ( c-addr base n -- ) - write 8 bytes from memory into glyph n.
+[x] GLYPH@ ( base n c-addr -- ) - read glyph n back into 8 bytes of memory.
+
+Redefining a character, the whole loop - copy first, because editing FONT
+edits the font being drawn with and there is no way back short of a reboot:
+    CREATE MYGLYPH 8 ALLOT
+    FONT FONT2 FONT-COPY            \ work on a copy
+    $FF MYGLYPH C!  $81 MYGLYPH 1+ C!    ( ...8 bytes... )
+    MYGLYPH FONT2 200 GLYPH!        \ redefine character 200
+    FONT2 CHARSET                   \ and show it
+Nothing stops you pointing CHARSET at a font you never wrote; the screen
+fills with whatever those 2 KB happened to contain, and FONT CHARSET
+typed blind still puts it back.

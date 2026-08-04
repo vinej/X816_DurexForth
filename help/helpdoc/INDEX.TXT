@@ -5,7 +5,7 @@ Every entry on these pages carries [x] or [ ]. [x] means the word IS in
 this machine and [ ] means it is not yet - and as of 2026-08-04 that is
 not a hand-kept promise: each page was probed word by word against the
 live dictionary, so the two lists agree with what FIND-NAME can see.
-339 of 567 are present. The unticked remainder is mostly whole modules
+346 of 572 are present. The unticked remainder is mostly whole modules
 (FLOAT, GRAPHIC, AUDIO*, LOADSAVE) plus the four files durexforth.asm
 does not assemble - INPUT, KEYBOARD's last three, CONTROL's clock and
 I2C - each of which says so on its own page.
@@ -29,13 +29,13 @@ I2C - each of which says so on its own page.
  FILE        OPEN-FILE READ-LINE INCLUDE R/O W/O  CD DIR
  STRUCTURE   BEGIN-STRUCTURE FIELD: +FIELD  (records)
  SYSTEM      BYE VER ENVIRONMENT? UNUSED IRQ FREE
- VIDEO       SCREEN COLOR BORDER CLS LOCATE VPOKE V! ...
+ VIDEO       BORDER CLS LOCATE VPOKE V!  + CHARSET/GLYPH! (font)
  SPRITE      SPRITE SPRITE-POS SPRITE-IMAGE MOVSPR ...
  GRAPHIC     GINIT PSET LINE RECT OVAL GTEXT + pen API
  TILE        TILE TDATA TATTR  (layer-1 tilemap cells)
  PAL         PAL!  (palette entry)
  INPUT       JOY MOUSE MX MY MB MWHEEL
- KEYBOARD    KEY? GETKEY CHARSET KEYMAP
+ KEYBOARD    KEY KEY?  (CHARSET moved to VIDEO)
  AUDIOFM     PSG & YM2151 FM  FMINIT FMNOTE PSGNOTE ...
  AUDIOYM     raw YM2151 register access  YM! FMPOKE
  AUDIOPCM    PCM FIFO  PCMCTRL PCMRATE PCM! PCM-WRITE
