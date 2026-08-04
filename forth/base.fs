@@ -1,6 +1,6 @@
 : 2+ 1+ 1+ ;
-: 2! swap over ! 2+ ! ;
-: 2@ dup 2+ @ swap @ ;
+: 2! swap over ! 4 + ! ;
+: 2@ dup 4 + @ swap @ ;
 : jmp, 4c c, ;
 : postpone bl word dup find ?dup 0= if
 count notfound then
@@ -10,10 +10,10 @@ rot drop -1 = if [ ' literal compile,
 : ['] ' postpone literal ; immediate
 : [char] char postpone literal
 ; immediate
-: else jmp, here 0 ,
-swap here swap ! ; immediate
-: until postpone 0branch , ; immediate
-: again jmp, , ; immediate
+: else jmp, here 0 w,
+swap here swap w! ; immediate
+: until postpone 0branch w, ; immediate
+: again jmp, w, ; immediate
 : recurse
 latestxt compile, ; immediate
 
@@ -32,11 +32,13 @@ else begin >in @ ')' parse nip >in @ rot
 - = while refill drop repeat then ;
 immediate
 
+( X816 stage B: return-ADDRESS juggling uses rw>/w>r - a >R cell is 32
+  bits but an rts consumes 16. )
 : lits ( -- addr len )
-r> 1+ count 2dup + 1- >r ;
+rw> 1+ count 2dup + 1- w>r ;
 
 ( "0 to foo" sets value foo to 0 )
-: (to) >r split r@ 2+ c! r> c! ;
+: (to) >r split $ff and r@ 3 + c! r> w! ;
 \ TO on a VALUE - code word, first byte $a9 - patches its immediates.
 \ TO on a 2VALUE - create/does> word, first byte $20 - stores the double
 \ at the data field xt+5 with 2!.
@@ -94,8 +96,8 @@ repeat ; immediate
  3. variable length data )
 here 60 c, ( rts )
 : create
-header postpone dodoes literal , ;
-: does> r> 1+ latest >xt 1+ 2+ ! ;
+header postpone dodoes literal w, ;
+: does> rw> 1+ latest >xt 3 + w! ;
 
 .( asm..)
 parse-name asm included
@@ -112,7 +114,7 @@ parse-name asm included
    foo . \ prints 1 )
 : value ( n -- )
 ( TO relies on this lda/ldy order )
-code split swap lda,# ldy,#
+code split swap lda,# $ff and ldy,#
 ['] pushya jmp, ;
 : constant value ;
 ( to free up space, pad could be
@@ -122,9 +124,9 @@ $500 constant pad ( X16 golden RAM )
 begin ?dup while space 1- repeat ;
 
 ( X816: W moved out of the relocated MSB stack plane - asm/durexforth.asm )
-a8 value w
-aa value w2
-ac value w3
+d4 value w
+d8 value w2
+dc value w3
 
 : hex 10 base ! ;
 : decimal a base ! ;
@@ -138,31 +140,31 @@ postpone drop postpone drop ; immediate
 \ the parked sysx/disk modules; they return with the platform-hooks phase.
 
 code 2/
-msb lda,x 80 cmp,# msb ror,x lsb ror,x
+msb lda,x 8000 cmp,# msb ror,x lsb ror,x
 rts, end-code
 code or
-msb lda,x msb 1+ ora,x msb 1+ sta,x
-lsb lda,x lsb 1+ ora,x lsb 1+ sta,x
-inx, rts, end-code
+msb lda,x msb 2+ ora,x msb 2+ sta,x
+lsb lda,x lsb 2+ ora,x lsb 2+ sta,x
+inx, inx, rts, end-code
 code xor
-msb lda,x msb 1+ eor,x msb 1+ sta,x
-lsb lda,x lsb 1+ eor,x lsb 1+ sta,x
-inx, rts, end-code
+msb lda,x msb 2+ eor,x msb 2+ sta,x
+lsb lda,x lsb 2+ eor,x lsb 2+ sta,x
+inx, inx, rts, end-code
 
-:- dup inx, rts, end-code
+:- dup inx, inx, rts, end-code
 code lshift ( x1 u -- x2 )
 lsb dec,x -branch bmi,
-lsb 1+ asl,x msb 1+ rol,x
+lsb 2+ asl,x msb 2+ rol,x
 latest >xt jmp,
 code rshift ( x1 u -- x2 )
 lsb dec,x -branch bmi,
-msb 1+ lsr,x lsb 1+ ror,x
+msb 2+ lsr,x lsb 2+ ror,x
 latest >xt jmp,
 
 : variable
 0 value
 here latest >xt 1+ (to)
-2 allot ;
+4 allot ;
 
 ( true alias: a new header whose xt
   points at the old word's code, with
@@ -171,11 +173,11 @@ here latest >xt 1+ (to)
 : synonym ( "newname" "oldname" -- )
 header parse-name 2dup find-name
 ?dup 0= if notfound then nip nip
-dup >xt latest dup c@ $1f and + 1+ !
+dup >xt latest dup c@ $1f and + 1+ w!
 c@ $c0 and latest dup c@ rot or swap c! ;
 
 ( double / buffer defining words - DEFINING.TXT )
-: 2variable ( "name" -- ) variable 2 allot ;
+: 2variable ( "name" -- ) variable 4 allot ;
 : buffer: ( n "name" -- ) create allot ;
 : 2constant ( d "name" -- ) create , , does> 2@ ;
 : 2value ( d "name" -- ) create , , does> 2@ ;
@@ -190,34 +192,31 @@ c@ $c0 and latest dup c@ rot or swap c! ;
 
 ( double-cell numbers - DOUBLE.TXT. core so DOUBLE works without compat. )
 code 2over ( a b c d -- a b c d a b )
-dex,
-msb 4 + lda,x msb sta,x
-lsb 4 + lda,x lsb sta,x
-dex,
-msb 4 + lda,x msb sta,x
-lsb 4 + lda,x lsb sta,x rts, end-code
+dex, dex,
+msb 8 + lda,x msb sta,x
+lsb 8 + lda,x lsb sta,x
+dex, dex,
+msb 8 + lda,x msb sta,x
+lsb 8 + lda,x lsb sta,x rts, end-code
 code 2swap ( a b c d -- c d a b )
-lsb lda,x lsb 2+ ldy,x
-lsb sty,x lsb 2+ sta,x
-msb lda,x msb 2+ ldy,x
-msb sty,x msb 2+ sta,x
-lsb 1+ lda,x lsb 3 + ldy,x
-lsb 1+ sty,x lsb 3 + sta,x
-msb 1+ lda,x msb 3 + ldy,x
-msb 1+ sty,x msb 3 + sta,x rts, end-code
+lsb lda,x pha, lsb 4 + lda,x lsb sta,x pla, lsb 4 + sta,x
+msb lda,x pha, msb 4 + lda,x msb sta,x pla, msb 4 + sta,x
+lsb 2+ lda,x pha, lsb 6 + lda,x lsb 2+ sta,x pla, lsb 6 + sta,x
+msb 2+ lda,x pha, msb 6 + lda,x msb 2+ sta,x pla, msb 6 + sta,x
+rts, end-code
 code d+ ( d1 d2 -- d3 )
 clc,
-lsb 1+ lda,x lsb 3 + adc,x lsb 3 + sta,x
-msb 1+ lda,x msb 3 + adc,x msb 3 + sta,x
-lsb lda,x lsb 2+ adc,x lsb 2+ sta,x
-msb lda,x msb 2+ adc,x msb 2+ sta,x
-inx, inx, rts, end-code
+lsb 2+ lda,x lsb 6 + adc,x lsb 6 + sta,x
+msb 2+ lda,x msb 6 + adc,x msb 6 + sta,x
+lsb lda,x lsb 4 + adc,x lsb 4 + sta,x
+msb lda,x msb 4 + adc,x msb 4 + sta,x
+inx, inx, inx, inx, rts, end-code
 : ?dnegate 0< if dnegate then ;
 : dabs dup ?dnegate ;
 : d>s ( d -- n ) drop ;
 : d- ( d1 d2 -- d3 ) dnegate d+ ;
 : d2* ( d -- 2d ) 2dup d+ ;
-: d2/ ( d -- d/2 ) dup >r 2/ swap 1 rshift r> 1 and $f lshift or swap ;
+: d2/ ( d -- d/2 ) dup >r 2/ swap 1 rshift r> 1 and $1f lshift or swap ;
 : d0= ( d -- flag ) or 0= ;
 : d0< ( d -- flag ) nip 0< ;
 : d= ( d1 d2 -- flag ) d- d0= ;
@@ -296,8 +295,8 @@ postpone then ; immediate
 : marker ( -- )
 (includes) latest here create , , ,
 does> dup @ to here
-   2+ dup @ to latest
-   2+     @ to (includes) ;
+   4 + dup @ to latest
+   4 +     @ to (includes) ;
 
 : include parse-name included ;
 

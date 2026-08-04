@@ -8,5 +8,5 @@ r> move then ;
 : defcode ( "name" -- )
 parse-name 2dup find-name ?dup 0=
 if notfound then nip nip
-count $1f and + here swap ! ;
+count $1f and + here swap w! ;
 : define defcode ] ;

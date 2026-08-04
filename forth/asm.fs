@@ -1,18 +1,21 @@
 : 1mi create c, does> c@ c, ;
 : 2mi create c, does> c@ c, c, ;
-: 3mi create c, does> c@ c, , ;
+: 3mi create c, does> c@ c, w, ;
 : 23mi create , does>
-over $ff00 and if c@ c, ,
+over $ff00 and if c@ c, w,
 else 1+ c@ c, c, then ;
+( X816 stage B: code words run M=0 - accumulator immediates are 16-bit
+  wide, index immediates stay 8-bit. ami = opcode + word immediate. )
+: ami create c, does> c@ c, w, ;
 
-$69 2mi adc,#
+$69 ami adc,#
 $656d 23mi adc,
 $757d 23mi adc,x
 $79 3mi adc,y
 $61 2mi adc,(x)
 $71 2mi adc,(y)
 
-$29 2mi and,#
+$29 ami and,#
 $252d 23mi and,
 $353d 23mi and,x
 $39 3mi and,y
@@ -40,7 +43,7 @@ $d8 1mi cld,
 $58 1mi cli,
 $b8 1mi clv,
 
-$c9 2mi cmp,#
+$c9 ami cmp,#
 $c5cd 23mi cmp,
 $d5dd 23mi cmp,x
 $d9 3mi cmp,y
@@ -59,7 +62,7 @@ $d6de 23mi dec,x
 $ca 1mi dex,
 $88 1mi dey,
 
-$49 2mi eor,#
+$49 ami eor,#
 $454d 23mi eor,
 $555d 23mi eor,x
 $59 3mi eor,y
@@ -77,7 +80,7 @@ $6c 3mi (jmp),
 
 $20 3mi jsr,
 
-$a9 2mi lda,#
+$a9 ami lda,#
 $a5ad 23mi lda,
 $b5bd 23mi lda,x
 $b9 3mi lda,y
@@ -98,7 +101,7 @@ $565e 23mi lsr,x
 
 $ea 1mi nop,
 
-$9 2mi ora,#
+$9 ami ora,#
 $050d 23mi ora,
 $151d 23mi ora,x
 $19 3mi ora,y
@@ -121,7 +124,7 @@ $767e 23mi ror,x
 $40 1mi rti,
 $60 1mi rts,
 
-$e9 2mi sbc,#
+$e9 ami sbc,#
 $e5ed 23mi sbc,
 $f5fd 23mi sbc,x
 $f9 3mi sbc,y
@@ -150,9 +153,6 @@ $ba 1mi tsx,
 $8a 1mi txa,
 $9a 1mi txs,
 $98 1mi tya,
-
-\ illegal opcodes
-$cb 2mi sbx,#
 
 : code header ;
 : end-code ;

@@ -82,6 +82,7 @@ fs_getbyte
     ldy fs_ysave
     sec
     rts
+!as
 .serve
     ldy fs_cpos
     lda fs_cache, y

@@ -70,3 +70,34 @@ TWO_R_FETCH ; ( -- x1 x2 ) (R: x1 x2 -- x1 x2)
     lda 9,s
     sta MSB+2,x
     rts
+
+; Return-ADDRESS juggling, 16-bit. >R/R> move whole 32-bit cells, but a
+; real return address on the CPU stack is one 16-bit word - the stage-A
+; idiom "r> ... >r ; " (LITS, DOES>, (?DO), (+LOOP)) needs these instead,
+; or the rts after them consumes half a cell and executes the other half.
+; RW> zero-... no: BANK1-extends (the address is in this bank, and its
+; consumers do C@/+ arithmetic on it as a flat cell).
+
+    +BACKLINK "rw>", 3 | F_NO_TAIL_CALL_ELIMINATION
+RW_FROM ; ( -- w ) (R: w -- ) pull the caller's next R WORD
+    pla
+    inc
+    sta W
+    dex
+    dex
+    pla
+    sta LSB,x
+    lda #(BANK1 >> 16)
+    sta MSB,x
+    jmp (W)
+
+    +BACKLINK "w>r", 3 | F_NO_TAIL_CALL_ELIMINATION
+W_TO_R ; ( w -- ) (R: -- w ) push the cell's low word to R
+    pla
+    inc
+    sta W
+    lda LSB,x
+    pha
+    inx
+    inx
+    jmp (W)

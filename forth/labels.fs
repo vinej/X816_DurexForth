@@ -27,18 +27,23 @@ variable locp variable refp
 locs locp ! refs refp ! \ init
 
 \ reference
+( X816 stage B: HERE is a flat cell; the 2-byte entry slots are written
+  with w! and read back through cw@, which re-attaches THIS bank - a
+  16-bit-masked address handed to C! would write into bank 0. )
+: w@ ( a -- x ) @ $ffff and ;
+: cw@ ( a -- flataddr ) w@ $10000 or ;
 : @@ ( index -- dummy )
-here refp @ !
+here refp @ w!
 2 refp +! refp @ c! 1 refp +! 0 ;
 \ label
 : @: ( index -- )
-here locp @ !
+here locp @ w!
 2 locp +! locp @ c! 1 locp +! ;
 : end-code
 locs begin dup locp @ < while
 refs begin dup refp @ < while
 over 2+ c@ over 2+ c@ = if
-over @ over @ 2+ - over @ 1+ c!
+over cw@ over cw@ 2+ - over cw@ 1+ c!
 then 3 + repeat drop 3 + repeat drop
 \ reset
 locs locp ! refs refp ! ;

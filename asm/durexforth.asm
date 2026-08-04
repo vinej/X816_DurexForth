@@ -67,10 +67,14 @@ K_SPACE = ' '
 ;    $09-$40 and the handler corrupt each other once per frame, with the
 ;    victim chosen by interrupt phase - failures that look random and
 ;    move every run. The planes live in the free region at $32+.
-; Stage B planes: 40 cells of 32 bits. LSB = LOW WORD plane, MSB = HIGH
+; Stage B planes: 38 cells of 32 bits. LSB = LOW WORD plane, MSB = HIGH
 ; WORD plane (the names are historical, the width is not). X steps by 2.
-LSB = $32 ; low-word plane:  [$32 .. $81]
-MSB = $82 ; high-word plane: [$82 .. $D1]
+; $CA-$D3 is a deliberate GUARD BAND: the underflow reporters run with X
+; a cell or two ABOVE the empty mark, and those out-of-range plane writes
+; must land in dead space - stage A had the same slack by accident, and
+; without it the exception path clobbers W while reporting.
+LSB = $32 ; low-word plane:  [$32 .. $7D]
+MSB = $7e ; high-word plane: [$7E .. $C9]
 ; Temporary work areas for words, FOUR bytes each now: W holds a 24-bit
 ; pointer (byte 3 is padding kept zero) so @/! can go `lda [W],y` and
 ; reach the whole 16 MB. Some words use W..W2 as one 8-byte area - W2
@@ -107,10 +111,11 @@ WORDLIST_BASE = $feff
 ; in separate ranges on the zeropage, so that popping and
 ; pushing gets faster (only one inx/dex operation).
 
-X_INIT = $50 ; 40 cells x 2 bytes of low word - X steps by 2 per cell.
-             ; (The C64's 56 cells shrink: two word planes plus the wider
-             ; W areas must all fit in the free direct page at $32-$DF.
-             ; ANS asks for 32; the deepest suite test uses fewer than 20.)
+X_INIT = $4c ; 38 cells x 2 bytes of low word - X steps by 2 per cell.
+             ; (The C64's 56 cells shrink: two word planes, the guard band
+             ; and the wider W areas must all fit in the direct page at
+             ; $32-$DF. ANS asks for 32; the suite's deepest test uses
+             ; fewer than 20.)
 
 ; Dictionary
 ; ----------
@@ -263,9 +268,15 @@ ONE
 
     +BACKLINK "-1", 2
 MINUS_ONE
+    ; NOT pushya: its Y is a bank BYTE, and $FF zero-extends to $00FF -
+    ; a "-1" with a positive high word broke every POSTPONE of a
+    ; non-immediate word before this was traced.
     lda	#$ffff
-    ldy	#$ff
-    jmp pushya
+    dex
+    dex
+    sta LSB, x
+    sta MSB, x
+    rts
 
 ; START - points to the code of the startup word (a flat address).
     +BACKLINK "start", 5

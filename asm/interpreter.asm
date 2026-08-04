@@ -124,8 +124,13 @@ interpret_tib
     lda #-8
     ; fall through
 throw_a
-    ldy #$ff
-    jsr pushya
+    ; sign-extend the (always negative) code to a full cell - a bank
+    ; byte in Y cannot carry $FFFF
+    dex
+    dex
+    sta LSB,x
+    lda #$ffff
+    sta MSB,x
     jmp THROW
 
     +BACKLINK "execute", 7
@@ -362,6 +367,9 @@ FIND_NAME ; ( caddr u -- nt | 0 )
     inx
     jmp ZERO
 
+; the compare paths below are entered FROM the 8-bit walk - the assembler
+; must agree (a 16-bit immediate here runs its third byte as BRK)
+!as
 .string_compare
     ; equal strlen, now compare strings...
     tay
@@ -387,11 +395,13 @@ FIND_NAME ; ( caddr u -- nt | 0 )
     sta MSB, x
     rts
 
+!as
 .word_not_equal
     ldy #0
     lda (W), y
     and #STRLEN_MASK
     jmp .string_compare_failed
+!al
 
 GET_IMMED ; ( nt -- 1 | -1 )
     lda LSB, x

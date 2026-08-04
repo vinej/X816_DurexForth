@@ -69,15 +69,17 @@ ZBRANCH
     rts
 
     ; Exempt from TCE as top of return stack must contain a return address.
+    ; The return address is ONE 16-bit word (rw>/w>r); the loop's i and
+    ; limit are full cells.
     +BACKLINK "unloop",	6 | F_NO_TAIL_CALL_ELIMINATION
+    jsr RW_FROM
     jsr R_TO
     jsr R_TO
-    jsr R_TO
     inx
     inx
     inx
     inx
-    jsr TO_R
+    jsr W_TO_R
     rts
 
     +BACKLINK "exit", 4 | F_IMMEDIATE

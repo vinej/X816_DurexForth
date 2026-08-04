@@ -60,8 +60,11 @@ TYPE ; ( caddr u -- )
     beq +
 .pushtrue
     lda #$ffff
-    ldy #$ff
-    jmp pushya
+    dex
+    dex
+    sta LSB, x
+    sta MSB, x
+    rts
 +   jmp PUSHA ; A = 0: false
 
     +BACKLINK "key", 3
