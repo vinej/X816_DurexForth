@@ -1,27 +1,31 @@
 ; <# #> HOLD SIGN # #S U. . SPACE
+;
+; Stage B: a pictured number is a 64-bit double (two cells), and UD/MOD
+; does the heavy lifting exactly as before - the digit extraction below is
+; width-independent (digits < 36). The hold area is bytes in bank-1 golden
+; RAM; the pointer stays a 16-bit self-modified immediate.
 
 .hold_start = $5fc ; X16 golden RAM (grows down, stays within page $05)
 
 ; : <# holdp ! ;
 +BACKLINK "<#", 2
 LESS_NUMBER_SIGN
-    lda #<.hold_start
+    lda #.hold_start
     sta .holdp
     rts
 
-; : #> 2drop holdp @ $3fc over - ;
+; : #> 2drop holdp @ $5fc over - ;
 +BACKLINK "#>", 2
-NUMBER_SIGN_GREATER
+NUMBER_SIGN_GREATER ; ( ud -- addr len )
     lda .holdp
-    sta LSB+1,x
-    lda #>.hold_start
-    sta MSB+1,x
-    lda #<.hold_start
+    sta LSB+2,x
+    lda #(BANK1 >> 16)
+    sta MSB+2,x
+    lda #.hold_start
     sec
     sbc .holdp
     sta LSB,x
-    lda #0
-    sta MSB,x
+    stz MSB,x
     rts
 
 ; : hold -1 holdp +! holdp @ c! ;
@@ -29,17 +33,23 @@ NUMBER_SIGN_GREATER
 HOLD
     dec .holdp
     inx
-    lda LSB-1,x
+    inx
+    sep #$20
+!as
+    lda LSB-2,x
 .holdp = * + 1
     sta .hold_start
+    rep #$20
+!al
     rts
 
 ; : sign 0< if '-' hold then ;
 +BACKLINK "sign", 4
 SIGN
     inx
-    lda MSB-1,x
-    and #$80
+    inx
+    lda MSB-2,x
+    and #$8000
     bne +
     rts
 +   jsr LITC
@@ -69,8 +79,8 @@ NUMBER_SIGN_S
     jsr NUMBER_SIGN
     lda LSB,x
     ora MSB,x
-    ora LSB+1,x
-    ora MSB+1,x
+    ora LSB+2,x
+    ora MSB+2,x
     bne NUMBER_SIGN_S
     rts
 

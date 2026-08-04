@@ -1,28 +1,35 @@
 ; IF THEN BEGIN WHILE REPEAT BRANCH 0BRANCH UNLOOP EXIT
+;
+; Stage B: compiled control flow keeps its stage-A shape - branch operands
+; in the instruction stream are 16-bit IN-BANK addresses (the dictionary
+; stays inside bank $01, DUREXFORTH.md 2.3). So forward references compile
+; a 2-byte placeholder with WCOMMA and are patched with W_STORE, while the
+; general , and ! move whole 32-bit cells. HERE pushes a flat address; its
+; low word is the in-bank pointer these operands want.
 
     +BACKLINK "if", 2 | F_IMMEDIATE
-    jsr LIT
+    jsr LITXT
     !word ZBRANCH
     jsr COMPILE_COMMA
     jsr HERE
     jsr ZERO
-    jmp COMMA
+    jmp WCOMMA
 
     +BACKLINK "then", 4 | F_IMMEDIATE
     jsr HERE
     jsr SWAP
-    jmp STORE
+    jmp W_STORE
 
     +BACKLINK "begin", 5 | F_IMMEDIATE
     jmp HERE
 
     +BACKLINK "while", 5 | F_IMMEDIATE
-    jsr LIT
+    jsr LITXT
     !word ZBRANCH
     jsr COMPILE_COMMA
     jsr HERE
     jsr ZERO
-    jsr COMMA
+    jsr WCOMMA
     jmp SWAP
 
 COMPILE_JMP
@@ -32,44 +39,33 @@ COMPILE_JMP
 
     +BACKLINK "repeat", 6 | F_IMMEDIATE
     jsr COMPILE_JMP
-    jsr COMMA
+    jsr WCOMMA
     jsr HERE
     jsr SWAP
-    jmp STORE
+    jmp W_STORE
 
     +BACKLINK "branch", 6
 BRANCH
     pla
-    sta W
-    pla
-    sta W + 1
-
-    ldy	#2
-    lda	(W), y
-    sta + + 2
-    dey
-    lda	(W), y
+    inc
+    sta W ; the 2-byte operand's own address (in this bank)
+    lda (W)
     sta + + 1
 +   jmp PLACEHOLDER_ADDRESS ; replaced with branch destination
 
     +BACKLINK "0branch", 7
 ZBRANCH
     inx
-    lda	LSB-1, x
-    ora	MSB-1, x
+    inx
+    lda LSB - 2, x
+    ora MSB - 2, x
     beq BRANCH
 
-    ; skip offset
+    ; skip the 2-byte operand
     pla
     clc
     adc #2
-    bcc +
-    tay
-    pla
-    adc #0
     pha
-    tya
-+   pha
     rts
 
     ; Exempt from TCE as top of return stack must contain a return address.
@@ -77,6 +73,8 @@ ZBRANCH
     jsr R_TO
     jsr R_TO
     jsr R_TO
+    inx
+    inx
     inx
     inx
     jsr TO_R
@@ -88,16 +86,17 @@ EXIT
     bne +
     ; do tail call elimination: instead of adding a final rts,
     ; replace the last jsr with a jmp.
-    lda HERE_LSB
+    lda HERE_PTR
     sec
     sbc #3
-    tay
-    lda HERE_MSB
-    sbc #0
-    sta .instr_ptr + 1
+    sta .instr_ptr
+    sep #$20
+!as
     lda #OP_JMP
 .instr_ptr = * + 1
-    sta PLACEHOLDER_ADDRESS,y ; replaced with instruction pointer
+    sta PLACEHOLDER_ADDRESS ; operand replaced with the jsr's address
+    rep #$20
+!al
     rts
 +
     lda #OP_RTS

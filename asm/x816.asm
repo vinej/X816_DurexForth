@@ -1,15 +1,14 @@
 ; X816 - kernel crossing and machine glue.
 ;
-; durexForth code is 8-bit (M=1, X=1 native); the X816 kernel ABI is 16-bit
-; (M=0, X=0), entered by jsl through the jump table at $00:FE00 (entry n at
-; $FE00 + 4*n; numbers from X816_core tools/contract.py). This file is the
-; ONLY place that switches register widths - the same one-crossing rule
-; x16lib's system/x816kernel.asm follows, and for the same reason: a missed
-; sep does not crash, it leaves 8-bit code running 16-bit and the symptom
-; lands somewhere else entirely.
+; Stage B: durexForth code runs M=0/X=1 (durexforth.asm header); the X816
+; kernel ABI wants M=0/X=0, entered by jsl through the jump table at
+; $00:FE00 (entry n at $FE00 + 4*n; numbers from X816_core
+; tools/contract.py). Each shim goes rep #$30 for the crossing and comes
+; back with sep #$10 - the accumulator stays wide throughout, so the
+; convention holds at every boundary a word can see.
 ;
-; Every shim preserves X and Y (KERNAL CHROUT/GETIN did, and the Forth
-; stack pointer lives in X); the kernel itself preserves nothing but D/DBR.
+; Every shim preserves X and Y (the Forth stack pointer lives in X); the
+; kernel itself preserves nothing but D/DBR.
 ;
 ; The program runs with PBR = DBR = its own bank ($01), so absolute data
 ; references reach the image. The two things that must NOT go through DBR:
@@ -31,7 +30,7 @@ KERN_FS_READ  = $00fe48             ; C:X = parameter block -> C = bytes read
 KERN_FS_SEEK  = $00fe50             ; C:X = parameter block
 
 ; Direct-page staging for the width crossing. $E0-$EF is unclaimed by the
-; Forth core (stacks $09-$78, W/W2/W3 $9C-$A1).
+; Forth core (planes $32-$D1, W/W2/W3 $D4-$DF).
 KTMP  = $e0                         ; 16-bit result/argument staging
 KTMP2 = $e2                         ; second 16-bit staging
 SPR_OFF = $ef                       ; sprite.asm attribute offset (in dp so
@@ -42,73 +41,70 @@ SPR_OFF = $ef                       ; sprite.asm attribute offset (in dp so
 ; 16-bit, with this value. NOT the C64's $01FF: kernel calls (jsl + KENTER
 ; frames + C bodies) and the VSYNC cursor IRQ land on this stack too, and
 ; a 16-bit S that sinks below $0100 dives into the direct page and smashes
-; the Forth stacks at $41-$78. KERNEL.md 3.1 gives programs $0100-$1FFF of
-; stack; take the top. CATCH snapshots only SL (8-bit tsx), which stays
-; valid because Forth's own return depth keeps S inside the $1Fxx page -
-; THROW rebuilds SH from >RSTACK_TOP.
+; the Forth stacks. KERNEL.md 3.1 gives programs $0100-$1FFF of stack;
+; take the top. CATCH snapshots the full 16-bit S (exception.asm).
 RSTACK_TOP = $1fff
 
 ; Switch DBR to bank $00 for a run of I/O-page accesses. Clobbers A - use
-; at word entry, before the first operand load.
+; at word entry, before the first operand load. (phb/plb are 8-bit always;
+; the lda #0 rides in the 16-bit accumulator harmlessly.)
 !macro VIO {
     phb
     lda #0
     pha
     plb
+    plb ; drop the high byte of the 16-bit push, keep DBR = the low ($00)
 }
 !macro VIO_END {
     plb
 }
 
-; PUTCHR - print A. The KERNAL-CHROUT shape: preserves A, X and Y.
-; CON_PUTC interprets $08 backspace, $0a newline, $0d return; everything
-; else is a CP437 glyph. One translation: the Forth sends $0d meaning the
-; PETSCII "next line", but CON_PUTC's $0d is return-only (column 0, same
-; row) - so $0d becomes $0a here, or every REPL line would overprint row 0.
+; PUTCHR - print the character in A (low byte). The KERNAL-CHROUT shape:
+; preserves A, X and Y. CON_PUTC interprets $08 backspace, $0a newline,
+; $0d return; everything else is a CP437 glyph. One translation: the Forth
+; sends $0d meaning the PETSCII "next line", but CON_PUTC's $0d is
+; return-only (column 0, same row) - so $0d becomes $0a here, or every
+; REPL line would overprint row 0.
 PUTCHR
     phx
     phy
     pha
+    and #$ff
     cmp #$0d
     bne +
     lda #$0a
 +   rep #$30
-!al
 !rl
     and #$00ff
     jsl KERN_PUTC
-    sep #$30
-!as
+    sep #$10
 !rs
     pla
     ply
     plx
     rts
 
-; kern_getc - blocking key read, A = character. Polls CON_GETKEY rather
-; than calling the blocking CON_GETC: the shell's own line reader polls
-; (the path run-fwboot.sh proves on the real keyboard), and polling from
-; here keeps the block on our side of the ABI. Keys without a character
-; ($01xx) are swallowed: the 8-bit Forth REPL cannot express them yet.
+; kern_getc - blocking key read, A = character (zero-extended). Polls
+; CON_GETKEY rather than calling the blocking CON_GETC: the shell's own
+; line reader polls, and polling from here keeps the block on our side of
+; the ABI. Keys without a character ($01xx) are swallowed: the Forth REPL
+; cannot express them yet.
 kern_getc
     phx
     phy
 -   rep #$30
-!al
 !rl
     jsl KERN_GETKEY
-    sta KTMP
-    sep #$30
-!as
+    sep #$10
 !rs
+    sta KTMP
     lda KTMP
-    ora KTMP+1
     beq -               ; no key yet
-    lda KTMP+1
+    and #$ff00
     bne -               ; non-character key
+    lda KTMP
     ply
     plx
-    lda KTMP
     rts
 
 ; kern_getin - the GETIN shape: A = character, 0 if none. Non-character
@@ -117,33 +113,34 @@ kern_getin
     phx
     phy
     rep #$30
-!al
 !rl
     jsl KERN_GETKEY
-    sta KTMP
-    sep #$30
-!as
+    sep #$10
 !rs
+    sta KTMP
+    lda KTMP
+    and #$ff00
+    beq +
+    lda #0
     ply
     plx
-    lda KTMP+1
-    bne +
-    lda KTMP
     rts
-+   lda #0
++   lda KTMP
+    ply
+    plx
     rts
 
 ; kern_cls - clear the console.
 kern_cls
     phx
     phy
+    pha
     rep #$30
-!al
 !rl
     jsl KERN_CLS
-    sep #$30
-!as
+    sep #$10
 !rs
+    pla
     ply
     plx
     rts
@@ -151,11 +148,11 @@ kern_cls
 ; kern_gotoxy - A = column, Y = row.
 kern_gotoxy
     sta KTMP
-    sty KTMP2
     phx
     phy
+    sty KTMP2
+    stz KTMP2+1
     rep #$30
-!al
 !rl
     lda KTMP2
     and #$00ff
@@ -163,8 +160,7 @@ kern_gotoxy
     lda KTMP
     and #$00ff
     jsl KERN_GOTOXY
-    sep #$30
-!as
+    sep #$10
 !rs
     ply
     plx
@@ -175,13 +171,11 @@ kern_getxy
     phx
     phy
     rep #$30
-!al
 !rl
     jsl KERN_GETXY
     sta KTMP
     stx KTMP2
-    sep #$30
-!as
+    sep #$10
 !rs
     ply
     plx
@@ -192,12 +186,10 @@ kern_frames
     phx
     phy
     rep #$30
-!al
 !rl
     jsl KERN_FRAMES
     sta KTMP
-    sep #$30
-!as
+    sep #$10
 !rs
     ply
     plx
@@ -210,15 +202,13 @@ kern_fs_open
     phx
     phy
     rep #$30
-!al
 !rl
     ldx #1                          ; path bank = this bank
     lda #fs_name
     ldy #0                          ; mode 0 = read (KFS_READ)
     jsl KERN_FS_OPEN
     sta KTMP
-    sep #$30
-!as
+    sep #$10
 !rs
     ply
     plx
@@ -230,15 +220,13 @@ kern_fs_open
 kern_fs_close
     phx
     phy
+    and #$ff
     sta KTMP
-    stz KTMP+1
     rep #$30
-!al
 !rl
     lda KTMP
     jsl KERN_FS_CLOSE
-    sep #$30
-!as
+    sep #$10
 !rs
     ply
     plx
@@ -246,23 +234,20 @@ kern_fs_close
 
 ; kern_fs_fill - A = handle. Reads up to 128 bytes into fs_cache (fs.asm)
 ; with ONE kernel crossing and returns the count in A (0 = end of file, and
-; a device error reads as end of file). fs.asm's fs_getbyte serves single
-; bytes out of the cache; reading source a byte per jsl cost the test
-; suite whole minutes.
+; a device error reads as end of file).
 kern_fs_fill
     phx
     phy
+    and #$ff
     sta fs_blk+0                    ; handle (block +0); dest and count are
                                     ; assembled constants in fs.asm
     rep #$30
-!al
 !rl
     ldx #1                          ; block pointer bank
     lda #fs_blk
     jsl KERN_FS_READ
     sta KTMP                        ; bytes read
-    sep #$30
-!as
+    sep #$10
 !rs
     ply
     plx
@@ -279,20 +264,24 @@ kern_fs_fill
 kern_fs_seekback
     phx
     phy
+    and #$ff
     sta fs_skblk+0
-    tya
+    sty KTMP
+    stz KTMP+1
+    lda KTMP
     eor #$ff
-    clc
-    adc #1                          ; two's complement low byte
+    inc                             ; two's complement low byte
+    sep #$20
+!as
     sta fs_skblk+4                  ; offset = -Y, sign-extended $FF above
-    rep #$30
+    rep #$20
 !al
+    rep #$30
 !rl
     ldx #1
     lda #fs_skblk
     jsl KERN_FS_SEEK
-    sep #$30
-!as
+    sep #$10
 !rs
     ply
     plx
@@ -306,11 +295,16 @@ kern_fs_seekback
     +BACKLINK "emu-exit", 8
 EMU_EXIT
     phb
+    sep #$20
+!as
     lda #0
     pha
     plb                             ; the I/O page lives in bank 0
     lda LSB, x                      ; direct page: readable under any DBR
     sta $9fbc
+    rep #$20
+!al
+    inx
     inx
     plb
     rts
@@ -318,10 +312,8 @@ EMU_EXIT
 ; kern_exit - back to the kernel prompt. Does not return.
 kern_exit
     rep #$30
-!al
 !rl
     lda #0
     jsl KERN_EXIT
-!as
 !rs
 -   bra -                           ; unreachable

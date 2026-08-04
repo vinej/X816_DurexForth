@@ -2,8 +2,32 @@
 
 ; ACME assembler
 
-!cpu 65816	; X816: 65816 native. The core is still 8-bit code (M=1, X=1);
-		; asm/x816.asm is the only file that switches widths.
+!cpu 65816	; X816: 65816 native, 32-bit cells (stage B).
+;
+; THE WIDTH CONVENTION - the one decision every primitive honours
+; (X816_core doc/DUREXFORTH.md 4.2: get this wrong and the failures look
+; random). At every word's ENTRY and EXIT, and at every point where
+; compiled code runs:
+;
+;     M = 0   (16-bit accumulator/memory)
+;     X = 1   (8-bit index registers)
+;
+; A word that needs byte operations goes `sep #$20` and MUST `rep #$20`
+; before rts. A word that needs a 16-bit index saves and restores the
+; width. The kernel crossings in x816.asm keep their own discipline
+; (rep #$30 around jsl) and re-enter this convention on the way out.
+;
+; Cells are 32 bits, held in two direct-page WORD planes indexed by X,
+; which steps by TWO (dex/dex pushes, inx/inx pops). The historical names
+; stay: LSB is the LOW WORD plane (bits 0-15), MSB the HIGH WORD plane
+; (bits 16-31). `lda LSB, x` under M=0 reads a cell's low word in one
+; instruction - the C64 split-byte-stack shape, widened, exactly as
+; DUREXFORTH.md 2.2 planned. Neighbouring items are +2/-2, not +1.
+;
+; Addresses in cells are FLAT 24-bit (the whole point of stage B:
+; DUREXFORTH.md 2.1) - the dictionary's cells carry $01xxxx, TIB carries
+; $01x600, and @/! dereference through [W] long addressing. Compiled code
+; still targets bank $01 with plain 16-bit jsr (2.3's one-bank ceiling).
 !to "build/forth.bin", plain	; X816 image: file offset = offset in bank $01
 ; No !ct: text/char literals stay ASCII. The X816 console is CP437, which
 ; agrees with ASCII in $20-$7E; the X16 control codes ($93 clear, $12 rvs)
@@ -43,19 +67,17 @@ K_SPACE = ' '
 ;    $09-$40 and the handler corrupt each other once per frame, with the
 ;    victim chosen by interrupt phase - failures that look random and
 ;    move every run. The planes live in the free region at $32+.
-LSB = $32 ; low-byte stack:  [$32 .. $69]
-MSB = $6a ; high-byte stack: [$6A .. $A1]
-; Temporary work areas for words, two bytes each.  These MUST stay outside
-; the X16 ROM's own zeropage segments (ZPKERNAL $80-$90, ZPDOS $91-$9B,
-; ZPAUDIO $A7-$A8, ZPMATH $A9-$D3, ZPBASIC $D4-$FE): the C64 port had W at
-; $8B, and any code word that parked the Forth stack pointer in W across a
-; KERNAL call (open, chkin, ...) got it clobbered by CBDOS and crashed with
-; a "stack" error.  $9C-$A6 is claimed by no ROM bank.
-; Moved from the C64's $9C-$A1: that range is inside the relocated MSB
-; plane now. Still contiguous - some words use W..W2+1 as one 4-byte area.
-W = $a8
-W2 = $aa ; must stay at W+2
-W3 = $ac
+; Stage B planes: 40 cells of 32 bits. LSB = LOW WORD plane, MSB = HIGH
+; WORD plane (the names are historical, the width is not). X steps by 2.
+LSB = $32 ; low-word plane:  [$32 .. $81]
+MSB = $82 ; high-word plane: [$82 .. $D1]
+; Temporary work areas for words, FOUR bytes each now: W holds a 24-bit
+; pointer (byte 3 is padding kept zero) so @/! can go `lda [W],y` and
+; reach the whole 16 MB. Some words use W..W2 as one 8-byte area - W2
+; must stay at W+4.
+W = $d4
+W2 = $d8 ; must stay at W+4
+W3 = $dc
 TIB = $600 ; text input buffer (X16 golden RAM; $600-$7ff = 512 bytes)
 ; TIB grows upward as nested INCLUDEs stack their current lines, so it gets
 ; the top 512-byte run of golden RAM all to itself.  It must NOT sit at $400:
@@ -85,7 +107,10 @@ WORDLIST_BASE = $feff
 ; in separate ranges on the zeropage, so that popping and
 ; pushing gets faster (only one inx/dex operation).
 
-X_INIT = $38 ; 56 cells, the original capacity - see the LSB/MSB comment
+X_INIT = $50 ; 40 cells x 2 bytes of low word - X steps by 2 per cell.
+             ; (The C64's 56 cells shrink: two word planes plus the wider
+             ; W areas must all fit in the free direct page at $32-$DF.
+             ; ANS asks for 32; the deepest suite test uses fewer than 20.)
 
 ; Dictionary
 ; ----------
@@ -149,9 +174,12 @@ PLACEHOLDER_ADDRESS = $1200
     tcd
     ldx #RSTACK_TOP
     txs
-    sep #$30
-!as
+    sep #$10
 !rs
+    rep #$20
+!al
+    ; The stage-B convention starts here: M=0, X=1, for every word and all
+    ; compiled code (see the header). x816.asm crossings re-establish it.
     phk
     plb
     cli
@@ -172,24 +200,59 @@ _START = * + 1
 ; Word Definitions
 ; ----------------
 
-!macro VALUE .word {
-    lda	#<.word
-    ldy	#>.word
+; The bank the image lives in. Cells hold FLAT addresses: pushing the
+; address of anything assembled in this file means pushing BANK1 + label.
+; (The label alone is still what absolute operands want - only the value
+; that lands in a CELL carries the bank.)
+BANK1 = $010000
+
+!macro VALUE .val {
+    lda	#.val & $ffff
+    ldy	#^.val
     jmp pushya
 }
 
+; pushya - push the cell A:Y (A = low word, Y = high byte; bits 24-31
+; zero). The historical name, one width up: every address on this machine
+; fits 24 bits, so Y-as-bank covers all constant pushes.
     +BACKLINK "pushya", 6
 pushya
     dex
+    dex
     sta	LSB, x
-    sty	MSB, x
+    sep #$20
+!as
+    tya
+    sta MSB, x
+    stz MSB+1, x
+    rep #$20
+!al
+    rts
+
+; PUSHA - push A as a cell, high word zero. The workhorse for 16-bit
+; results computed in A.
+PUSHA
+    dex
+    dex
+    sta LSB, x
+    stz MSB, x
+    rts
+
+; pushbank1 - push A as a bank-$01 flat address: cell = BANK1 + A.
+; Replaces stage A's `lda #< / ldy #> / jsr pushya` for in-image
+; addresses.
+pushbank1
+    dex
+    dex
+    sta LSB, x
+    lda #(BANK1 >> 16)
+    sta MSB, x
     rts
 
     +BACKLINK "0", 1
 ZERO
     lda	#0
-    tay
-    jmp pushya
+    jmp PUSHA
 
     +BACKLINK "1", 1
 ONE
@@ -200,14 +263,16 @@ ONE
 
     +BACKLINK "-1", 2
 MINUS_ONE
-    lda	#-1
-    tay
+    lda	#$ffff
+    ldy	#$ff
     jmp pushya
 
-; START - points to the code of the startup word.
+; START - points to the code of the startup word (a flat address).
     +BACKLINK "start", 5
-    +VALUE	_START
+    +VALUE	BANK1 + _START
 
+; The planes and scratch live in the direct page = bank $00: their flat
+; addresses have no bank byte.
     +BACKLINK "msb", 3
     +VALUE	MSB
 
@@ -241,7 +306,12 @@ BOOT_STRING
 !src "../build/version.asm"
 PRINT_BOOT_MESSAGE
     ldx #0
--   lda BOOT_STRING,x
+-   sep #$20
+!as
+    lda BOOT_STRING,x
+    rep #$20
+!al
+    and #$ff
     jsr PUTCHR
     inx
     cpx #(PRINT_BOOT_MESSAGE - BOOT_STRING)
@@ -251,12 +321,12 @@ PRINT_BOOT_MESSAGE
     jmp QUIT
 
 ; LATEST - points to the most recently defined dictionary word.
+; LATEST_PTR is the 16-bit in-bank pointer inside the VALUE's immediate.
 
     +BACKLINK "latest", 6
 LATEST
-LATEST_LSB = * + 1
-LATEST_MSB = * + 3
-    +VALUE	__LATEST
+LATEST_PTR = * + 1
+    +VALUE	BANK1 + __LATEST
 
 HERE_POSITION ; everything following this will be overwritten!
 
@@ -265,23 +335,20 @@ HERE_POSITION ; everything following this will be overwritten!
 ; prints, and QUIT still delivers a working prompt with the assembled
 ; words only - a card problem must not cost the machine its REPL.
 load_base
-    lda #<PRINT_BOOT_MESSAGE
+    lda #PRINT_BOOT_MESSAGE
     sta _START
-    lda #>PRINT_BOOT_MESSAGE
-    sta _START+1
     dex
     dex
-    lda #<basename
-    sta LSB+1, x
-    lda #>basename
-    sta MSB+1, x
+    dex
+    dex
+    lda #basename
+    sta LSB+2, x
+    lda #(BANK1 >> 16)
+    sta MSB+2, x
     lda #(basename_end - basename)
     sta LSB, x
-    lda #0
-    sta MSB, x
-    lda #>(QUIT-1)
-    pha
-    lda #<(QUIT-1)
+    stz MSB, x
+    lda #QUIT-1
     pha
     jmp INCLUDED
 
