@@ -124,7 +124,7 @@ STATE
     !word 0, 0
 
     +BACKLINK "latestxt", 8
-LATEST_XT = * + 1
+LATEST_XT = * + 3
     +VALUE	BANK1 + 0
 
     ; Exempt from TCE because `: x ;` does not compile a jsr.
@@ -314,7 +314,7 @@ LITERAL
 ; pointer, patched at HERE_PTR by everything that allots.
     +BACKLINK "here", 4
 HERE
-HERE_PTR = * + 1
+HERE_PTR = * + 3
     +VALUE  BANK1 + HERE_POSITION
 
     +BACKLINK "dodoes", 6

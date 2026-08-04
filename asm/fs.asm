@@ -194,9 +194,9 @@ INCLUDED ; ( addr u -- ) interpret a file as source
     jmp throw_a
 +
     sta SOURCE_ID_LSB
+    stz SOURCE_ID_MSB
     sep #$20
 !as
-    stz SOURCE_ID_MSB
     stz fs_ccnt             ; a fresh file starts with an empty cache,
     stz fs_cpos             ; whatever an aborted include left behind
     rep #$20

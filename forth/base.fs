@@ -38,14 +38,14 @@ immediate
 rw> 1+ count 2dup + 1- w>r ;
 
 ( "0 to foo" sets value foo to 0 )
-: (to) >r split $ff and r@ 3 + c! r> w! ;
+: (to) >r split r@ 8 + w! r> 3 + w! ;
 \ TO on a VALUE - code word, first byte $a9 - patches its immediates.
 \ TO on a 2VALUE - create/does> word, first byte $20 - stores the double
 \ at the data field xt+5 with 2!.
 : to ' dup c@ $20 = if
 5 + state c@ if postpone literal postpone 2! exit then 2!
 else
-1+ state c@ if postpone literal postpone (to) exit then (to)
+state c@ if postpone literal postpone (to) exit then (to)
 then ; immediate
 
 : allot ( n -- ) here + to here ;
@@ -113,13 +113,12 @@ parse-name asm included
    1 to foo
    foo . \ prints 1 )
 : value ( n -- )
-( TO relies on this lda/ldy order )
-code split swap lda,# $ff and ldy,#
-['] pushya jmp, ;
+( TO relies on this exact layout: low-word imm at xt+3, high at xt+8 )
+code dex, dex, split swap lda,# lsb sta,x lda,# msb sta,x rts, ;
 : constant value ;
 ( to free up space, pad could be
   e.g. HERE+34 instead )
-$500 constant pad ( X16 golden RAM )
+$10500 constant pad ( golden RAM, as a flat bank-1 address )
 : spaces ( n -- )
 begin ?dup while space 1- repeat ;
 
@@ -163,7 +162,7 @@ latest >xt jmp,
 
 : variable
 0 value
-here latest >xt 1+ (to)
+here latest >xt (to)
 4 allot ;
 
 ( true alias: a new header whose xt

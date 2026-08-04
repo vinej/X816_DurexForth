@@ -27,9 +27,9 @@ quit_reset
     sta TIB_SIZE
     sta TO_IN_W
     sta SOURCE_ID_LSB
+    sta SOURCE_ID_MSB
     sep #$20
 !as
-    sta SOURCE_ID_MSB
     sta SAVE_INPUT_STACK_DEPTH
     rep #$20
 !al
@@ -601,12 +601,7 @@ WORD
 
     lda #$ffff
     sta SOURCE_ID_LSB
-    sep #$20
-!as
-    lda #$ff
     sta SOURCE_ID_MSB
-    rep #$20
-!al
 
     jmp interpret_and_close
 

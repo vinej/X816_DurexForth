@@ -211,10 +211,17 @@ _START = * + 1
 ; that lands in a CELL carries the bank.)
 BANK1 = $010000
 
+; The VALUE shape: two 16-bit immediates, so any 32-bit cell fits.
+; TO patches the low word at xt+3 and the high word at xt+8 - the
+; Forth-level VALUE generator (base.fs) emits the identical layout.
 !macro VALUE .val {
+    dex
+    dex
     lda	#.val & $ffff
-    ldy	#^.val
-    jmp pushya
+    sta LSB, x
+    lda	#(.val >> 16) & $ffff
+    sta MSB, x
+    rts
 }
 
 ; pushya - push the cell A:Y (A = low word, Y = high byte; bits 24-31
@@ -336,7 +343,7 @@ PRINT_BOOT_MESSAGE
 
     +BACKLINK "latest", 6
 LATEST
-LATEST_PTR = * + 1
+LATEST_PTR = * + 3
     +VALUE	BANK1 + __LATEST
 
 HERE_POSITION ; everything following this will be overwritten!

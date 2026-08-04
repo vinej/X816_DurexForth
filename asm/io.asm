@@ -248,8 +248,8 @@ TIB_SIZE
     jmp pushbank1
 
     +BACKLINK "source-id", 9
-SOURCE_ID_LSB = * + 1
-SOURCE_ID_MSB = * + 4
+SOURCE_ID_LSB = * + 3
+SOURCE_ID_MSB = * + 8
     ; -1 : string (via evaluate)
     ; 0 : keyboard
     ; 1+ : file id
@@ -328,11 +328,7 @@ POP_INPUT_SOURCE
     jsr pop_input_stack
     sta TIB_PTR
     jsr pop_input_stack
-    sep #$20
-!as
     sta SOURCE_ID_MSB
-    rep #$20
-!al
     jsr pop_input_stack
     sta SOURCE_ID_LSB
     jsr pop_input_stack
