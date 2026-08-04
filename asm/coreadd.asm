@@ -13,7 +13,7 @@ TWO_MINUS ; ( n -- n-2 )
     lda MSB, x
     sbc #0
     sta MSB, x
-    rts
+    rtl
 
     +BACKLINK "sgn", 3
 SGN ; ( n -- -1|0|1 )
@@ -25,11 +25,11 @@ SGN ; ( n -- -1|0|1 )
     lda #1                      ; positive -> 1
     sta LSB, x
     stz MSB, x
-    rts
+    rtl
 ++  lda #$ffff                  ; negative -> -1
     sta LSB, x
     sta MSB, x
-+   rts
++   rtl
 
     +BACKLINK "catnib", 6
 CATNIB ; ( nh nl -- byte ) (nh<<4) | nl
@@ -47,7 +47,7 @@ CATNIB ; ( nh nl -- byte ) (nh<<4) | nl
     inx
     sta LSB, x
     stz MSB, x
-    rts
+    rtl
 
     +BACKLINK "sbit", 4
 SBIT ; ( addr mask -- ) set the masked bits at addr
@@ -66,7 +66,7 @@ SBIT ; ( addr mask -- ) set the masked bits at addr
     inx
     inx
     inx
-    rts
+    rtl
 
     +BACKLINK "cbit", 4
 CBIT ; ( addr mask -- ) clear the masked bits at addr
@@ -86,7 +86,7 @@ CBIT ; ( addr mask -- ) clear the masked bits at addr
     inx
     inx
     inx
-    rts
+    rtl
 
     +BACKLINK "fbit", 4
 FBIT ; ( flag addr mask -- ) set masked bits if flag, else clear
@@ -119,7 +119,7 @@ FBIT ; ( flag addr mask -- ) set masked bits if flag, else clear
     inx
     inx
     inx
-    rts
+    rtl
 
 ; ROLL is deferred to a Forth definition: the split ZP stack is indexed with
 ; zp,X (which has no zp,Y counterpart for LDA), so variable-depth access is
@@ -159,14 +159,14 @@ TWO_ROT ; ( a b c d e f -- c d e f a b )
     sta LSB, x
     lda W3
     sta MSB, x
-    rts
+    rtl
 
     +BACKLINK "sleep", 5
 SLEEP ; ( jiffies -- ) wait n VSYNC frames (kernel IRQ_FRAMES; 60 Hz)
-    jsr kern_frames             ; KTMP = frame count (16-bit, wraps)
+    jsl BANK1 + kern_frames             ; KTMP = frame count (16-bit, wraps)
     lda KTMP                    ; start
     sta W
--   jsr kern_frames
+-   jsl BANK1 + kern_frames
     lda KTMP
     sec
     sbc W                       ; elapsed (wrap-safe 16-bit subtract)
@@ -174,7 +174,7 @@ SLEEP ; ( jiffies -- ) wait n VSYNC frames (kernel IRQ_FRAMES; 60 Hz)
     bcc -
     inx
     inx
-    rts
+    rtl
 
     +BACKLINK "ms", 2
 MS ; ( u -- ) wait ~u milliseconds (calibrated 8 MHz busy loop)
@@ -198,7 +198,7 @@ MS ; ( u -- ) wait ~u milliseconds (calibrated 8 MHz busy loop)
     bra -
 +++ inx
     inx
-    rts
+    rtl
 
     +BACKLINK "reboot", 6
 REBOOT ; ( -- ) leave Forth: back to the kernel prompt (EXIT, status 0)
@@ -206,7 +206,7 @@ REBOOT ; ( -- ) leave Forth: back to the kernel prompt (EXIT, status 0)
 
     +BACKLINK "ticks", 5
 TICKS ; ( -- ud ) VSYNC frame counter as an unsigned double (16-bit, wraps)
-    jsr kern_frames             ; KTMP = frames
+    jsl BANK1 + kern_frames             ; KTMP = frames
     dex
     dex
     dex
@@ -216,4 +216,4 @@ TICKS ; ( -- ud ) VSYNC frame counter as an unsigned double (16-bit, wraps)
     stz MSB+2, x
     stz LSB, x                  ; high cell = 0
     stz MSB, x
-    rts
+    rtl

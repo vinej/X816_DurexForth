@@ -1,7 +1,7 @@
 ; X816 - kernel crossing and machine glue.
 ;
 ; Stage B: durexForth code runs M=0/X=1 (durexforth.asm header); the X816
-; kernel ABI wants M=0/X=0, entered by jsl through the jump table at
+; kernel ABI wants M=0/X=0, entered by jsl BANK1 + through the jump table at
 ; $00:FE00 (entry n at $FE00 + 4*n; numbers from X816_core
 ; tools/contract.py). Each shim goes rep #$30 for the crossing and comes
 ; back with sep #$10 - the accumulator stays wide throughout, so the
@@ -82,7 +82,7 @@ PUTCHR
     pla
     ply
     plx
-    rts
+    rtl
 
 ; kern_getc - blocking key read, A = character (zero-extended). Polls
 ; CON_GETKEY rather than calling the blocking CON_GETC: the shell's own
@@ -105,7 +105,7 @@ kern_getc
     lda KTMP
     ply
     plx
-    rts
+    rtl
 
 ; kern_getin - the GETIN shape: A = character, 0 if none. Non-character
 ; keys read as "no key".
@@ -124,11 +124,11 @@ kern_getin
     lda #0
     ply
     plx
-    rts
+    rtl
 +   lda KTMP
     ply
     plx
-    rts
+    rtl
 
 ; kern_cls - clear the console.
 kern_cls
@@ -143,7 +143,7 @@ kern_cls
     pla
     ply
     plx
-    rts
+    rtl
 
 ; kern_gotoxy - A = column, Y = row.
 kern_gotoxy
@@ -164,7 +164,7 @@ kern_gotoxy
 !rs
     ply
     plx
-    rts
+    rtl
 
 ; kern_getxy - KTMP = column, KTMP2 = row (16-bit each).
 kern_getxy
@@ -179,7 +179,7 @@ kern_getxy
 !rs
     ply
     plx
-    rts
+    rtl
 
 ; kern_frames - KTMP = VSYNC frame count (16-bit, wraps).
 kern_frames
@@ -193,7 +193,7 @@ kern_frames
 !rs
     ply
     plx
-    rts
+    rtl
 
 ; kern_fs_open - open the NUL-terminated path staged in fs_name (fs.asm),
 ; read-only. Out: carry clear and A = handle, or carry set and A = KERR_*.
@@ -213,7 +213,7 @@ kern_fs_open
     ply
     plx
     lda KTMP
-    rts
+    rtl
 
 ; kern_fs_close - A = handle. Best-effort: a refused close (handle not
 ; open) is the common case for close_all_logical_files and is ignored.
@@ -230,7 +230,7 @@ kern_fs_close
 !rs
     ply
     plx
-    rts
+    rtl
 
 ; kern_fs_fill - A = handle. Reads up to 128 bytes into fs_cache (fs.asm)
 ; with ONE kernel crossing and returns the count in A (0 = end of file, and
@@ -253,9 +253,9 @@ kern_fs_fill
     plx
     bcs +                           ; kernel error: report as EOF
     lda KTMP
-    rts
+    rtl
 +   lda #0
-    rts
+    rtl
 
 ; kern_fs_seekback - A = handle, Y = bytes to step back (1..128). Rewinds
 ; the kernel's file position over cached-but-unconsumed bytes when a nested
@@ -285,7 +285,7 @@ kern_fs_seekback
 !rs
     ply
     plx
-    rts
+    rtl
 
 ; emu-exit ( status -- ) - stop the EMULATOR with an exit code, so a test
 ; harness gets its verdict the moment the suite finishes instead of waiting
@@ -307,7 +307,7 @@ EMU_EXIT
     inx
     inx
     plb
-    rts
+    rtl
 
 ; kern_exit - back to the kernel prompt. Does not return.
 kern_exit

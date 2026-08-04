@@ -10,7 +10,7 @@ K_MOUSE_CONFIG = $ff68
 JOY ; ( n -- buttons ) 0 = keyboard, 1-4 = gamepads; active-high, 0 if absent
     lda LSB, x
     stx W                       ; save forth stack pointer
-    jsr K_JOYSTICK_GET          ; A=byte0 X=byte1 Y=$00 present / $ff absent
+    jsl BANK1 + K_JOYSTICK_GET          ; A=byte0 X=byte1 Y=$00 present / $ff absent
     cpy #0
     bne +                       ; absent
     eor #$ff                    ; active-high low byte
@@ -26,7 +26,7 @@ JOY ; ( n -- buttons ) 0 = keyboard, 1-4 = gamepads; active-high, 0 if absent
     sta LSB, x
     lda W3
     sta MSB, x
-    rts
+    rtl
 
     +BACKLINK "mouse", 5
 MOUSE ; ( mode -- ) 0 = off, 1 = on, -1 = auto-scale
@@ -34,10 +34,10 @@ MOUSE ; ( mode -- ) 0 = off, 1 = on, -1 = auto-scale
     stx W
     ldx #0
     ldy #0
-    jsr K_MOUSE_CONFIG
+    jsl BANK1 + K_MOUSE_CONFIG
     ldx W
     inx
-    rts
+    rtl
 
 ; mouse_get ($ff6b, .A=0): returns .A=buttons, r0 ($02/$03)=X, r1 ($04/$05)=Y.
 K_MOUSE_GET = $ff6b
@@ -46,44 +46,44 @@ K_MOUSE_GET = $ff6b
 MX ; ( -- x )
     stx W
     lda #0
-    jsr K_MOUSE_GET
+    jsl BANK1 + K_MOUSE_GET
     ldx W
     dex
     lda $02
     sta LSB, x
     lda $03
     sta MSB, x
-    rts
+    rtl
 
     +BACKLINK "my", 2
 MY ; ( -- y )
     stx W
     lda #0
-    jsr K_MOUSE_GET
+    jsl BANK1 + K_MOUSE_GET
     ldx W
     dex
     lda $04
     sta LSB, x
     lda $05
     sta MSB, x
-    rts
+    rtl
 
     +BACKLINK "mb", 2
 MB ; ( -- buttons ) bit0 left, bit1 right, bit2 middle
     stx W
     lda #0
-    jsr K_MOUSE_GET             ; .A = buttons
+    jsl BANK1 + K_MOUSE_GET             ; .A = buttons
     ldx W
     dex
     sta LSB, x
     stz MSB, x
-    rts
+    rtl
 
     +BACKLINK "mwheel", 6
 MWHEEL ; ( -- delta ) signed wheel movement (best-effort: r2 low byte)
     stx W
     lda #0
-    jsr K_MOUSE_GET
+    jsl BANK1 + K_MOUSE_GET
     ldx W
     dex
     lda $06
@@ -92,4 +92,4 @@ MWHEEL ; ( -- delta ) signed wheel movement (best-effort: r2 low byte)
     bpl +
     lda #$ff
     sta MSB, x
-+   rts
++   rtl

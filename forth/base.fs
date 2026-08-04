@@ -32,18 +32,18 @@ else begin >in @ ')' parse nip >in @ rot
 - = while refill drop repeat then ;
 immediate
 
-( X816 stage B: return-ADDRESS juggling uses rw>/w>r - a >R cell is 32
-  bits but an rts consumes 16. )
+( Return-ADDRESS juggling uses rl>/l>r - a >R cell is 32 bits but a
+  return address is a 3-byte word. )
 : lits ( -- addr len )
-rw> 1+ count 2dup + 1- w>r ;
+rl> 1+ count 2dup + 1- l>r ;
 
 ( "0 to foo" sets value foo to 0 )
 : (to) >r split r@ 8 + w! r> 3 + w! ;
 \ TO on a VALUE - code word, first byte $a9 - patches its immediates.
-\ TO on a 2VALUE - create/does> word, first byte $20 - stores the double
-\ at the data field xt+5 with 2!.
-: to ' dup c@ $20 = if
-5 + state c@ if postpone literal postpone 2! exit then 2!
+\ TO on a 2VALUE - create/does> word, first byte $22 (jsl dodoes) -
+\ stores the double at the data field xt+7 with 2!.
+: to ' dup c@ $22 = if
+7 + state c@ if postpone literal postpone 2! exit then 2!
 else
 state c@ if postpone literal postpone (to) exit then (to)
 then ; immediate
@@ -95,9 +95,11 @@ repeat ; immediate
  2. two-byte code pointer. default: rts
  3. variable length data )
 here 60 c, ( rts )
+( split, not rshift: rshift is defined later in this file )
 : create
-header postpone dodoes literal w, ;
-: does> rw> 1+ latest >xt 3 + w! ;
+header postpone dodoes literal dup w, split nip c, ;
+: does> rl> 1+ dup latest >xt 4 + w!
+split nip latest >xt 6 + c! ;
 
 .( asm..)
 parse-name asm included
@@ -114,7 +116,7 @@ parse-name asm included
    foo . \ prints 1 )
 : value ( n -- )
 ( TO relies on this exact layout: low-word imm at xt+3, high at xt+8 )
-code dex, dex, split swap lda,# lsb sta,x lda,# msb sta,x rts, ;
+code dex, dex, split swap lda,# lsb sta,x lda,# msb sta,x rtl, ;
 : constant value ;
 ( to free up space, pad could be
   e.g. HERE+34 instead )
@@ -140,17 +142,17 @@ postpone drop postpone drop ; immediate
 
 code 2/
 msb lda,x 8000 cmp,# msb ror,x lsb ror,x
-rts, end-code
+rtl, end-code
 code or
 msb lda,x msb 2+ ora,x msb 2+ sta,x
 lsb lda,x lsb 2+ ora,x lsb 2+ sta,x
-inx, inx, rts, end-code
+inx, inx, rtl, end-code
 code xor
 msb lda,x msb 2+ eor,x msb 2+ sta,x
 lsb lda,x lsb 2+ eor,x lsb 2+ sta,x
-inx, inx, rts, end-code
+inx, inx, rtl, end-code
 
-:- dup inx, inx, rts, end-code
+:- dup inx, inx, rtl, end-code
 code lshift ( x1 u -- x2 )
 lsb dec,x -branch bmi,
 lsb 2+ asl,x msb 2+ rol,x
@@ -196,20 +198,20 @@ msb 8 + lda,x msb sta,x
 lsb 8 + lda,x lsb sta,x
 dex, dex,
 msb 8 + lda,x msb sta,x
-lsb 8 + lda,x lsb sta,x rts, end-code
+lsb 8 + lda,x lsb sta,x rtl, end-code
 code 2swap ( a b c d -- c d a b )
 lsb lda,x pha, lsb 4 + lda,x lsb sta,x pla, lsb 4 + sta,x
 msb lda,x pha, msb 4 + lda,x msb sta,x pla, msb 4 + sta,x
 lsb 2+ lda,x pha, lsb 6 + lda,x lsb 2+ sta,x pla, lsb 6 + sta,x
 msb 2+ lda,x pha, msb 6 + lda,x msb 2+ sta,x pla, msb 6 + sta,x
-rts, end-code
+rtl, end-code
 code d+ ( d1 d2 -- d3 )
 clc,
 lsb 2+ lda,x lsb 6 + adc,x lsb 6 + sta,x
 msb 2+ lda,x msb 6 + adc,x msb 6 + sta,x
 lsb lda,x lsb 4 + adc,x lsb 4 + sta,x
 msb lda,x msb 4 + adc,x msb 4 + sta,x
-inx, inx, inx, inx, rts, end-code
+inx, inx, inx, inx, rtl, end-code
 : ?dnegate 0< if dnegate then ;
 : dabs dup ?dnegate ;
 : d>s ( d -- n ) drop ;

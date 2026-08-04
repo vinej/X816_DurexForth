@@ -13,12 +13,12 @@ _EXCEPTION_HANDLER
 CATCH
     ; save data stack pointer
     txa
-    jsr PUSHA
-    jsr TO_R
+    jsl BANK1 + PUSHA
+    jsl BANK1 + TO_R
     ; save previous handler
-    jsr EXCEPTION_HANDLER
-    jsr FETCH
-    jsr TO_R
+    jsl BANK1 + EXCEPTION_HANDLER
+    jsl BANK1 + FETCH
+    jsl BANK1 + TO_R
     ; set current handler = the full 16-bit CPU stack pointer
     stx W3
     rep #$10
@@ -28,17 +28,17 @@ CATCH
     sep #$10
 !rs
     ldx W3
-    jsr PUSHA
-    jsr EXCEPTION_HANDLER
-    jsr STORE
+    jsl BANK1 + PUSHA
+    jsl BANK1 + EXCEPTION_HANDLER
+    jsl BANK1 + STORE
     ; execute returns if no THROW
-    jsr EXECUTE
+    jsl BANK1 + EXECUTE
     ; restore previous handler
-    jsr R_TO
-    jsr EXCEPTION_HANDLER
-    jsr STORE
+    jsl BANK1 + R_TO
+    jsl BANK1 + EXCEPTION_HANDLER
+    jsl BANK1 + STORE
     ; discard saved stack pointer
-    jsr R_TO
+    jsl BANK1 + R_TO
     inx
     inx
     ; normal completion
@@ -52,13 +52,13 @@ THROW
     ; 0 throw is no-op
     inx
     inx
-    rts
+    rtl
 +   lda _EXCEPTION_HANDLER
     beq .print_error_and_abort
 
     ; restore the CPU stack: S := the handler's saved 16-bit value.
-    jsr EXCEPTION_HANDLER
-    jsr FETCH
+    jsl BANK1 + EXCEPTION_HANDLER
+    jsl BANK1 + FETCH
     stx W3
     lda LSB,x
     rep #$10
@@ -72,22 +72,22 @@ THROW
     inx
 
     ; restore previous handler
-    jsr R_TO
-    jsr EXCEPTION_HANDLER
-    jsr STORE
+    jsl BANK1 + R_TO
+    jsl BANK1 + EXCEPTION_HANDLER
+    jsl BANK1 + STORE
 
     ; exc# on return stack
-    jsr R_TO
-    jsr SWAP
-    jsr TO_R
+    jsl BANK1 + R_TO
+    jsl BANK1 + SWAP
+    jsl BANK1 + TO_R
 
     ; restore stack
     lda LSB,x
     tax
     inx
     inx
-    jsr R_TO
-    rts
+    jsl BANK1 + R_TO
+    rtl
 
 .print_error_and_abort
     lda MSB,x
@@ -105,15 +105,15 @@ THROW
 +
     cmp #-2 ; abort"
     bne +
-    jsr .get_abort_string
+    jsl BANK1 + .get_abort_string
     jmp .type_and_abort
-+   jsr .get_system_exception_string
-    jsr COUNT
++   jsl BANK1 + .get_system_exception_string
+    jsl BANK1 + COUNT
 .type_and_abort
-    jsr RVS
-    jsr TYPE
+    jsl BANK1 + RVS
+    jsl BANK1 + TYPE
 .cr_and_abort
-    jsr CR
+    jsl BANK1 + CR
     ; X816: an uncaught error stops the EMULATOR right here with the
     ; message on screen (status 1), so a test harness never waits out a
     ; timeout on a machine that has already said what went wrong. $9FBC
@@ -155,13 +155,13 @@ THROW
     +VALUE BANK1 + .user_interrupt
 
 .unknown_exception
-    jsr RVS
-    jsr DOT
+    jsl BANK1 + RVS
+    jsl BANK1 + DOT
     lda #'e'
-    jsr PUTCHR
+    jsl BANK1 + PUTCHR
     lda #'r'
-    jsr PUTCHR
-    jsr PUTCHR
+    jsl BANK1 + PUTCHR
+    jsl BANK1 + PUTCHR
     jmp .cr_and_abort
 
 .get_abort_string
@@ -169,7 +169,7 @@ THROW
     lda #0
 .msg_bank = * + 1
     ldy #0
-    jsr pushya
+    jsl BANK1 + pushya
 .msg_len = * + 1
     lda #0
     ldy #0

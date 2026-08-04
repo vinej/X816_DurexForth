@@ -123,6 +123,9 @@ $767e 23mi ror,x
 
 $40 1mi rti,
 $60 1mi rts,
+$6b 1mi rtl,
+$e2 2mi sep,
+$c2 2mi rep,
 
 $e9 ami sbc,#
 $e5ed 23mi sbc,
@@ -153,6 +156,15 @@ $ba 1mi tsx,
 $8a 1mi txa,
 $9a 1mi txs,
 $98 1mi tya,
+
+( 24-bit transfers: operand is a flat address; the bank byte follows
+  the 16-bit half. Cross-word references from runtime-assembled code
+  MUST use these - a 16-bit jmp/jsr would run in the wrong bank. )
+: jsl, ( a -- ) $22 c, dup w, split nip c, ;
+: jml, ( a -- ) $5c c, dup w, split nip c, ;
+( jml [abs]: $DC takes a 16-bit bank-0 ABSOLUTE operand - there is no
+  [dp] form; a direct-page address like W2 works because dp IS bank 0. )
+: [jmp], ( a -- ) $dc c, w, ;
 
 : code header ;
 : end-code ;

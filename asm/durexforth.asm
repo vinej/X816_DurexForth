@@ -2,7 +2,15 @@
 
 ; ACME assembler
 
-!cpu 65816	; X816: 65816 native, 32-bit cells (stage B).
+!cpu 65816	; X816: 65816 native, 32-bit cells, LONG threading (stage C).
+;
+; STAGE C: ONE LONG WORLD. Every call in the image is jsl, every return
+; rtl, every tail-transfer jml, every indirect dispatch jml [dp]. Mixed
+; return widths across tail-jumps were the alternative, and that way lies
+; a minefield of one-byte stack misalignments. Compiled code lives in
+; banks $01-$04 (256 KB of single-cycle BRAM); a definition never
+; straddles a bank, so in-word branch operands stay 16-bit and re-attach
+; the bank carried by the return address.
 ;
 ; THE WIDTH CONVENTION - the one decision every primitive honours
 ; (X816_core doc/DUREXFORTH.md 4.2: get this wrong and the failures look
@@ -13,7 +21,7 @@
 ;     X = 1   (8-bit index registers)
 ;
 ; A word that needs byte operations goes `sep #$20` and MUST `rep #$20`
-; before rts. A word that needs a 16-bit index saves and restores the
+; before rtl. A word that needs a 16-bit index saves and restores the
 ; width. The kernel crossings in x816.asm keep their own discipline
 ; (rep #$30 around jsl) and re-enter this convention on the way out.
 ;
@@ -27,7 +35,7 @@
 ; Addresses in cells are FLAT 24-bit (the whole point of stage B:
 ; DUREXFORTH.md 2.1) - the dictionary's cells carry $01xxxx, TIB carries
 ; $01x600, and @/! dereference through [W] long addressing. Compiled code
-; still targets bank $01 with plain 16-bit jsr (2.3's one-bank ceiling).
+; still targets bank $01 with plain 16-bit jsl (2.3's one-bank ceiling).
 !to "build/forth.bin", plain	; X816 image: file offset = offset in bank $01
 ; No !ct: text/char literals stay ASCII. The X816 console is CP437, which
 ; agrees with ASCII in $20-$7E; the X16 control codes ($93 clear, $12 rvs)
@@ -130,20 +138,23 @@ STRLEN_MASK = $1f
 F_IMMEDIATE = $80 ; interpret the word even in compiler STATE
 F_NO_TAIL_CALL_ELIMINATION = $40
 ; Exempt this word from tail call elimination i.e.
-; "jsr WORD + rts" will not be replaced by "jmp WORD".
+; "jsl BANK1 + WORD + rtl" will not be replaced by "jmp WORD".
 
 * = WORDLIST_BASE
 
 !byte 0 ; zero name length = end of dictionary.
 
 !set __LATEST = WORDLIST_BASE
+; Stage C: the xt field is 3 bytes (24-bit flat address). Assembled words
+; all live in bank $01; compiled words land wherever HERE walks.
 !macro BACKLINK .name , .namesize {
     !set .xt = *
-    * = __LATEST - len(.name) - 3
+    * = __LATEST - len(.name) - 4
     !set __LATEST = *
     !byte .namesize
     !text .name
     !word .xt
+    !byte 1
     * = .xt
 }
 
@@ -195,12 +206,12 @@ PLACEHOLDER_ADDRESS = $1200
 COLD
     ldx #X_INIT
 
-    jsr quit_reset
+    jsl BANK1 + quit_reset
 
-    jsr PAGE
+    jsl BANK1 + PAGE
 
 _START = * + 1
-    jsr load_base
+    jsl BANK1 + load_base
 
 ; Word Definitions
 ; ----------------
@@ -221,7 +232,7 @@ BANK1 = $010000
     sta LSB, x
     lda	#(.val >> 16) & $ffff
     sta MSB, x
-    rts
+    rtl
 }
 
 ; pushya - push the cell A:Y (A = low word, Y = high byte; bits 24-31
@@ -239,7 +250,7 @@ pushya
     stz MSB+1, x
     rep #$20
 !al
-    rts
+    rtl
 
 ; PUSHA - push A as a cell, high word zero. The workhorse for 16-bit
 ; results computed in A.
@@ -248,10 +259,10 @@ PUSHA
     dex
     sta LSB, x
     stz MSB, x
-    rts
+    rtl
 
 ; pushbank1 - push A as a bank-$01 flat address: cell = BANK1 + A.
-; Replaces stage A's `lda #< / ldy #> / jsr pushya` for in-image
+; Replaces stage A's `lda #< / ldy #> / jsl BANK1 + pushya` for in-image
 ; addresses.
 pushbank1
     dex
@@ -259,7 +270,7 @@ pushbank1
     sta LSB, x
     lda #(BANK1 >> 16)
     sta MSB, x
-    rts
+    rtl
 
     +BACKLINK "0", 1
 ZERO
@@ -283,7 +294,7 @@ MINUS_ONE
     dex
     sta LSB, x
     sta MSB, x
-    rts
+    rtl
 
 ; START - points to the code of the startup word (a flat address).
     +BACKLINK "start", 5
@@ -330,11 +341,11 @@ PRINT_BOOT_MESSAGE
     rep #$20
 !al
     and #$ff
-    jsr PUTCHR
+    jsl BANK1 + PUTCHR
     inx
     cpx #(PRINT_BOOT_MESSAGE - BOOT_STRING)
     bne -
-    jsr CR
+    jsl BANK1 + CR
     ldx #X_INIT
     jmp QUIT
 
@@ -366,6 +377,13 @@ load_base
     lda #(basename_end - basename)
     sta LSB, x
     stz MSB, x
+    ; the include chain's final rtl needs a 3-byte return: bank, then PC
+    sep #$20
+!as
+    lda #1
+    pha
+    rep #$20
+!al
     lda #QUIT-1
     pha
     jmp INCLUDED

@@ -6,7 +6,7 @@
     +BACKLINK "time@", 5
 TIME_FETCH ; ( -- h m s )
     stx W3
-    jsr $ff50
+    jsl $ff50
     ldx W3
     dex
     dex
@@ -20,12 +20,12 @@ TIME_FETCH ; ( -- h m s )
     lda $07
     sta LSB, x
     stz MSB, x
-    rts
+    rtl
 
     +BACKLINK "date@", 5
 DATE_FETCH ; ( -- year month day )  year is the full 4-digit year
     stx W3
-    jsr $ff50
+    jsl $ff50
     ldx W3
     dex
     dex
@@ -43,7 +43,7 @@ DATE_FETCH ; ( -- year month day )  year is the full 4-digit year
     lda $04
     sta LSB, x
     stz MSB, x
-    rts
+    rtl
 
     +BACKLINK "settime", 7
 SETTIME ; ( year month day h m s -- )
@@ -62,7 +62,7 @@ SETTIME ; ( year month day h m s -- )
     sbc #<2000
     sta $02
     stx W3
-    jsr $ff4d
+    jsl $ff4d
     ldx W3
     inx
     inx
@@ -70,4 +70,4 @@ SETTIME ; ( year month day h m s -- )
     inx
     inx
     inx
-    rts
+    rtl

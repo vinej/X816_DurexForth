@@ -4,7 +4,7 @@
 ; Stage B: HERE and LATEST are 16-bit IN-BANK pointers (the dictionary
 ; stays in bank $01, DUREXFORTH.md 2.3) pushed as flat BANK1+ addresses.
 ; `,` moves a 4-byte cell; `w,` the 2-byte units the code generator deals
-; in (jsr targets, branch operands); `c,` single opcodes. Inline literals
+; in (jsl BANK1 + targets, branch operands); `c,` single opcodes. Inline literals
 ; come in three widths: LITC (byte), LITW (word, zero-extended), LIT
 ; (full cell) - LITERAL picks the smallest that fits. LITXT carries a
 ; 2-byte in-bank address and pushes it bank-extended.
@@ -14,49 +14,56 @@ curr_word_no_tail_call_elimination
 last_word_no_tail_call_elimination
     !word 1
 
-    +BACKLINK "c,", 2
-CCOMMA
+; Stage C: HERE is a 24-bit pointer (low word in HERE_PTR, bank word in
+; HERE_BANK - the two immediates of the HERE value). The comma family
+; writes through [W] so compilation lands in whatever bank HERE walks.
+here_to_w
     lda HERE_PTR
     sta W
+    lda HERE_BANK
+    sta W+2
+    rtl
+
+    +BACKLINK "c,", 2
+CCOMMA
+    jsl BANK1 + here_to_w
     sep #$20
 !as
     lda LSB, x
-    sta (W)
+    sta [W]
     rep #$20
 !al
     inc HERE_PTR
     inx
     inx
-    rts
+    rtl
 
     +BACKLINK "w,", 2
 WCOMMA ; ( x -- ) compile the low 16 bits
-    lda HERE_PTR
-    sta W
+    jsl BANK1 + here_to_w
     lda LSB, x
-    sta (W)
+    sta [W]
     inc HERE_PTR
     inc HERE_PTR
     inx
     inx
-    rts
+    rtl
 
     +BACKLINK ",", 1
 COMMA ; ( x -- ) compile a 4-byte cell
-    lda HERE_PTR
-    sta W
+    jsl BANK1 + here_to_w
     lda LSB, x
-    sta (W)
+    sta [W]
     ldy #2
     lda MSB, x
-    sta (W), y
+    sta [W], y
     lda HERE_PTR
     clc
     adc #4
     sta HERE_PTR
     inx
     inx
-    rts
+    rtl
 
     +BACKLINK "w!", 2
 W_STORE ; ( x addr -- ) store the low 16 bits of x
@@ -70,7 +77,7 @@ W_STORE ; ( x addr -- ) store the low 16 bits of x
     inx
     inx
     inx
-    rts
+    rtl
 
 ; -----
 
@@ -78,7 +85,7 @@ W_STORE ; ( x addr -- ) store the low 16 bits of x
 LBRAC
     lda #0
     sta STATE
-    rts
+    rtl
 
 ; -----
 
@@ -87,11 +94,11 @@ LBRAC
 RBRAC
     lda #1
     sta STATE
-    rts
+    rtl
 
     +BACKLINK ";", 1 | F_IMMEDIATE
 SEMICOLON
-    jsr EXIT
+    jsl BANK1 + EXIT
 
     ; Unhides the word.
 PENDING_LATEST = * + 1
@@ -115,7 +122,7 @@ PENDING_LATEST = * + 1
     sta (W)
     rep #$20
 !al
-    rts
+    rtl
 
 ; STATE - Is the interpreter executing code (0) or compiling a word (non-zero)?
     +BACKLINK "state", 5
@@ -125,6 +132,7 @@ STATE
 
     +BACKLINK "latestxt", 8
 LATEST_XT = * + 3
+LATEST_XT_BANK = * + 8
     +VALUE	BANK1 + 0
 
     ; Exempt from TCE because `: x ;` does not compile a jsr.
@@ -133,7 +141,7 @@ COLON
     lda LATEST_PTR
     pha
 
-    jsr HEADER ; makes the dictionary entry / header
+    jsl BANK1 + HEADER ; makes the dictionary entry / header
 
     ; defer the LATEST update to ;
     lda LATEST_PTR
@@ -142,10 +150,33 @@ COLON
     pla
     sta LATEST_PTR
 
+    ; a definition must fit its bank: bump HERE to the next bank when
+    ; fewer than 1 KB remain (documented ceiling per definition)
+    jsl BANK1 + bank_headroom
+
     lda HERE_PTR
     sta LATEST_XT
+    lda HERE_BANK
+    sta LATEST_XT_BANK
 
     jmp RBRAC ; enter compile mode
+
+; If HERE is within 1 KB of its bank's ceiling, advance to the next bank.
+; Bank $01's ceiling is the dictionary headers (checked per line by
+; interpret_tib); banks $02-$04 run to $FFFF. Beyond $04: -8 throw.
+bank_headroom
+    lda HERE_PTR
+    cmp #$fc00
+    bcc +
+    lda HERE_BANK
+    inc
+    cmp #5
+    bcc ++
+    lda #-8
+    jmp throw_a
+++  sta HERE_BANK
+    stz HERE_PTR
++   rtl
 
     +BACKLINK "header", 6
 HEADER ; ( "name" -- )
@@ -153,7 +184,7 @@ HEADER ; ( "name" -- )
 
     ; Parse: name address (flat) -> W2, length stays below the two
     ; popped cells at LSB-4.
-    jsr PARSE_NAME
+    jsl BANK1 + PARSE_NAME
     inx
     inx
     lda LSB, x
@@ -174,9 +205,9 @@ HEADER ; ( "name" -- )
     rep #$20
 !al
 
-    ; Move LATEST back over the new entry: len + 1 flag/len byte + 2 xt.
+    ; Move LATEST back over the new entry: len + 1 flag/len byte + 3 xt.
     clc
-    adc #3
+    adc #4
     sta W3
     lda LATEST_PTR
     sec
@@ -191,7 +222,7 @@ HEADER ; ( "name" -- )
     sta (W)
     ldy #0
 -   lda [W2], y
-    jsr CHAR_TO_LOWERCASE
+    jsl BANK1 + CHAR_TO_LOWERCASE
     iny
     sta (W), y
 .putlen
@@ -199,11 +230,19 @@ HEADER ; ( "name" -- )
     bne -
     rep #$20
 !al
-    ; Store the xt: one 16-bit store at offset len+1.
+    ; Store the xt: 16-bit low word at len+1, bank byte at len+3.
     iny
     lda HERE_PTR
     sta (W), y
-    rts
+    iny
+    iny
+    sep #$20
+!as
+    lda HERE_BANK
+    sta (W), y
+    rep #$20
+!al
+    rtl
 
     +BACKLINK "lit", 3
 LIT ; push the 4-byte inline cell
@@ -211,17 +250,23 @@ LIT ; push the 4-byte inline cell
     dex
     pla
     sta W
+    sep #$20
+!as
+    pla
+    sta W+2
+    rep #$20
+!al
     ldy #1
-    lda (W), y
+    lda [W], y
     sta LSB, x
     ldy #3
-    lda (W), y
+    lda [W], y
     sta MSB, x
     lda W
     clc
     adc #5
     sta W
-    jmp (W)
+    jml [W]
 
     +BACKLINK "litw", 4
 LITW ; push the 2-byte inline word, zero-extended
@@ -229,23 +274,35 @@ LITW ; push the 2-byte inline word, zero-extended
     dex
     pla
     sta W
+    sep #$20
+!as
+    pla
+    sta W+2
+    rep #$20
+!al
     ldy #1
-    lda (W), y
+    lda [W], y
     sta LSB, x
     stz MSB, x
     lda W
     clc
     adc #3
     sta W
-    jmp (W)
+    jml [W]
 
 LITXT ; push the 2-byte inline in-bank address as a flat BANK1+ cell
     dex
     dex
     pla
     sta W
+    sep #$20
+!as
+    pla
+    sta W+2
+    rep #$20
+!al
     ldy #1
-    lda (W), y
+    lda [W], y
     sta LSB, x
     lda #(BANK1 >> 16)
     sta MSB, x
@@ -253,7 +310,7 @@ LITXT ; push the 2-byte inline in-bank address as a flat BANK1+ cell
     clc
     adc #3
     sta W
-    jmp (W)
+    jml [W]
 
     +BACKLINK "litc", 4
 LITC ; push the 1-byte inline literal
@@ -264,20 +321,28 @@ LITC ; push the 1-byte inline literal
     sta W
     sep #$20
 !as
-    lda (W)
+    pla
+    sta W+2
+    lda [W]
     rep #$20
 !al
     and #$ff
     sta LSB, x
     stz MSB, x
     inc W
-    jmp (W)
+    jml [W]
 
     +BACKLINK "compile,", 8
-COMPILE_COMMA
-    lda #OP_JSR
-    jsr compile_a
-    jmp WCOMMA
+COMPILE_COMMA ; ( xt -- ) compile a 4-byte `jsl xt`
+    lda #$22 ; jsl
+    jsl BANK1 + compile_a
+    jsl BANK1 + DUP
+    jsl BANK1 + WCOMMA          ; low word
+    lda MSB, x          ; bank byte
+    and #$ff
+    sta LSB, x
+    stz MSB, x
+    jmp CCOMMA
 
     +BACKLINK "literal", 7 | F_IMMEDIATE
 LITERAL
@@ -292,21 +357,21 @@ LITERAL
     sta LSB, x
     lda #(BANK1 >> 16)
     sta MSB, x
-    jsr COMPILE_COMMA
+    jsl BANK1 + COMPILE_COMMA
     jmp CCOMMA ; writes byte
 .word
     lda #LITW
     sta LSB, x
     lda #(BANK1 >> 16)
     sta MSB, x
-    jsr COMPILE_COMMA
+    jsl BANK1 + COMPILE_COMMA
     jmp WCOMMA ; writes word
 .cell
     lda #LIT
     sta LSB, x
     lda #(BANK1 >> 16)
     sta MSB, x
-    jsr COMPILE_COMMA
+    jsl BANK1 + COMPILE_COMMA
     jmp COMMA ; writes the whole cell
 
 ; HERE - points to the next free byte of memory. When compiling, compiled
@@ -315,25 +380,41 @@ LITERAL
     +BACKLINK "here", 4
 HERE
 HERE_PTR = * + 3
+HERE_BANK = * + 8
     +VALUE  BANK1 + HERE_POSITION
 
     +BACKLINK "dodoes", 6
 
-    ; behavior pointer address => W
+    ; behavior pointer address => W (24-bit: the created word may live in
+    ; any code bank)
     pla
     inc
     sta W
+    sep #$20
+!as
+    pla
+    sta W+2
+    rep #$20
+!al
 
-    ; push data pointer (flat) to param stack
+    ; push data pointer (flat: behavior field + 3) to param stack
     dex
     dex
     lda W
     clc
-    adc #2
+    adc #3
     sta LSB, x
-    lda #(BANK1 >> 16)
+    lda W+2
+    and #$ff
     sta MSB, x
 
-    lda (W) ; the behavior pointer itself
+    lda [W] ; the behavior pointer, low word
     sta W2
-    jmp (W2)
+    ldy #2
+    sep #$20
+!as
+    lda [W], y ; its bank
+    sta W2+2
+    rep #$20
+!al
+    jml [W2]

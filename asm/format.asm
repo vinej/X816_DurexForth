@@ -12,7 +12,7 @@
 LESS_NUMBER_SIGN
     lda #.hold_start
     sta .holdp
-    rts
+    rtl
 
 ; : #> 2drop holdp @ $5fc over - ;
 +BACKLINK "#>", 2
@@ -26,7 +26,7 @@ NUMBER_SIGN_GREATER ; ( ud -- addr len )
     sbc .holdp
     sta LSB,x
     stz MSB,x
-    rts
+    rtl
 
 ; : hold -1 holdp +! holdp @ c! ;
 +BACKLINK "hold", 4
@@ -41,7 +41,7 @@ HOLD
     sta .hold_start
     rep #$20
 !al
-    rts
+    rtl
 
 ; : sign 0< if '-' hold then ;
 +BACKLINK "sign", 4
@@ -51,8 +51,8 @@ SIGN
     lda MSB-2,x
     and #$8000
     bne +
-    rts
-+   jsr LITC
+    rtl
++   jsl BANK1 + LITC
     !byte '-'
     jmp HOLD
 
@@ -60,10 +60,10 @@ SIGN
 ; dup $a < if 7 - then $37 + hold ;
 +BACKLINK "#", 1
 NUMBER_SIGN
-    jsr BASE
-    jsr FETCH
-    jsr UD_MOD
-    jsr ROT
+    jsl BANK1 + BASE
+    jsl BANK1 + FETCH
+    jsl BANK1 + UD_MOD
+    jsl BANK1 + ROT
     lda LSB,x
     cmp #10
     bcs +
@@ -76,36 +76,36 @@ NUMBER_SIGN
 ; : #s # begin 2dup or while # repeat ;
 +BACKLINK "#s", 2
 NUMBER_SIGN_S
-    jsr NUMBER_SIGN
+    jsl BANK1 + NUMBER_SIGN
     lda LSB,x
     ora MSB,x
     ora LSB+2,x
     ora MSB+2,x
     bne NUMBER_SIGN_S
-    rts
+    rtl
 
 ; : u. 0 <# #s #> type space ;
 +BACKLINK "u.", 2
-    jsr ZERO
-    jsr LESS_NUMBER_SIGN
-    jsr NUMBER_SIGN_S
-    jsr NUMBER_SIGN_GREATER
-    jsr TYPE
+    jsl BANK1 + ZERO
+    jsl BANK1 + LESS_NUMBER_SIGN
+    jsl BANK1 + NUMBER_SIGN_S
+    jsl BANK1 + NUMBER_SIGN_GREATER
+    jsl BANK1 + TYPE
     jmp SPACE
 
 ; : . dup abs 0 <# #s rot sign #>
 ; type space ;
 +BACKLINK ".", 1
 DOT
-    jsr DUP
-    jsr ABS
-    jsr ZERO
-    jsr LESS_NUMBER_SIGN
-    jsr NUMBER_SIGN_S
-    jsr ROT
-    jsr SIGN
-    jsr NUMBER_SIGN_GREATER
-    jsr TYPE
+    jsl BANK1 + DUP
+    jsl BANK1 + ABS
+    jsl BANK1 + ZERO
+    jsl BANK1 + LESS_NUMBER_SIGN
+    jsl BANK1 + NUMBER_SIGN_S
+    jsl BANK1 + ROT
+    jsl BANK1 + SIGN
+    jsl BANK1 + NUMBER_SIGN_GREATER
+    jsl BANK1 + TYPE
     jmp SPACE
 
 +BACKLINK "space", 5

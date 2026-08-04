@@ -14,7 +14,7 @@ brk_handler
     ; the platform-hooks phase; the X16 NMINV/CBINV vector stores are gone
     ; ($316-$319 is inside the X816 stack region, and there is no KERNAL).
     lda #-28 ; user interrupt
-    jsr throw_a
+    jsl BANK1 + throw_a
 
 quit_reset
     ; goes here from QUIT and program start
@@ -43,18 +43,18 @@ quit_reset
 close_all_logical_files:
     lda #8
 -   pha
-    jsr kern_fs_close
+    jsl BANK1 + kern_fs_close
     pla
     dec
     bne -
 
     pla
     tax
-    rts
+    rtl
 
     +BACKLINK "quit", 4
 QUIT
-    jsr quit_reset
+    jsl BANK1 + quit_reset
 
     ; resets the return stack. 16-bit txs: an 8-bit txs in native mode
     ; zeroes SH and would put the return stack in the direct page.
@@ -69,24 +69,24 @@ QUIT
 
 interpret_and_close
     lda #interpret_loop
-    jsr pushbank1
-    jsr CATCH
-    jsr CLOSE_INPUT_SOURCE
+    jsl BANK1 + pushbank1
+    jsl BANK1 + CATCH
+    jsl BANK1 + CLOSE_INPUT_SOURCE
     jmp THROW
 
 interpret_loop
-    jsr REFILL
+    jsl BANK1 + REFILL
     inx
     inx
     lda MSB-2,x
     beq .refill_failed
-    jsr interpret_tib
+    jsl BANK1 + interpret_tib
     jmp interpret_loop
 .refill_failed
-    rts
+    rtl
 
 interpret_tib
-    jsr INTERPRET
+    jsl BANK1 + INTERPRET
     cpx #X_INIT+1
     bpl .throw_stack_underflow
     lda TO_IN_W
@@ -95,27 +95,33 @@ interpret_tib
 
     ; X816: the dictionary-overflow check runs for EVERY source, and throws
     ; both when the gap shrinks below a page and when the pointers have
-    ; already crossed.
+    ; already crossed. Only bank $01 shares space with the headers; in
+    ; banks $02-$04 COLON's bank_headroom does the policing.
+    lda HERE_BANK
+    and #$ff
+    cmp #1
+    bne .no_header_clash
     lda LATEST_PTR
     sec
     sbc HERE_PTR
     bcc .throw_dictionary_overflow
     and #$ff00
     beq .throw_dictionary_overflow
+.no_header_clash
 
     ; 0 - keyboard, -1 evaluate, else file
     lda SOURCE_ID_LSB
     beq +
-    rts
+    rtl
 +   lda STATE
     bne +
     lda #'o'
-    jsr PUTCHR
+    jsl BANK1 + PUTCHR
     lda #'k'
-    jsr PUTCHR
+    jsl BANK1 + PUTCHR
     lda #$d
     jmp PUTCHR
-+   rts
++   rtl
 
 .throw_stack_underflow
     lda #-4
@@ -137,12 +143,14 @@ throw_a
 EXECUTE
     lda LSB, x
     sta W
+    lda MSB, x
+    sta W+2 ; bank (bits 24-31 land in the pad, jml ignores them)
     inx
     inx
-    jmp (W)
+    jml [W]
 
 INTERPRET
-    jsr PARSE_NAME
+    jsl BANK1 + PARSE_NAME
 
     lda LSB,x
     bne +
@@ -150,16 +158,16 @@ INTERPRET
     inx
     inx
     inx
-    rts
+    rtl
 +
-    jsr TWODUP
-    jsr FIND_NAME ; ( caddr u 0 | caddr u nt )
+    jsl BANK1 + TWODUP
+    jsl BANK1 + FIND_NAME ; ( caddr u 0 | caddr u nt )
     lda MSB, x
     bne .found_word
 
     inx
     inx
-    jsr READ_NUMBER
+    jsl BANK1 + READ_NUMBER
     beq .was_number
 
     ; Not a word, not a number: through the hookable not-found vector
@@ -167,7 +175,7 @@ INTERPRET
     ; module's float-literal parser) either consumes caddr/u and returns
     ; like a word, or chains to NOTFOUND.  Get the cell with 'NOTFOUND.
     ; Like the number path above, suppress tail-call elimination when the
-    ; handler compiles an inline literal (jsr + data bytes).
+    ; handler compiles an inline literal (jsl + data bytes).
     lda STATE
     sta curr_word_no_tail_call_elimination
 
@@ -192,16 +200,18 @@ INTERPRET
     bne +
     lda QUOTE_VEC
     sta W2
-    jmp (W2)
+    bra ++
 +   lda NOTFOUND_VEC
     sta W2
-    jmp (W2)
+++  lda #(BANK1 >> 16)
+    sta W2+2
+    jml [W2]
 
     ; yep, it's a number...
 .was_number
     lda STATE ; are we compiling?
     bne +
-    rts
+    rtl
 +   ; yes, compile the number
     sta curr_word_no_tail_call_elimination
     jmp LITERAL
@@ -218,9 +228,9 @@ INTERPRET
     pla
     sta MSB, x
     sta MSB+2, x
-    jsr TO_XT
-    jsr SWAP
-    jsr GET_IMMED ; ( xt 1 | xt -1 )
+    jsl BANK1 + TO_XT
+    jsl BANK1 + SWAP
+    jsl BANK1 + GET_IMMED ; ( xt 1 | xt -1 )
     inx
     inx
 
@@ -241,10 +251,10 @@ FOUND_WORD_WITH_NO_TCE = * + 1
 
     +BACKLINK "notfound",8
 print_word_not_found_error ; ( caddr u -- )
-    jsr RVS
-    jsr TYPE
+    jsl BANK1 + RVS
+    jsl BANK1 + TYPE
     lda #'?'
-    jsr PUTCHR
+    jsl BANK1 + PUTCHR
     lda #-13 ; undefined word
     jmp throw_a
 
@@ -263,9 +273,9 @@ QUOTE_VEC ; "xxx" string-literal hook (RAM cell, see INTERPRET)
     jmp pushbank1
 
     +BACKLINK "'", 1
-    jsr PARSE_NAME
-    jsr TWODUP
-    jsr FIND_NAME ; ( addr u nt|0 )
+    jsl BANK1 + PARSE_NAME
+    jsl BANK1 + TWODUP
+    jsl BANK1 + FIND_NAME ; ( addr u nt|0 )
     inx
     inx
     lda MSB-2,x
@@ -279,23 +289,23 @@ QUOTE_VEC ; "xxx" string-literal hook (RAM cell, see INTERPRET)
 
     +BACKLINK "find", 4
 FIND ; ( xt -1 | xt 1 | caddr 0 )
-    jsr DUP
-    jsr TO_R
-    jsr COUNT
-    jsr FIND_NAME
+    jsl BANK1 + DUP
+    jsl BANK1 + TO_R
+    jsl BANK1 + COUNT
+    jsl BANK1 + FIND_NAME
     lda MSB, x
     beq +
-    jsr DUP
-    jsr TO_XT
-    jsr SWAP
-    jsr GET_IMMED
-    jsr R_TO
+    jsl BANK1 + DUP
+    jsl BANK1 + TO_XT
+    jsl BANK1 + SWAP
+    jsl BANK1 + GET_IMMED
+    jsl BANK1 + R_TO
     inx
     inx
-    rts
+    rtl
 +   inx
     inx
-    jsr R_TO
+    jsl BANK1 + R_TO
     jmp ZERO
 
 FIND_BUFFER = $480 ; X16 golden RAM
@@ -327,7 +337,7 @@ FIND_NAME ; ( caddr u -- nt | 0 )
     tay
     dey
 -   lda [W2],y
-    jsr CHAR_TO_LOWERCASE
+    jsl BANK1 + CHAR_TO_LOWERCASE
     sta FIND_BUFFER,y
     dey
     bpl -
@@ -348,9 +358,9 @@ FIND_NAME ; ( caddr u -- nt | 0 )
     beq .string_compare
 
 .string_compare_failed
-    ; no match, advance the dp
+    ; no match, advance the dp (entry = len byte + name + 3-byte xt)
     clc
-    adc #3
+    adc #4
     adc W
     sta W
     bcc +
@@ -384,7 +394,7 @@ FIND_NAME ; ( caddr u -- nt | 0 )
     ldy #0
     lda (W), y
     ; Immediate words are exempt from TCE because custom compile-time behavior.
-    ; (E.g. DROP compiles inx instead of jsr DROP.)
+    ; (E.g. DROP compiles inx instead of jsl BANK1 + DROP.)
     and #F_NO_TAIL_CALL_ELIMINATION | F_IMMEDIATE
     sta FOUND_WORD_WITH_NO_TCE
     rep #$20
@@ -393,7 +403,7 @@ FIND_NAME ; ( caddr u -- nt | 0 )
     sta LSB, x
     lda #(BANK1 >> 16)
     sta MSB, x
-    rts
+    rtl
 
 !as
 .word_not_equal
@@ -416,13 +426,13 @@ GET_IMMED ; ( nt -- 1 | -1 )
     lda #1
     sta LSB, x
     stz MSB, x
-    rts
+    rtl
 
 .not_immed
     lda #$ffff
     sta LSB, x
     sta MSB, x
-    rts
+    rtl
 
     +BACKLINK ">xt", 3
 TO_XT
@@ -437,11 +447,17 @@ TO_XT
     sec ; the +1 for the length byte rides in on the carry
     adc W
     sta W
-    lda (W) ; the 2-byte xt
+    lda (W) ; xt low word
     sta LSB, x
-    lda #(BANK1 >> 16)
+    ldy #2
+    sep #$20
+!as
+    lda (W), y ; xt bank
+    rep #$20
+!al
+    and #$ff
     sta MSB, x
-    rts
+    rtl
 
 IS_SPACE ; ( c -- f )
     lda LSB,x
@@ -455,99 +471,99 @@ IS_SPACE ; ( c -- f )
     lda #1
 +   sta LSB,x
     stz MSB,x
-    rts
+    rtl
 
 IS_NOT_SPACE ; ( c -- f )
-    jsr IS_SPACE
+    jsl BANK1 + IS_SPACE
     jmp ZEQU
 
 XT_SKIP ; ( addr n xt -- addr n )
     ; skip all chars satisfying xt
-    jsr TO_R
--   jsr DUP
-    jsr ZBRANCH
+    jsl BANK1 + TO_R
+-   jsl BANK1 + DUP
+    jsl BANK1 + ZBRANCH
     !word .done
-    jsr OVER
-    jsr FETCHBYTE
-    jsr R_FETCH
-    jsr EXECUTE
-    jsr ZBRANCH
+    jsl BANK1 + OVER
+    jsl BANK1 + FETCHBYTE
+    jsl BANK1 + R_FETCH
+    jsl BANK1 + EXECUTE
+    jsl BANK1 + ZBRANCH
     !word .done
-    jsr ONE
-    jsr SLASH_STRING
+    jsl BANK1 + ONE
+    jsl BANK1 + SLASH_STRING
     jmp -
 .done
-    jsr R_TO
+    jsl BANK1 + R_TO
     inx
     inx
-    rts
+    rtl
 
     +BACKLINK "parse-name", 10
 PARSE_NAME ; ( name -- addr u )
-    jsr SOURCE
-    jsr TO_IN
-    jsr FETCH
-    jsr SLASH_STRING
-    jsr LITXT
+    jsl BANK1 + SOURCE
+    jsl BANK1 + TO_IN
+    jsl BANK1 + FETCH
+    jsl BANK1 + SLASH_STRING
+    jsl BANK1 + LITXT
     !word IS_SPACE
-    jsr XT_SKIP
-    jsr OVER
-    jsr TO_R
-    jsr LITXT
+    jsl BANK1 + XT_SKIP
+    jsl BANK1 + OVER
+    jsl BANK1 + TO_R
+    jsl BANK1 + LITXT
     !word IS_NOT_SPACE
-    jsr XT_SKIP
-    jsr TWODUP
-    jsr ONE
-    jsr MIN
-    jsr PLUS
-    jsr SOURCE
+    jsl BANK1 + XT_SKIP
+    jsl BANK1 + TWODUP
+    jsl BANK1 + ONE
+    jsl BANK1 + MIN
+    jsl BANK1 + PLUS
+    jsl BANK1 + SOURCE
     inx
     inx
-    jsr MINUS
-    jsr TO_IN
-    jsr STORE
+    jsl BANK1 + MINUS
+    jsl BANK1 + TO_IN
+    jsl BANK1 + STORE
     inx
     inx
-    jsr R_TO
-    jsr TUCK
+    jsl BANK1 + R_TO
+    jsl BANK1 + TUCK
     jmp MINUS
 
 ; WORD ( delim -- strptr )
     +BACKLINK "word", 4
 WORD
     ; reset transient string length
-    jsr ZERO
-    jsr HERE
-    jsr STOREBYTE
+    jsl BANK1 + ZERO
+    jsl BANK1 + HERE
+    jsl BANK1 + STOREBYTE
 
 .skip_delimiters
-    jsr .get_char_from_tib
+    jsl BANK1 + .get_char_from_tib
     beq .reached_word_end
-    jsr .is_delim
+    jsl BANK1 + .is_delim
     beq .skip_delimiters
 
 .append_char
     ldy #0
-    jsr pushya
+    jsl BANK1 + pushya
 
     ; increment string length counter
-    jsr HERE
-    jsr FETCHBYTE
-    jsr ONEPLUS
-    jsr HERE
-    jsr STOREBYTE
+    jsl BANK1 + HERE
+    jsl BANK1 + FETCHBYTE
+    jsl BANK1 + ONEPLUS
+    jsl BANK1 + HERE
+    jsl BANK1 + STOREBYTE
 
     ; write character to string
-    jsr HERE
-    jsr HERE
-    jsr FETCHBYTE
-    jsr PLUS
-    jsr STOREBYTE
+    jsl BANK1 + HERE
+    jsl BANK1 + HERE
+    jsl BANK1 + FETCHBYTE
+    jsl BANK1 + PLUS
+    jsl BANK1 + STOREBYTE
 
     ; get next character from TIB
-    jsr .get_char_from_tib
+    jsl BANK1 + .get_char_from_tib
     beq .reached_word_end
-    jsr .is_delim
+    jsl BANK1 + .is_delim
     bne .append_char
 
 .reached_word_end
@@ -567,14 +583,14 @@ WORD
 
     ; compare with nonbreaking space, too
     cmp #K_SPACE | $80
-+   rts
++   rtl
 
 .get_char_from_tib
     lda TO_IN_W
     cmp TIB_SIZE
     bne +
     lda #0
-    rts
+    rtl
 +   lda TIB_PTR
     clc
     adc TO_IN_W
@@ -586,10 +602,10 @@ WORD
 !al
     and #$ff
     inc TO_IN_W
-    rts
+    rtl
 
     +BACKLINK "evaluate", 8
-    jsr PUSH_INPUT_SOURCE
+    jsl BANK1 + PUSH_INPUT_SOURCE
     lda LSB + 2, x
     sta EVALUATE_STRING_PTR
     lda LSB, x
@@ -607,12 +623,12 @@ WORD
 
     +BACKLINK "/string", 7
 SLASH_STRING ; ( addr u n -- addr u )
-    jsr DUP
-    jsr TO_R
-    jsr MINUS
-    jsr SWAP
-    jsr R_TO
-    jsr PLUS
+    jsl BANK1 + DUP
+    jsl BANK1 + TO_R
+    jsl BANK1 + MINUS
+    jsl BANK1 + SWAP
+    jsl BANK1 + R_TO
+    jsl BANK1 + PLUS
     jmp SWAP
 
 ; (entered and left in 8-bit A mode, part of READ_NUMBER's byte phase)
@@ -624,7 +640,7 @@ apply_base
     bne +
     inc W3+1
 +   lda (W3)
-    rts
+    rtl
 !al
 
 ; Z = success, NZ = fail
@@ -663,19 +679,19 @@ READ_NUMBER
     cmp #"#"
     bne .check_decimal
     lda #10
-    jsr apply_base
+    jsl BANK1 + apply_base
 
 .check_decimal
     cmp #"$"
     bne .check_binary
     lda #16
-    jsr apply_base
+    jsl BANK1 + apply_base
 
 .check_binary
     cmp #"%"
     bne .check_negate
     lda #2
-    jsr apply_base
+    jsl BANK1 + apply_base
 
 .check_negate
     cmp #"-"
@@ -690,11 +706,12 @@ READ_NUMBER
     lda _BASE
     sta LSB,x
     stz MSB,x
-    jsr U_M_STAR
+    jsl BANK1 + U_M_STAR
     lda LSB,x
     ora MSB,x
-    bne .parse_failed
-    sep #$20
+    beq +
+    jmp .parse_failed
++   sep #$20
 !as
     inc W3
     bne +
@@ -702,7 +719,7 @@ READ_NUMBER
 +   lda (W3)
 
 .loop_entry ; 8-bit A: char decode
-    jsr CHAR_TO_LOWERCASE
+    jsl BANK1 + CHAR_TO_LOWERCASE
 
     clc
     adc #-$30 ; ascii 0-9 -> 0-9
@@ -760,9 +777,9 @@ READ_NUMBER
 !al
     and #$ff
     beq +
-    jsr NEGATE
+    jsl BANK1 + NEGATE
     lda #0 ; Z set: success
-+   rts
++   rtl
 
 ; 'c' character literal (8-bit A on entry)
 !as
@@ -794,7 +811,7 @@ READ_NUMBER
     inx
     inx
     inx ; X is never zero here, so Z is clear: fail
-    rts
+    rtl
 
 .chars_to_process
     !byte 0
@@ -819,7 +836,7 @@ READ_NUMBER
 !al
     and #$ff
     bne +
--   rts
+-   rtl
 +   and #STRLEN_MASK
     pha
     dex
@@ -829,7 +846,7 @@ READ_NUMBER
     lda #(BANK1 >> 16)
     sta MSB, x
 .xt = * + 1
-    jsr PLACEHOLDER_ADDRESS
+    jsl BANK1 + PLACEHOLDER_ADDRESS
     inx
     inx
     lda MSB-2, x
@@ -837,7 +854,7 @@ READ_NUMBER
     beq .cancel
     pla
     clc
-    adc #3 ; guaranteed carry clear
+    adc #4 ; entry = len byte + name + 3-byte xt; carry guaranteed clear
     adc .dowords_nametoken
     sta .dowords_nametoken
     jmp .dowords_lambda
@@ -846,4 +863,4 @@ READ_NUMBER
     !word 0
 .cancel
     pla
-    rts
+    rtl

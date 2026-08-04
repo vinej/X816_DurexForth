@@ -13,12 +13,12 @@ DROP
     bne +
     inx
     inx
-    rts
+    rtl
 +   lda #OP_INX
-    jsr compile_a
+    jsl BANK1 + compile_a
     lda #OP_INX
 compile_a ; compile the byte in A (falls through on the tail call)
-    jsr PUSHA
+    jsl BANK1 + PUSHA
     jmp CCOMMA
 
     +BACKLINK "swap", 4
@@ -36,7 +36,7 @@ SWAP
     sta LSB, x
     pla
     sta LSB + 2, x
-    rts
+    rtl
 
     +BACKLINK "dup", 3
 DUP
@@ -46,21 +46,21 @@ DUP
     sta MSB, x
     lda LSB + 2, x
     sta LSB, x
-    rts
+    rtl
 
     +BACKLINK "?dup", 4
 QDUP
     lda MSB, x
     ora LSB, x
     bne DUP
-    rts
+    rtl
 
     +BACKLINK "nip", 3
 NIP ; ( a b -- b )
-    jsr SWAP
+    jsl BANK1 + SWAP
     inx
     inx
-    rts
+    rtl
 
     +BACKLINK "over", 4
 OVER
@@ -70,11 +70,11 @@ OVER
     sta MSB, x
     lda LSB + 4, x
     sta LSB, x
-    rts
+    rtl
 
     +BACKLINK "2dup", 4
 TWODUP
-    jsr OVER
+    jsl BANK1 + OVER
     jmp OVER
 
     +BACKLINK "1+", 2
@@ -82,7 +82,7 @@ ONEPLUS
     inc LSB, x
     bne +
     inc MSB, x
-+   rts
++   rtl
 
     +BACKLINK "1-", 2
 ONEMINUS
@@ -90,7 +90,7 @@ ONEMINUS
     bne +
     dec MSB, x
 +   dec LSB, x
-    rts
+    rtl
 
     +BACKLINK "+", 1
 PLUS
@@ -105,7 +105,7 @@ PLUS
 
     inx
     inx
-    rts
+    rtl
 
     +BACKLINK "=", 1
 EQUAL
@@ -122,7 +122,7 @@ EQUAL
     inx
     sta MSB, x
     sta LSB, x
-    rts
+    rtl
 
 ; 0=
     +BACKLINK "0=", 2
@@ -135,7 +135,7 @@ ZEQU
 +   lda #$ffff
 ++  sta MSB, x
     sta LSB, x
-    rts
+    rtl
 
     +BACKLINK "and", 3
     lda MSB, x
@@ -148,7 +148,7 @@ ZEQU
 
     inx
     inx
-    rts
+    rtl
 
     +BACKLINK "!", 1
 STORE
@@ -167,7 +167,7 @@ STORE
     inx
     inx
     inx
-    rts
+    rtl
 
     +BACKLINK "@", 1
 FETCH
@@ -181,7 +181,7 @@ FETCH
     ldy #2
     lda [W], y
     sta MSB, x
-    rts
+    rtl
 
     +BACKLINK "c!", 2
 STOREBYTE
@@ -199,7 +199,7 @@ STOREBYTE
     inx
     inx
     inx
-    rts
+    rtl
 
     +BACKLINK "c@", 2
 FETCHBYTE
@@ -215,13 +215,13 @@ FETCHBYTE
     and #$ff
     sta LSB, x
     stz MSB, x
-    rts
+    rtl
 
     +BACKLINK "count", 5
 COUNT
-    jsr DUP
-    jsr ONEPLUS
-    jsr SWAP
+    jsl BANK1 + DUP
+    jsl BANK1 + ONEPLUS
+    jsl BANK1 + SWAP
     jmp FETCHBYTE
 
     +BACKLINK "<", 1
@@ -241,56 +241,62 @@ LESS_THAN
     inx
     sta LSB, x
     sta MSB, x
-    rts
+    rtl
 
     +BACKLINK ">", 1
 GREATER_THAN
-    jsr SWAP
+    jsl BANK1 + SWAP
     jmp LESS_THAN
 
     +BACKLINK "max", 3
 MAX
-    jsr TWODUP
-    jsr LESS_THAN
-    jsr ZBRANCH
+    jsl BANK1 + TWODUP
+    jsl BANK1 + LESS_THAN
+    jsl BANK1 + ZBRANCH
     !word +
-    jsr SWAP
+    jsl BANK1 + SWAP
 +   inx
     inx
-    rts
+    rtl
 
     +BACKLINK "min", 3
 MIN
-    jsr TWODUP
-    jsr GREATER_THAN
-    jsr ZBRANCH
+    jsl BANK1 + TWODUP
+    jsl BANK1 + GREATER_THAN
+    jsl BANK1 + ZBRANCH
     !word +
-    jsr SWAP
+    jsl BANK1 + SWAP
 +   inx
     inx
-    rts
+    rtl
 
     +BACKLINK "tuck", 4
 TUCK ; ( x y -- y x y )
-    jsr SWAP
+    jsl BANK1 + SWAP
     jmp OVER
 
     ; Exempt from TCE as top of return stack must contain a return address.
-    ; M=0 makes the return-address juggling one pull: pla is 16-bit. A cell
-    ; on the return stack is TWO words, high word pushed first (so the low
-    ; word is at the lower address, like a cell in memory).
+    ; Stage C: a return address is THREE bytes (jsl BANK1 + pushes PBR too); pull
+    ; PC then bank, resume through jml [W]. A cell on the return stack is
+    ; still TWO 16-bit words, high word pushed first.
     +BACKLINK ">r", 2 | F_NO_TAIL_CALL_ELIMINATION
 TO_R
     pla
     inc
     sta W
+    sep #$20
+!as
+    pla
+    sta W+2
+    rep #$20
+!al
     lda MSB, x
     pha
     lda LSB, x
     pha
     inx
     inx
-    jmp (W)
+    jml [W]
 
     ; Exempt from TCE as top of return stack must contain a return address.
     +BACKLINK "r>", 2 | F_NO_TAIL_CALL_ELIMINATION
@@ -298,26 +304,32 @@ R_TO
     pla
     inc
     sta W
+    sep #$20
+!as
+    pla
+    sta W+2
+    rep #$20
+!al
     dex
     dex
     pla
     sta LSB, x
     pla
     sta MSB, x
-    jmp (W)
+    jml [W]
 
     ; Exempt from TCE as top of return stack must contain a return address.
     ; X816: stack-relative addressing - the cell sits above this word's own
-    ; return address (1,s..2,s): low word at 3,s, high word at 5,s.
+    ; THREE-byte return address (1,s..3,s): low word at 4,s, high at 6,s.
     +BACKLINK "r@", 2 | F_NO_TAIL_CALL_ELIMINATION
 R_FETCH
     dex
     dex
-    lda 3, s
+    lda 4, s
     sta LSB, x
-    lda 5, s
+    lda 6, s
     sta MSB, x
-    rts
+    rtl
 
     +BACKLINK "bl", 2
 BL
@@ -344,7 +356,7 @@ BL
     sta MSB, x
     pla
     sta LSB, x
-    rts
+    rtl
 
     +BACKLINK "depth", 5
     ; depth = (X_INIT - X) / 2 - X steps by two per cell now
@@ -362,16 +374,16 @@ BL
 
     +BACKLINK "within", 6
 WITHIN ; ( test low high -- flag )
-    jsr OVER
-    jsr MINUS
-    jsr TO_R
-    jsr MINUS
-    jsr R_TO
+    jsl BANK1 + OVER
+    jsl BANK1 + MINUS
+    jsl BANK1 + TO_R
+    jsl BANK1 + MINUS
+    jsl BANK1 + R_TO
     jmp U_LESS
 
 ; ERASE ( start len -- )
     +BACKLINK "erase", 5
-    jsr ZERO
+    jsl BANK1 + ZERO
     ; falls into FILL
 
 ; FILL ( start len char -- )
@@ -416,7 +428,7 @@ FILL
     dec W2 + 2
 +++ dec W2
     bra -
-+   rts
++   rtl
 
     +BACKLINK "base", 4
 BASE
@@ -427,7 +439,7 @@ _BASE
     +BACKLINK "2*", 2
     asl LSB, x
     rol MSB, x
-    rts
+    rtl
 
     +BACKLINK "rot", 3 ; ( a b c -- b c a )
 ROT
@@ -447,7 +459,7 @@ ROT
     sta LSB + 2, x
     pla
     sta LSB, x
-    rts
+    rtl
 
     +BACKLINK "+!", 2 ; ( num addr -- )
 PLUS_STORE
@@ -467,7 +479,7 @@ PLUS_STORE
     inx
     inx
     inx
-    rts
+    rtl
 
     +BACKLINK "split", 5 ; ( n -- low16 high16 )
     lda MSB, x
@@ -476,4 +488,4 @@ PLUS_STORE
     stz MSB - 2, x
     dex
     dex
-    rts
+    rtl

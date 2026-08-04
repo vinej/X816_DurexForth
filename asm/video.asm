@@ -46,7 +46,7 @@ VPOKE ; ( bank addr value -- )
     inx
     inx
     +VIO_END
-    rts
+    rtl
 
     +BACKLINK "vpeek", 5
 VPEEK ; ( bank addr -- value )
@@ -70,7 +70,7 @@ VPEEK ; ( bank addr -- value )
     sta LSB, x
     stz MSB, x
     +VIO_END
-    rts
+    rtl
 
     +BACKLINK "vaddr", 5
 VADDR ; ( bank addr -- ) point data port at VRAM, auto-increment 1
@@ -93,7 +93,7 @@ VADDR ; ( bank addr -- ) point data port at VRAM, auto-increment 1
     inx
     inx
     +VIO_END
-    rts
+    rtl
 
     +BACKLINK "v!", 2
 V_STORE ; ( byte -- )
@@ -107,7 +107,7 @@ V_STORE ; ( byte -- )
     inx
     inx
     +VIO_END
-    rts
+    rtl
 
     +BACKLINK "v@", 2
 V_FETCH ; ( -- byte )
@@ -123,7 +123,7 @@ V_FETCH ; ( -- byte )
     sta LSB, x
     stz MSB, x
     +VIO_END
-    rts
+    rtl
 
     +BACKLINK "v!w", 3
 V_STOREW ; ( w -- ) low byte first
@@ -139,7 +139,7 @@ V_STOREW ; ( w -- ) low byte first
     inx
     inx
     +VIO_END
-    rts
+    rtl
 
 ; X816: SCREEN (KERNAL screen_mode) and COLOR (the KERNAL's $0376 shadow)
 ; are gone - the kernel console owns the text mode and its attributes.
@@ -161,7 +161,7 @@ IOFETCHBYTE ; ( addr -- byte )
     and #$ff
     sta LSB, x
     stz MSB, x
-    rts
+    rtl
 
     +BACKLINK "border", 6
 BORDER ; ( color -- )
@@ -176,7 +176,7 @@ BORDER ; ( color -- )
     inx
     inx
     +VIO_END
-    rts
+    rtl
 
     +BACKLINK "cls", 3
 CLS ; ( -- )
@@ -187,16 +187,16 @@ LOCATE ; ( row col -- )
     lda LSB+2, x        ; row
     tay
     lda LSB, x          ; col
-    jsr kern_gotoxy     ; A = column, Y = row
+    jsl BANK1 + kern_gotoxy     ; A = column, Y = row
     inx
     inx
     inx
     inx
-    rts
+    rtl
 
     +BACKLINK "cursor", 6
 CURSOR ; ( -- row col )
-    jsr kern_getxy      ; KTMP = column, KTMP2 = row
+    jsl BANK1 + kern_getxy      ; KTMP = column, KTMP2 = row
     dex
     dex
     dex
@@ -207,11 +207,11 @@ CURSOR ; ( -- row col )
     lda KTMP
     sta LSB, x          ; col on top
     stz MSB, x
-    rts
+    rtl
 
     +BACKLINK "pos", 3
 POS ; ( -- col )
-    jsr kern_getxy
+    jsl BANK1 + kern_getxy
     lda KTMP
     jmp PUSHA
 
@@ -230,7 +230,7 @@ SCROLLX ; ( n -- )
     inx
     inx
     +VIO_END
-    rts
+    rtl
 
     +BACKLINK "scrolly", 7
 SCROLLY ; ( n -- )
@@ -247,7 +247,7 @@ SCROLLY ; ( n -- )
     inx
     inx
     +VIO_END
-    rts
+    rtl
 
 ; Text tilemap helpers. X816 console: 128-wide map at VRAM $00000 bank 0
 ; (runtime/console.c, MAPBASE 0), two bytes/cell (code, attribute).
@@ -276,7 +276,7 @@ TILE ; ( x y code attr -- )
     rep #$20
 !al
     +VIO_END
-    rts
+    rtl
 
     +BACKLINK "tdata", 5
 TDATA ; ( x y -- code )
@@ -299,7 +299,7 @@ TDATA ; ( x y -- code )
     sta LSB, x
     stz MSB, x
     +VIO_END
-    rts
+    rtl
 
     +BACKLINK "tattr", 5
 TATTR ; ( x y -- attr )
@@ -323,4 +323,4 @@ TATTR ; ( x y -- attr )
     sta LSB, x
     stz MSB, x
     +VIO_END
-    rts
+    rtl

@@ -31,11 +31,11 @@ cmove_getparams: ; pop ( src dst u ) into SRC/DST/LEN, X dropped by 6
 	tax
 	rep #$20
 !al
-	rts
+	rtl
 
     +BACKLINK "cmove>", 6
 CMOVE_BACK ; ( src dst u -- ) copy u bytes, high addresses first (overlap-safe up)
-	jsr cmove_getparams
+	jsl BANK1 + cmove_getparams
 	; point SRC/DST one past their last byte
 	lda SRC
 	clc
@@ -77,7 +77,7 @@ CMOVE_BACK ; ( src dst u -- ) copy u bytes, high addresses first (overlap-safe u
 
     +BACKLINK "cmove", 5
 CMOVE ; ( src dst u -- ) copy u bytes, low addresses first
-	jsr cmove_getparams
+	jsl BANK1 + cmove_getparams
 -	lda LEN
 	ora LEN + 2
 	beq cmove_done
@@ -100,16 +100,16 @@ CMOVE ; ( src dst u -- ) copy u bytes, low addresses first
 	bra -
 
 cmove_done
-	rts
+	rtl
 
     +BACKLINK "move", 4
 MOVE
-    jsr TO_R
-    jsr TWODUP
-    jsr U_LESS
-    jsr R_TO
-    jsr SWAP
-    jsr ZBRANCH
+    jsl BANK1 + TO_R
+    jsl BANK1 + TWODUP
+    jsl BANK1 + U_LESS
+    jsl BANK1 + R_TO
+    jsl BANK1 + SWAP
+    jsl BANK1 + ZBRANCH
     !word .br
     jmp CMOVE_BACK
 .br = *

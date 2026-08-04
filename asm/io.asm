@@ -20,7 +20,7 @@ PAGE
 RVS ; ( -- ) invert text output
     ; X816: CON_PUTC has no reverse-video control code; the console cursor
     ; owns the attribute byte. No-op until an attribute API exists.
-    rts
+    rtl
 
     +BACKLINK "cr", 2
 CR ; ( -- )
@@ -44,18 +44,18 @@ TYPE ; ( caddr u -- )
     inx
     inx
     inx
-    rts
-+   jsr OVER
-    jsr FETCHBYTE
-    jsr EMIT
-    jsr ONE
-    jsr SLASH_STRING
+    rtl
++   jsl BANK1 + OVER
+    jsl BANK1 + FETCHBYTE
+    jsl BANK1 + EMIT
+    jsl BANK1 + ONE
+    jsl BANK1 + SLASH_STRING
     jmp -
 
     +BACKLINK "key?", 4
     lda .key_pending
     bne .pushtrue
-    jsr kern_getin ; preserves X/Y
+    jsl BANK1 + kern_getin ; preserves X/Y
     sta .key_pending
     beq +
 .pushtrue
@@ -64,13 +64,13 @@ TYPE ; ( caddr u -- )
     dex
     sta LSB, x
     sta MSB, x
-    rts
+    rtl
 +   jmp PUSHA ; A = 0: false
 
     +BACKLINK "key", 3
     lda .key_pending
     bne +
--   jsr kern_getin
+-   jsl BANK1 + kern_getin
     cmp #0
     beq -
 +   stz .key_pending
@@ -94,10 +94,10 @@ CLOSE_INPUT_SOURCE
     lda SOURCE_ID_LSB
     beq +                   ; 0 = keyboard
     bmi +                   ; -1 = evaluate
-    jsr kern_fs_close
-+   jsr POP_INPUT_SOURCE
+    jsl BANK1 + kern_fs_close
++   jsl BANK1 + POP_INPUT_SOURCE
     ldx W3
-    rts
+    rtl
 
     +BACKLINK "refill", 6
 REFILL ; ( -- flag )
@@ -115,7 +115,7 @@ REFILL ; ( -- flag )
     ; backspace, so echoing the key IS the screen edit.
 
     ldy #0         ; TIB index (kern_getc/PUTCHR preserve X and Y)
--   jsr kern_getc
+-   jsl BANK1 + kern_getc
     cmp #$d
     beq .gotReturn
     cmp #$08
@@ -127,14 +127,14 @@ REFILL ; ( -- flag )
     sta TIB,y
     rep #$20
 !al
-    jsr PUTCHR     ; echo
+    jsl BANK1 + PUTCHR     ; echo
     iny
     bra -
 .backspace
     cpy #0
     beq -
     dey
-    jsr PUTCHR     ; echo the $08: the console steps back and blanks
+    jsl BANK1 + PUTCHR     ; echo the $08: the console steps back and blanks
     bra -
 .gotReturn
     ; Set TIB_SIZE to number of chars fetched.
@@ -143,14 +143,14 @@ REFILL ; ( -- flag )
     sty TIB_SIZE
     rep #$20
 !al
-    jsr PUTCHR
+    jsl BANK1 + PUTCHR
 .return_true
     dex
     dex
     lda #$ffff
     sta LSB,x
     sta MSB,x
-    rts
+    rtl
 
 .getLineFromDisk
     ; X816: SOURCE_ID is a kernel file handle; read it a byte at a time
@@ -159,7 +159,7 @@ REFILL ; ( -- flag )
     lda TIB_PTR
     sta W
 -   lda SOURCE_ID_LSB
-    jsr fs_getbyte ; byte in A (16-bit clean), carry set at EOF
+    jsl BANK1 + fs_getbyte ; byte in A (16-bit clean), carry set at EOF
     bcs .disk_eof
     ora #0
     beq .return_true
@@ -186,7 +186,7 @@ REFILL ; ( -- flag )
     dex
     stz MSB,x
     stz LSB,x
-    rts
+    rtl
 
 .getLineFromEvaluateString
     lda EVALUATE_STRING_SIZE
@@ -235,7 +235,7 @@ SOURCE
     lda TIB_SIZE
     sta LSB, x
     stz MSB, x
-    rts
+    rtl
 
 TIB_PTR
     !word 0
@@ -263,7 +263,7 @@ TO_IN_W
 
     +BACKLINK "char", 4
 CHAR ; ( name -- char )
-    jsr PARSE_NAME
+    jsl BANK1 + PARSE_NAME
     inx
     inx
     jmp FETCHBYTE
@@ -286,7 +286,7 @@ push_input_stack ; A(16) -> the save stack
     iny
     iny
     sty SAVE_INPUT_STACK_DEPTH
-    rts
+    rtl
 .input_stack_overflow
     lda #-8 ; dictionary/structure overflow - loud, never silent corruption
     jmp throw_a
@@ -297,43 +297,43 @@ pop_input_stack ; -> A(16)
     dey
     sty SAVE_INPUT_STACK_DEPTH
     lda SAVE_INPUT_STACK, y
-    rts
+    rtl
 
 PUSH_INPUT_SOURCE
     ; X816: hand cached read-ahead back to the kernel before another
     ; source becomes current (fs.asm).
-    jsr fs_flush
+    jsl BANK1 + fs_flush
     lda TO_IN_W
-    jsr push_input_stack
+    jsl BANK1 + push_input_stack
     lda SOURCE_ID_LSB
-    jsr push_input_stack
+    jsl BANK1 + push_input_stack
     lda SOURCE_ID_MSB ; only the low byte is meaningful
-    jsr push_input_stack
+    jsl BANK1 + push_input_stack
     lda TIB_PTR
-    jsr push_input_stack
+    jsl BANK1 + push_input_stack
     lda TIB_SIZE
-    jsr push_input_stack
+    jsl BANK1 + push_input_stack
     lda EVALUATE_STRING_PTR
-    jsr push_input_stack
+    jsl BANK1 + push_input_stack
     lda EVALUATE_STRING_SIZE
     jmp push_input_stack
 
 POP_INPUT_SOURCE
-    jsr pop_input_stack
+    jsl BANK1 + pop_input_stack
     sta EVALUATE_STRING_SIZE
-    jsr pop_input_stack
+    jsl BANK1 + pop_input_stack
     sta EVALUATE_STRING_PTR
-    jsr pop_input_stack
+    jsl BANK1 + pop_input_stack
     sta TIB_SIZE
-    jsr pop_input_stack
+    jsl BANK1 + pop_input_stack
     sta TIB_PTR
-    jsr pop_input_stack
+    jsl BANK1 + pop_input_stack
     sta SOURCE_ID_MSB
-    jsr pop_input_stack
+    jsl BANK1 + pop_input_stack
     sta SOURCE_ID_LSB
-    jsr pop_input_stack
+    jsl BANK1 + pop_input_stack
     sta TO_IN_W
-    rts
+    rtl
 
 ; handle errors returned by open,
 ; close, and chkin. If ioresult is
@@ -347,13 +347,13 @@ IOABORT ; ( ioresult -- )
     bne .print_ioerr
     lda LSB-2,x
     bne .print_ioerr
-    rts
+    rtl
 
 .print_ioerr
     lda #.ioerr
     sta W
 
-    jsr RVS
+    jsl BANK1 + RVS
 
     ldy #0
 -   sep #$20
@@ -364,7 +364,7 @@ IOABORT ; ( ioresult -- )
     rep #$20
 !al
     and #$ff
-    jsr PUTCHR
+    jsl BANK1 + PUTCHR
     iny
     sep #$20
 !as

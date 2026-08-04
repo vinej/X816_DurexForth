@@ -25,7 +25,7 @@ U_LESS ; ( a b -- flag )
     inx
     sta MSB, x
     sta LSB, x
-    rts
+    rtl
 
     +BACKLINK "-", 1
 MINUS
@@ -40,7 +40,7 @@ MINUS
 
     inx
     inx
-    rts
+    rtl
 
 product = W ; W and W2: 8 contiguous bytes of 64-bit product
 
@@ -78,7 +78,7 @@ U_M_STAR
     sta LSB, x
     lda product + 6
     sta MSB, x
-    rts
+    rtl
 
     +BACKLINK "um/mod", 6
 UM_DIV_MOD
@@ -149,7 +149,7 @@ M_PLUS ; ( d n -- d )
     sta MSB + 2, x
     inx
     inx
-    rts
+    rtl
 
     +BACKLINK "invert", 6
 INVERT
@@ -159,47 +159,47 @@ INVERT
     lda LSB, x
     eor #$ffff
     sta LSB, x
-    rts
+    rtl
 
     +BACKLINK "negate", 6
 NEGATE
-    jsr INVERT
+    jsl BANK1 + INVERT
     jmp ONEPLUS
 
     +BACKLINK "abs", 3
 ABS
     lda MSB, x
     bmi NEGATE
-    rts
+    rtl
 
 DABS_STAR           ; ( n1 n2 -- ud1 )
     lda MSB, x      ;   ud1 = abs(n1) * abs(n2)
     eor MSB + 2, x  ;   with the final sign in A's bit 15 (and the N flag)
     pha
-    jsr ABS
+    jsl BANK1 + ABS
     inx
     inx
-    jsr ABS
+    jsl BANK1 + ABS
     dex
     dex
-    jsr U_M_STAR
+    jsl BANK1 + U_M_STAR
     pla
-    rts
+    rtl
 
     +BACKLINK "*", 1
-    jsr DABS_STAR
+    jsl BANK1 + DABS_STAR
     inx
     inx
     and #$8000
     bne NEGATE
-    rts
+    rtl
 
     +BACKLINK "dnegate", 7
 DNEGATE
-    jsr INVERT
+    jsl BANK1 + INVERT
     inx
     inx
-    jsr INVERT
+    jsl BANK1 + INVERT
     dex
     dex
     inc LSB + 2, x
@@ -209,12 +209,12 @@ DNEGATE
     inc LSB, x
     bne +
     inc MSB, x
-+   rts
++   rtl
 
     +BACKLINK "m*", 2
-    jsr DABS_STAR
+    jsl BANK1 + DABS_STAR
     bmi DNEGATE
-    rts
+    rtl
 
     +BACKLINK "0<", 2
 ZERO_LESS
@@ -224,11 +224,11 @@ ZERO_LESS
     lda #$ffff
 +   sta MSB, x
     sta LSB, x
-    rts
+    rtl
 
     +BACKLINK "s>d", 3
 S_TO_D
-    jsr DUP
+    jsl BANK1 + DUP
     jmp ZERO_LESS
 
     +BACKLINK "fm/mod", 6
@@ -236,27 +236,27 @@ FM_DIV_MOD
     lda MSB, x
     sta DIVISOR_SIGN
     bpl +
-    jsr NEGATE
+    jsl BANK1 + NEGATE
     inx
     inx
-    jsr DNEGATE
+    jsl BANK1 + DNEGATE
     dex
     dex
 +   lda MSB + 2, x
     bpl +
-    jsr TUCK
-    jsr PLUS
-    jsr SWAP
-+   jsr UM_DIV_MOD
+    jsl BANK1 + TUCK
+    jsl BANK1 + PLUS
+    jsl BANK1 + SWAP
++   jsl BANK1 + UM_DIV_MOD
 DIVISOR_SIGN = * + 1
     lda #$ffff      ; placeholder, patched with the divisor's sign word
     bpl +
     inx
     inx
-    jsr NEGATE
+    jsl BANK1 + NEGATE
     dex
     dex
-+   rts
++   rtl
 
     +BACKLINK "/mod", 4
     lda MSB, x
@@ -265,7 +265,7 @@ DIVISOR_SIGN = * + 1
     sta LSB - 2, x
     inx
     inx
-    jsr S_TO_D
+    jsl BANK1 + S_TO_D
     dex
     dex
     jmp FM_DIV_MOD
@@ -283,7 +283,7 @@ UD_MOD
     stz MSB, x
     dex
     dex
-    jsr UM_DIV_MOD  ; divide the high cell
+    jsl BANK1 + UM_DIV_MOD  ; divide the high cell
     lda LSB, x
     pha
     lda MSB, x
@@ -292,11 +292,11 @@ UD_MOD
     sta LSB, x
     lda W3 + 2
     sta MSB, x
-    jsr UM_DIV_MOD  ; divide the low cell
+    jsl BANK1 + UM_DIV_MOD  ; divide the low cell
     dex
     dex
     pla             ; push the high cell of the quotient
     sta MSB, x
     pla
     sta LSB, x
-    rts
+    rtl

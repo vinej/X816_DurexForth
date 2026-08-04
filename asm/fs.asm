@@ -70,7 +70,7 @@ fs_getbyte
     bcc .serve
     rep #$20
 !al
-    jsr kern_fs_fill        ; A = handle -> A = fresh count (16-bit clean)
+    jsl BANK1 + kern_fs_fill        ; A = handle -> A = fresh count (16-bit clean)
     sep #$20
 !as
     sta fs_ccnt
@@ -81,7 +81,7 @@ fs_getbyte
 !al
     ldy fs_ysave
     sec
-    rts
+    rtl
 !as
 .serve
     ldy fs_cpos
@@ -92,7 +92,7 @@ fs_getbyte
     and #$ff
     ldy fs_ysave
     clc
-    rts
+    rtl
 fs_ysave !byte 0
 
 ; fs_flush - if the CURRENT source is a file with unconsumed cached bytes,
@@ -114,7 +114,7 @@ fs_flush
     and #$ff
     tay                     ; hmm: Y is 8-bit; count 1..128 fits
     lda SOURCE_ID_LSB
-    jsr kern_fs_seekback
+    jsl BANK1 + kern_fs_seekback
     sep #$20
 !as
 .fs_drop_sep
@@ -122,7 +122,7 @@ fs_flush
     stz fs_cpos
     rep #$20
 !al
-    rts
+    rtl
 .fs_drop
     sep #$20
 !as
@@ -130,7 +130,7 @@ fs_flush
     stz fs_cpos
     rep #$20
 !al
-    rts
+    rtl
 
     +BACKLINK "included", 8
 INCLUDED ; ( addr u -- ) interpret a file as source
@@ -162,7 +162,7 @@ INCLUDED ; ( addr u -- ) interpret a file as source
 +   rep #$20
 !al
 
-    jsr PUSH_INPUT_SOURCE
+    jsl BANK1 + PUSH_INPUT_SOURCE
 
     ; TIB bookkeeping, upstream's shape: nested include lines stack upward
     ; in the TIB region so the parent's unconsumed text is not clobbered.
@@ -184,12 +184,12 @@ INCLUDED ; ( addr u -- ) interpret a file as source
     sta TIB_PTR
 
 .open
-    jsr kern_fs_open
+    jsl BANK1 + kern_fs_open
     bcc +
     ; Could not open: undo the source push and throw. No message here -
     ; the standard exception report carries the code, and the silence is
     ; what lets base.fs probe for an optional AUTORUN with CATCH.
-    jsr POP_INPUT_SOURCE
+    jsl BANK1 + POP_INPUT_SOURCE
     lda #-37                ; file i/o exception
     jmp throw_a
 +

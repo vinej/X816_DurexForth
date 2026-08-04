@@ -7,5 +7,5 @@ CHAR_TO_LOWERCASE ; ( a -- a )
     cmp #'Z' + 1
     bcs +
     sbc #'A' - 'a' - 1
-+   rts
++   rtl
 !al

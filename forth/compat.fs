@@ -32,7 +32,7 @@ while >r dup c@ pet# accumulate
 r> um/mod swap r> ?negate
 swap r> ?negate ;
 
-: >body ( xt -- dataaddr ) 5 + ;
+: >body ( xt -- dataaddr ) 7 + ;
 : defer create ['] abort ,
 does> @ execute ;
 : defer! >body ! ;

@@ -26,7 +26,7 @@ LAYER_ON ; ( layer -- )
     inx
     inx
     +VIO_END
-    rts
+    rtl
 
     +BACKLINK "layer-off", 9
 LAYER_OFF ; ( layer -- )
@@ -46,7 +46,7 @@ LAYER_OFF ; ( layer -- )
     inx
     inx
     +VIO_END
-    rts
+    rtl
 
     +BACKLINK "mapbase", 7
 MAPBASE ; ( layer bank addr -- ) 512-aligned tile-map base
@@ -76,7 +76,7 @@ MAPBASE ; ( layer bank addr -- ) 512-aligned tile-map base
     rep #$20
 !al
     +VIO_END
-    rts
+    rtl
 
     +BACKLINK "tilebase", 8
 TILEBASE ; ( layer bank addr -- ) 2 KB-aligned tile-data base, 8x8 tiles
@@ -112,7 +112,7 @@ TILEBASE ; ( layer bank addr -- ) 2 KB-aligned tile-data base, 8x8 tiles
     rep #$20
 !al
     +VIO_END
-    rts
+    rtl
 
     +BACKLINK "layer-mode", 10
 LAYER_MODE ; ( layer cfg -- ) write the layer config byte
@@ -133,4 +133,4 @@ LAYER_MODE ; ( layer cfg -- ) write the layer config byte
     inx
     inx
     +VIO_END
-    rts
+    rtl

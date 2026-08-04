@@ -28,7 +28,7 @@ set_sprite
     sta VERA_ADDR_M
     lda #$11                    ; bank 1 + auto-increment 1
     sta VERA_ADDR_H
-    rts
+    rtl
 !al
 
     +BACKLINK "sprites-on", 10
@@ -43,7 +43,7 @@ SPRITES_ON ; ( -- )
     rep #$20
 !al
     +VIO_END
-    rts
+    rtl
 
     +BACKLINK "sprites-off", 11
 SPRITES_OFF ; ( -- )
@@ -57,7 +57,7 @@ SPRITES_OFF ; ( -- )
     rep #$20
 !al
     +VIO_END
-    rts
+    rtl
 
     +BACKLINK "sprite-pos", 10
 SPRITE_POS ; ( x y sprite -- )
@@ -67,7 +67,7 @@ SPRITE_POS ; ( x y sprite -- )
     lda #2
     sta SPR_OFF
     lda LSB, x                  ; sprite
-    jsr set_sprite
+    jsl BANK1 + set_sprite
     lda LSB+4, x                ; x lo
     sta VERA_DATA0
     lda LSB+5, x                ; x hi
@@ -87,7 +87,7 @@ SPRITE_POS ; ( x y sprite -- )
     inx
     inx
     +VIO_END
-    rts
+    rtl
 
     +BACKLINK "sprite-get", 10
 SPRITE_GET ; ( sprite -- x y )
@@ -97,7 +97,7 @@ SPRITE_GET ; ( sprite -- x y )
     lda #2
     sta SPR_OFF
     lda LSB, x
-    jsr set_sprite
+    jsl BANK1 + set_sprite
     lda VERA_DATA0              ; x lo
     sta W
     lda VERA_DATA0              ; x hi
@@ -119,7 +119,7 @@ SPRITE_GET ; ( sprite -- x y )
     sta LSB, x
     stz MSB, x
     +VIO_END
-    rts
+    rtl
 
     +BACKLINK "sprite-image", 12
 SPRITE_IMAGE ; ( graphaddr sprite -- ) 4bpp image, 32-aligned VRAM address
@@ -128,7 +128,7 @@ SPRITE_IMAGE ; ( graphaddr sprite -- ) 4bpp image, 32-aligned VRAM address
 !as
     stz SPR_OFF
     lda LSB, x                  ; sprite
-    jsr set_sprite
+    jsl BANK1 + set_sprite
     lda LSB+3, x                ; graphaddr hi
     sta W+1
     lda LSB+2, x                ; graphaddr lo
@@ -150,7 +150,7 @@ SPRITE_IMAGE ; ( graphaddr sprite -- ) 4bpp image, 32-aligned VRAM address
     inx
     inx
     +VIO_END
-    rts
+    rtl
 
     +BACKLINK "sprite-size", 11
 SPRITE_SIZE ; ( width height sprite -- ) size codes 0-3 = 8/16/32/64
@@ -160,7 +160,7 @@ SPRITE_SIZE ; ( width height sprite -- ) size codes 0-3 = 8/16/32/64
     lda #7
     sta SPR_OFF
     lda LSB, x
-    jsr set_sprite
+    jsl BANK1 + set_sprite
     lda LSB+2, x                ; height
     and #3
     asl
@@ -185,7 +185,7 @@ SPRITE_SIZE ; ( width height sprite -- ) size codes 0-3 = 8/16/32/64
     rep #$20
 !al
     +VIO_END
-    rts
+    rtl
 
     +BACKLINK "sprite-z", 8
 SPRITE_Z ; ( z sprite -- ) Z-depth 0=off 1=behind 2=between 3=front
@@ -195,7 +195,7 @@ SPRITE_Z ; ( z sprite -- ) Z-depth 0=off 1=behind 2=between 3=front
     lda #6
     sta SPR_OFF
     lda LSB, x
-    jsr set_sprite
+    jsl BANK1 + set_sprite
     lda LSB+2, x                ; z
     and #3
     asl
@@ -208,7 +208,7 @@ SPRITE_Z ; ( z sprite -- ) Z-depth 0=off 1=behind 2=between 3=front
     inx
     inx
     +VIO_END
-    rts
+    rtl
 
     +BACKLINK "sprite", 6
 SPRITE ; ( num zdepth -- ) set Z-depth on sprite num and enable the layer
@@ -218,7 +218,7 @@ SPRITE ; ( num zdepth -- ) set Z-depth on sprite num and enable the layer
     lda #6
     sta SPR_OFF
     lda LSB+2, x                ; num
-    jsr set_sprite
+    jsl BANK1 + set_sprite
     lda LSB, x                  ; zdepth
     and #3
     asl
@@ -241,7 +241,7 @@ SPRITE_MOV ; ( num x y -- ) = BASIC MOVSPR num,x,y
     lda #2
     sta SPR_OFF
     lda LSB+4, x                ; num
-    jsr set_sprite
+    jsl BANK1 + set_sprite
     lda LSB+2, x                ; x lo
     sta VERA_DATA0
     lda LSB+3, x                ; x hi
@@ -259,7 +259,7 @@ SPRITE_MOV ; ( num x y -- ) = BASIC MOVSPR num,x,y
     rep #$20
 !al
     +VIO_END
-    rts
+    rtl
 
     +BACKLINK "sprite-mem", 10
 SPRITE_MEM ; ( num bank addr -- ) point image at VRAM bank:addr
@@ -268,7 +268,7 @@ SPRITE_MEM ; ( num bank addr -- ) point image at VRAM bank:addr
 !as
     stz SPR_OFF
     lda LSB+4, x                ; num
-    jsr set_sprite
+    jsl BANK1 + set_sprite
     lda LSB+1, x                ; addr hi
     sta W+1
     lda LSB, x                  ; addr lo
@@ -297,4 +297,4 @@ SPRITE_MEM ; ( num bank addr -- ) point image at VRAM bank:addr
     rep #$20
 !al
     +VIO_END
-    rts
+    rtl

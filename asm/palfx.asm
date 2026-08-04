@@ -32,7 +32,7 @@ PAL ; ( rgb index -- ) set palette entry index (0-255) to 12-bit $0RGB
     inx
     inx
     +VIO_END
-    rts
+    rtl
 
     +BACKLINK "dcsel", 5
 DCSEL ; ( n -- ) select DCSEL bank 0-63 (VERA FX)
@@ -47,7 +47,7 @@ DCSEL ; ( n -- ) select DCSEL bank 0-63 (VERA FX)
     inx
     inx
     +VIO_END
-    rts
+    rtl
 
     +BACKLINK "fx-mult", 7
 FX_MULT ; ( a b -- n ) signed 16x16 -> 32-bit via the VERA FX multiplier.
@@ -112,7 +112,7 @@ FX_MULT ; ( a b -- n ) signed 16x16 -> 32-bit via the VERA FX multiplier.
     lda W+2
     sta MSB, x
     +VIO_END
-    rts
+    rtl
 
     +BACKLINK "fx*", 3
     jmp FX_MULT                 ; alias: signed 16x16 -> 32-bit
@@ -130,7 +130,7 @@ FX_OFF ; ( -- ) turn the VERA FX helpers back off (so plain VPOKE works)
     rep #$20
 !al
     +VIO_END
-    rts
+    rtl
 
     +BACKLINK "fx-fill", 7
 FX_FILL ; ( byte vbank vaddr count -- ) fast VRAM fill via the 32-bit cache.
@@ -139,7 +139,7 @@ FX_FILL ; ( byte vbank vaddr count -- ) fast VRAM fill via the 32-bit cache.
     sep #$20
 !as
     lda LSB+6, x                ; fill byte
-    jsr fx_fill_core
+    jsl BANK1 + fx_fill_core
     txa                         ; drop 4 cells
     clc
     adc #8
@@ -147,7 +147,7 @@ FX_FILL ; ( byte vbank vaddr count -- ) fast VRAM fill via the 32-bit cache.
     rep #$20
 !al
     +VIO_END
-    rts
+    rtl
 
     +BACKLINK "fx-clear", 8
 FX_CLEAR ; ( vbank vaddr count -- ) zero a VRAM region
@@ -155,7 +155,7 @@ FX_CLEAR ; ( vbank vaddr count -- ) zero a VRAM region
     sep #$20
 !as
     lda #0
-    jsr fx_fill_core
+    jsl BANK1 + fx_fill_core
     txa                         ; drop 3 cells
     clc
     adc #6
@@ -163,7 +163,7 @@ FX_CLEAR ; ( vbank vaddr count -- ) zero a VRAM region
     rep #$20
 !al
     +VIO_END
-    rts
+    rtl
 
 ; A = fill byte; vbank=LSB+4,x vaddr=LSB+2/+3,x count=LSB/+1,x (bytes).
 ; Leaves the stack alone. 8-bit A throughout.
@@ -265,5 +265,5 @@ fxf_end
     sta VERA_CTRL               ; DCSEL=2
     stz $9f29                   ; FX_CTRL = 0
     stz VERA_CTRL               ; DCSEL=0, ADDRSEL=0
-    rts
+    rtl
 !al

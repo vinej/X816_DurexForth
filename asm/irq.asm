@@ -133,7 +133,7 @@ iu_hook
     sta irq_on
 iu_done
     plp
-    rts
+    rtl
 
 irq_tramp
     lda irq_busy
@@ -173,14 +173,14 @@ it_sv1
     and #1                      ; VSYNC (the KERNAL acks it)
     beq it_novs
     ldy #0
-    jsr irq_call
+    jsl BANK1 + irq_call
 it_novs
     lda irq_isr_s
     and #2                      ; LINE: ack first, nobody else will
     beq it_noln
     sta VERA_ISR
     ldy #2
-    jsr irq_call
+    jsl BANK1 + irq_call
 it_noln
     lda irq_isr_s
     and #4                      ; SPRCOL: ack, then accumulate the groups
@@ -194,13 +194,13 @@ it_noln
     ora irq_colm
     sta irq_colm
     ldy #4
-    jsr irq_call
+    jsl BANK1 + irq_call
 it_nosc
     lda irq_isr_s
     and #8                      ; AFLOW: the armed word refills = the ack
     beq it_noaf
     ldy #6
-    jsr irq_call
+    jsl BANK1 + irq_call
 it_noaf
     lda #1
     sta $9f25                   ; put the VERA state back: port 1...
@@ -240,9 +240,9 @@ irq_call ; Y = slot offset: run the xt (if any) on the private stack
     lda irq_xts+1, y
     sta W+1
     ldx #X_IRQ
-    jmp (W)                     ; word rts's back to the dispatch
+    jmp (W)                     ; word rtl's back to the dispatch
 ic_none
-    rts
+    rtl
 
     +BACKLINK "collisions", 10
     ; ( -- mask ) collision groups seen since the last read (then cleared)
@@ -251,4 +251,4 @@ ic_none
     sta LSB, x
     stz MSB, x
     stz irq_colm
-    rts
+    rtl
