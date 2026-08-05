@@ -42,6 +42,12 @@ psginit
 T{ 63 2 psgvol  1 2 psgpan  10 psg@ -> $7f }T   \ left only, volume 63 kept
 T{ 3 2 psgpan  10 psg@ -> $ff }T                \ both channels, still 63
 T{ 61 31 psg!  3 7 psgwav  31 psg@ -> 253 }T    \ pulse width 61 survives
+\ ...and PSGPW is the other way round: it keeps the waveform. Without it
+\ there was no way to set a pulse width at all, so every pulse voice was
+\ stuck at the 1-in-64 duty cycle PSGINIT leaves - audible, but a thin
+\ click rather than a tone, which is exactly how it was reported.
+T{ 32 7 psgpw  31 psg@ -> $e0 }T                \ waveform 3 kept, width 32
+T{ 0 7 psgpw  31 psg@ -> $c0 }T
 \ PSGVOL is the deliberate exception: the page says "both channels", so
 \ setting a volume sets them, and any earlier panning goes with it.
 T{ 20 2 psgvol  10 psg@ -> $d4 }T

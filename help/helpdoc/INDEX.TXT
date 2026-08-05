@@ -5,7 +5,7 @@ Every entry on these pages carries [x] or [ ]. [x] means the word IS in
 this machine and [ ] means it is not yet - and as of 2026-08-04 that is
 not a hand-kept promise: each page was probed word by word against the
 live dictionary, so the two lists agree with what FIND-NAME can see.
-416 of 587 are present. The unticked remainder is mostly whole modules
+417 of 588 are present. The unticked remainder is mostly whole modules
 (FLOAT, GRAPHIC, AUDIO*, LOADSAVE) plus the four files durexforth.asm
 does not assemble - INPUT, KEYBOARD's last three, CONTROL's clock and
 I2C - each of which says so on its own page.

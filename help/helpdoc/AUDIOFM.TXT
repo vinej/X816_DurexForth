@@ -23,6 +23,14 @@ VERA PSG - voice registers, 4 bytes each at VRAM $1F9C0:
                                so it overrides an earlier PSGPAN
 [x]   PSGWAV   ( wave voice -- )   waveform 0-3 (pulse/saw/triangle/noise);
                                keeps the pulse width in the same byte
+[x]   PSGPW    ( pw voice -- )     pulse width 0-63, keeping the waveform.
+                               NOT optional for waveform 0: the renderer
+                               emits a high sample only while phase>>10
+                               is <= pw, so the 0 that PSGINIT leaves is
+                               a 1-in-64 duty cycle - a thin click, not a
+                               tone. 32 is a square wave. Saw and triangle
+                               use pw as an XOR on the phase instead and
+                               are full-strength at any width.
 [x]   PSGPAN   ( pan voice -- )    stereo pan (1=left 2=right 3=both);
                                keeps the volume in the same byte
 [ ]   PSGPLAY  ( c-addr u voice -- )   play a play-string (blocking)
@@ -41,5 +49,12 @@ YM2151 FM:
 [ ]   FMCHORD  ( c-addr u channel -- )  play a chord string (blocking)
 
 A beep, with no driver involved:
-    PSGINIT  1181 0 PSGFREQ  63 0 PSGVOL  0 0 PSGWAV   \ ~440 Hz
-    0 0 PSGVOL                                        \ and silence
+    PSGINIT  1181 0 PSGFREQ         \ ~440 Hz
+    32 0 PSGPW  0 0 PSGWAV          \ square wave - see PSGPW
+    63 0 PSGVOL                     \ ...and it sounds
+    0 0 PSGVOL                      \ silence again
+
+One voice at full volume is about an eighth of the output's range, so a
+single PSG note is quiet by design: the mix leaves headroom for sixteen
+voices plus PCM and the YM2151. Use several voices, or the YM, to fill
+it. A sawtooth is the loudest single waveform - try 1 0 PSGWAV.

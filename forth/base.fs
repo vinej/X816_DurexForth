@@ -666,6 +666,14 @@ $f9c0 constant psgbase          ( VRAM $1F9C0 = bank 1, offset $F9C0 )
   4 * 2 + >r 3 and 6 lshift r@ psg@ 63 and or r> psg! ;
 : psgwav ( wave voice -- )
   4 * 3 + >r 3 and 6 lshift r@ psg@ 63 and or r> psg! ;
+( PULSE WIDTH, the other half of that byte, and NOT optional for the
+  pulse waveform: the renderer emits a high sample only while
+  phase>>10 <= pw, so the width PSGINIT leaves behind - zero - is a
+  1-in-64 duty cycle. That is a thin click, not a tone, and it is why a
+  square-wave beep needs 32 here. Saw and triangle use pw as an XOR on
+  the phase instead, so they are loud at any width. )
+: psgpw ( pw voice -- )
+  4 * 3 + >r 63 and r@ psg@ $c0 and or r> psg! ;
 
 : pcmctrl ( n -- ) $9f3b ioc! ;
 : pcmrate ( n -- ) $9f3c ioc! ;
