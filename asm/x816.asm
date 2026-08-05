@@ -41,6 +41,13 @@ KERN_FS_SEEK  = $00fe50             ; C:X = parameter block
 KERN_FS_SIZE  = $00fe54             ; C = handle -> C:X = 32-bit size
 KERN_FS_DELETE = $00fe58            ; C:X = path
 KERN_FS_RENAME = $00fe5c            ; C:X = parameter block (old, new)
+KERN_DIR_OPEN  = $00fe60            ; C:X = path -> C = handle (129 up)
+KERN_DIR_NEXT  = $00fe64            ; C = handle, X:Y = 18-byte entry buffer
+KERN_DIR_CLOSE = $00fe68            ; C = handle
+KERN_FS_CHDIR  = $00fe6c            ; C:X = path
+KERN_FS_GETCWD = $00fe70            ; C:X = buffer (KFS_PATH = 80 bytes)
+KERN_FS_MKDIR  = $00fe74            ; C:X = path
+KERN_FS_RMDIR  = $00fe78            ; C:X = path
 
 ; Direct-page staging for the width crossing. $E0-$EF is unclaimed by the
 ; Forth core (planes $32-$D1, W/W2/W3 $D4-$DF).

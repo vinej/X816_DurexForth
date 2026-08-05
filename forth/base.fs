@@ -584,6 +584,53 @@ create (rl-nl) 1 allot  10 (rl-nl) c!
   dup >r write-file ?dup if r> drop exit then
   (rl-nl) 1 r> write-file ;
 
+( DIRECTORIES. The X16's CD/DIR talked to a CBM device over the IEC
+  bus and took DOS command strings; here they are kernel calls, and a
+  path is ordinary ASCII with / separators, absolute or relative.
+
+  A directory entry is 18 bytes: name at +0, 13 bytes NUL-terminated;
+  attributes at +13 with bit 0 set for a directory; size at +14 as 32
+  bits, 0 for a directory. )
+create dirent 18 allot
+create (cwdbuf) 80 allot        ( KFS_PATH, what FS_GETCWD needs )
+: dirent-name ( -- c-addr u ) dirent dup 13 0 do
+    dup c@ 0= if leave then 1+ loop over - ;
+: dirent-dir? ( -- flag ) dirent 13 + c@ 1 and 0<> ;
+: dirent-size ( -- u ) dirent 14 + @ ;
+
+: cd ( c-addr u -- ior ) fs-chdir ;
+: mkdir ( c-addr u -- ior ) fs-mkdir ;
+: rmdir ( c-addr u -- ior ) fs-rmdir ;
+: cwd ( -- c-addr u ior ) (cwdbuf) dup fs-getcwd ( addr len ior ) ;
+: pwd ( -- ) cwd if ." ?" 2drop else type then cr ;
+
+: dir-open ( c-addr u -- handle ior ) fs-diropen ;
+: dir-close ( handle -- ior ) fs-dirclose ;
+( ior 2 from the kernel is END OF DIRECTORY, not a fault - it uses
+  BADARG for a handle that was never a directory, and that shows up on
+  the FIRST call rather than the last. So 2 becomes a false flag here
+  and anything else stays an error worth reporting. )
+: dir-next ( handle -- flag ior )
+  dirent swap fs-dirnext
+  dup 0= if drop -1 0 exit then
+  dup 2 = if drop 0 0 exit then
+  0 swap ;
+
+( DIR lists the working directory. Directories are marked <DIR> where a
+  size would go, because a FAT32 directory entry stores 0 there and a
+  bare 0 in a size column tells you nothing. )
+: dir ( -- )
+  cr pwd
+  s" ." dir-open ( handle ior )
+  if drop ." cannot open ." cr exit then
+  begin dup dir-next ( handle flag ior )
+    ?dup if ." dir error " . drop cr exit then
+  while
+    dirent-name type
+    dirent-name nip 14 swap - 0 max spaces
+    dirent-dir? if ." <DIR>" else dirent-size u. then cr
+  repeat dir-close drop ;
+
 cr
 ( the machine's two spaces: program in the four single-cycle banks
   via HERE/ALLOT, data in SDRAM from bank $05 up to $DF via

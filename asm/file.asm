@@ -448,3 +448,195 @@ FS_RENAME_W
 +   sta LSB, x
     stz MSB, x
     rtl
+
+; ---------------------------------------------------------------------------
+; DIRECTORIES.
+;
+; Directory handles are 129 up, a range DISJOINT from file handles 1..5
+; (runtime/kfs.h), so passing one to fs-read is a clean KERR_BADARG rather
+; than a walk through directory records as if they were file bytes. They
+; come from a separate pool of two, so a listing must be closed before
+; another can start.
+; ---------------------------------------------------------------------------
+
+; CHDIR, MKDIR and RMDIR are the same shape as fs-delete above -
+; ( c-addr u -- ior ) with the path staged in file_name1 - and each is
+; written out rather than shared through one body with a patched jsl
+; operand. That was tried: the patch site was computed as an offset from
+; the routine's start, the count was wrong by nine bytes, and it would
+; have called into the middle of an instruction. A shared body needs the
+; site named by LABEL, and at that point three plain copies of twenty
+; obvious lines are the cheaper thing to be sure of.
+!macro PATHCALL .entry {
+    jsl BANK1 + file_pop_name
+    phx
+    phy
+    rep #$30
+!rl
+    ldx #1                          ; path bank
+    lda #file_name1
+    jsl .entry
+    sta KTMP
+    sep #$10
+!rs
+    ply
+    plx
+    dex
+    dex
+    lda #0
+    bcc +
+    lda KTMP
++   sta LSB, x
+    stz MSB, x
+    rtl
+}
+
+    +BACKLINK "fs-chdir", 8
+FS_CHDIR_W ; ( c-addr u -- ior )
+    +PATHCALL KERN_FS_CHDIR
+
+    +BACKLINK "fs-mkdir", 8
+FS_MKDIR_W ; ( c-addr u -- ior )
+    +PATHCALL KERN_FS_MKDIR
+
+    +BACKLINK "fs-rmdir", 8
+FS_RMDIR_W ; ( c-addr u -- ior )
+    +PATHCALL KERN_FS_RMDIR
+
+; ---------------------------------------------------------------------------
+; fs-getcwd ( addr -- len ior ) - write the working directory, NUL
+; terminated, into the caller's buffer. It needs 80 bytes (KFS_PATH); the
+; kernel writes as many as the path takes and never asks how big it is, so
+; a short buffer is silent corruption and not this word's to catch.
+; ---------------------------------------------------------------------------
+    +BACKLINK "fs-getcwd", 9
+FS_GETCWD_W
+    lda LSB, x
+    sta KTMP                        ; buffer, low 16
+    lda MSB, x
+    sta KTMP2                       ; buffer bank
+    phx
+    phy
+    rep #$30
+!rl
+    ldx KTMP2
+    lda KTMP
+    jsl KERN_FS_GETCWD
+    sta KTMP                        ; length written
+    sep #$10
+!rs
+    ply
+    plx
+    dex
+    dex
+    lda #0
+    bcc +
+    lda KTMP
+    stz KTMP                        ; failed: report length 0, not garbage
++   sta LSB, x                      ; ior
+    stz MSB, x
+    lda KTMP
+    sta LSB+2, x                    ; length, over the buffer address
+    stz MSB+2, x
+    rtl
+
+; ---------------------------------------------------------------------------
+; fs-diropen ( c-addr u -- handle ior )
+; ---------------------------------------------------------------------------
+    +BACKLINK "fs-diropen", 10
+FS_DIROPEN_W
+    jsl BANK1 + file_pop_name
+    phx
+    phy
+    rep #$30
+!rl
+    ldx #1
+    lda #file_name1
+    jsl KERN_DIR_OPEN
+    sta KTMP
+    sep #$10
+!rs
+    ply
+    plx
+    dex
+    dex
+    dex
+    dex
+    lda #0
+    bcc +
+    lda KTMP
+    stz KTMP                        ; no handle on failure
++   sta LSB, x                      ; ior
+    stz MSB, x
+    lda KTMP
+    sta LSB+2, x                    ; handle
+    stz MSB+2, x
+    rtl
+
+; ---------------------------------------------------------------------------
+; fs-dirnext ( addr handle -- ior ) - fill an 18-byte entry buffer:
+;   +0  name, 13 bytes, NUL terminated    +13 attributes, bit 0 = directory
+;   +14 size, 32 bits (0 for a directory)
+;
+; END OF DIRECTORY IS ior 2 (KERR_NOTFOUND), not an error to report: the
+; kernel uses BADARG for "that was never a directory handle", which happens
+; on the FIRST call rather than the last, so the two cannot be confused.
+; base.fs's DIR-NEXT turns 2 into a false flag.
+;
+; The buffer goes in X:Y here and not C:X - C is spent on the handle. Same
+; 24-bit shape, shifted along one register.
+; ---------------------------------------------------------------------------
+    +BACKLINK "fs-dirnext", 10
+FS_DIRNEXT_W
+    lda LSB, x
+    sta KTMP                        ; handle
+    lda LSB+2, x
+    sta KTMP2                       ; buffer, low 16
+    lda MSB+2, x
+    sta W3                          ; buffer bank
+    inx
+    inx                             ; drop the handle cell
+    phx
+    phy
+    rep #$30
+!rl
+    lda KTMP
+    ldx KTMP2
+    ldy W3
+    jsl KERN_DIR_NEXT
+    sta KTMP
+    sep #$10
+!rs
+    ply
+    plx
+    lda #0
+    bcc +
+    lda KTMP
++   sta LSB, x                      ; ior, over the buffer address
+    stz MSB, x
+    rtl
+
+; ---------------------------------------------------------------------------
+; fs-dirclose ( handle -- ior )
+; ---------------------------------------------------------------------------
+    +BACKLINK "fs-dirclose", 11
+FS_DIRCLOSE_W
+    lda LSB, x
+    sta KTMP
+    phx
+    phy
+    rep #$30
+!rl
+    lda KTMP
+    jsl KERN_DIR_CLOSE
+    sta KTMP
+    sep #$10
+!rs
+    ply
+    plx
+    lda #0
+    bcc +
+    lda KTMP
++   sta LSB, x
+    stz MSB, x
+    rtl

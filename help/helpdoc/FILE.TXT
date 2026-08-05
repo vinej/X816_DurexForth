@@ -70,12 +70,50 @@ error, 6 exists, 7 not empty. These words RETURN it; they do not throw.
 [x] FLUSH-FILE ( fileid -- ior ) - the same, for the same reason.
     CLOSE-FILE is the sync point on this machine.
 
---- X16 directory navigation (device 8) ---
-[ ] CD  ( c-addr u -- )   change directory (sends "CD:<name>" to the DOS).
-                      S" .." CD goes up;  S" /" CD goes to the root.
-[ ] DIR ( -- )            list the current directory.
+--- directories (kernel DIR_* / FS_CHDIR / FS_MKDIR) ---
+Paths are ASCII with / separators, absolute or relative to the working
+directory, and "." and ".." both work. There is no device number and no
+DOS command channel: the X16 words below sent command strings to a CBM
+drive over the IEC bus, and this machine has no IEC bus.
 
---- durexForth: disk / DOS command channel ---
+[x] DIR ( -- ) - list the working directory: name, then size, or <DIR>
+    where a size would be. FAT32 stores 0 as a directory's size, and a
+    bare 0 in a size column tells you nothing.
+[x] CD ( c-addr u -- ior ) - change directory. S" .." CD goes up, S" /"
+    CD goes to the root. This moves the KERNEL's working directory, the
+    same one the prompt uses, so a program and its user cannot disagree
+    about what "../X" means.
+[x] PWD ( -- ) - print the working directory.
+[x] CWD ( -- c-addr u ior ) - the working directory as a string, in a
+    resident 80-byte buffer (KFS_PATH). Copy it if you need it to
+    survive the next call.
+[x] MKDIR ( c-addr u -- ior ) - create a directory.
+[x] RMDIR ( c-addr u -- ior ) - remove an EMPTY one. A non-empty
+    directory is refused rather than orphaned, which is the only thing
+    between a mistyped name and lost files.
+
+Walking a directory yourself, when DIR's format is not what you want:
+[x] DIR-OPEN ( c-addr u -- handle ior ) - open a directory for reading.
+    Handles are 129 up, from a pool of TWO, and separate from file
+    handles - so one listing must be closed before another starts.
+[x] DIR-NEXT ( handle -- flag ior ) - read one entry into DIRENT. flag
+    false means the end, with ior still 0: running out is not an error.
+[x] DIR-CLOSE ( handle -- ior ) - give the handle back.
+[x] DIRENT ( -- addr ) - the 18-byte entry buffer the above fills:
+    name at +0 (13 bytes, NUL terminated), attributes at +13 (bit 0 set
+    = directory), size at +14 (32 bits, 0 for a directory).
+[x] DIRENT-NAME ( -- c-addr u ) / DIRENT-DIR? ( -- flag ) /
+    DIRENT-SIZE ( -- u ) - read those three fields.
+    : LIST S" ." DIR-OPEN DROP
+      BEGIN DUP DIR-NEXT DROP WHILE DIRENT-NAME TYPE CR REPEAT
+      DIR-CLOSE DROP ;
+
+--- durexForth: disk / DOS command channel (X16, not ported) ---
+Every word here is a CBM DOS concept - a device number, a command
+channel, an error channel - and none of them exists on this machine.
+The replacements are above: LS is DIR, DOS/SEND-CMD/RDERR have no
+counterpart because there is no drive to talk to, and OPEN/CLOSE are
+OPEN-FILE/CLOSE-FILE.
 [ ] DEVICE ( n -- ) - set the current disk device number (default 8).
 [ ] DOS ( "cmd<cr>" -- ) - send the rest of the line to the drive command channel, print the reply.
 [ ] SEND-CMD ( addr len -- ) - send a command string to the drive and print its response.

@@ -114,6 +114,28 @@ user-confirmed on the MiSTer:
   `->`, so every `T{ ... }T` must leave exactly what it compares:
   `T{ dup -> 0 }T` after a two-item result is WRONG NUMBER, not a
   check of the top item.
+- **Directories** (2026-08-04): the other half of the filesystem.
+  asm/file.asm adds `fs-chdir/mkdir/rmdir/getcwd/diropen/dirnext/
+  dirclose`; base.fs adds `dir` (name + size, `<DIR>` where a size
+  would be), `cd`, `pwd`, `cwd`, `mkdir`, `rmdir`, and the
+  entry-level `dir-open/dir-next/dir-close` over a `dirent` buffer
+  with `dirent-name/-dir?/-size`. DIR-NEXT maps the kernel's
+  end-of-directory (ior 2, KERR_NOTFOUND) to a FALSE FLAG with ior 0 -
+  running out is not an error, and the kernel uses BADARG for a
+  non-directory handle, which shows on the FIRST call not the last.
+  Directory handles are 129 up from a pool of TWO, disjoint from file
+  handles. Proven by `test/testdir.fs`, which asserts CD moved the
+  KERNEL's directory (creates a file by relative name inside, finds it
+  by absolute name from the root) and that RMDIR refuses a non-empty
+  directory rather than orphaning it.
+  **Trap: BEGIN/WHILE/REPEAT are COMPILE-ONLY.** Typed at the
+  interpreter they compile branches into HERE that nothing executes -
+  the loop silently does not loop, and the symptom was a WRONG NUMBER
+  from a later `T{ }T` because the stack was not what the loop should
+  have left. Any test that walks something needs a colon definition.
+  Also: a shared body with a `jsl` operand patched at a computed
+  offset was tried for chdir/mkdir/rmdir and was wrong by nine bytes;
+  three plain copies are the cheaper thing to be sure of.
 - **`break` vs `brk`** (2026-08-04, user: "Ctrl+Alt+PrtScr only shows
   BRK"): the abort worked, the word was wrong. -28 is raised by both
   the break key and a BRK opcode and CATCH must not distinguish them
@@ -261,7 +283,7 @@ user-confirmed on the MiSTer:
    replacements for the parked C64 words
    (`ls`, `open`, `help`, `turnkey` — see base.fs comments).
 4. **helpdoc tracker: DONE and machine-verified (2026-08-04)** —
-   363/574 ticked, and the checkboxes are no longer a hand-kept
+   374/583 ticked, and the checkboxes are no longer a hand-kept
    promise: a generated probe card runs `find-name` over every entry,
    both directions, so `[x]`-but-absent and `[ ]`-but-present are both
    empty. Re-run it after any word changes (the generator is a few
