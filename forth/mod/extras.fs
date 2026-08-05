@@ -1,29 +1,31 @@
-\ EXTRAS - structures, deferred-word helpers, legacy dictionary words
-\ (STRUCTURE.TXT, DEFINING.TXT, DICTIONARY.TXT, FLOW.TXT AHEAD).
+\ EXTRAS - the legacy dictionary and compiler words that base.fs does not
+\ carry (DICTIONARY.TXT, FLOW.TXT AHEAD).
 \ Cart: NEEDS EXTRAS      SD card: INCLUDE EXTRAS
-\ Self-contained: carries its own >BODY / DEFER family so it also works on the
-\ core cartridge without COMPAT (redefinitions there are identical + harmless).
+\
+\ THIS FILE USED TO REDEFINE ELEVEN WORDS BASE.FS ALREADY HAS, and every
+\ one of its copies was the 16-bit-cell version from before stage B:
+\
+\   >body   was  5 +      the CREATE shape here is jsl dodoes (4 bytes)
+\                         plus a 3-byte DOES> pointer, so the body is at
+\                         xt+7. Writing at +5 lands INSIDE that pointer.
+\   field:  was  2 +field a cell is FOUR bytes now
+\   begin-structure, end-structure, +field, cfield:, defer, defer!,
+\   defer@, is, action-of - all duplicated, all stale.
+\
+\ The damage was not subtle once it ran: DEFER! stored an execution token
+\ two bytes early, over the DOES> pointer, so the first call to a deferred
+\ word jumped into the middle of its own header and hung the machine.
+\ testextras found it the first time it was ever run.
+\
+\ This is the same mistake compat.fs made - shadowing base.fs with weaker
+\ copies - and it has the same answer: ONE WORD, ONE DEFINITION. The words
+\ below are the ones base.fs genuinely does not define.
+\
+\ (The old header claimed the file was "self-contained" so it could work on
+\ a cartridge without COMPAT. base.fs defines all eleven unconditionally,
+\ so there is nothing to be self-contained about.)
 
 decimal
-
-\ --- structures (Forth-2012) ---------------------------------------------------
-\   begin-structure point  field: p.x  field: p.y  end-structure
-\   point -> 4 ;  <addr> p.y -> addr+2
-: begin-structure ( "name" -- addr 0 ) create here 0 , 0 does> @ ;
-: end-structure ( addr size -- ) swap ! ;
-: +field  ( off n "name" -- off' ) create over , + does> @ + ;
-: field:  ( off "name" -- off' ) 2 +field ;
-: cfield: ( off "name" -- off' ) 1 +field ;
-
-\ --- deferred words --------------------------------------------------------------
-: >body ( xt -- dataaddr ) 5 + ;
-: defer ( "name" -- ) create ['] abort , does> @ execute ;
-: defer! ( xt2 xt1 -- ) >body ! ;
-: defer@ ( xt1 -- xt2 ) >body @ ;
-: is ( xt "name" -- ) state @ if
-  postpone ['] postpone defer! else ' defer! then ; immediate
-: action-of ( "name" -- xt ) state @ if
-  postpone ['] postpone defer@ else ' defer@ then ; immediate
 
 \ --- compiler helpers -------------------------------------------------------------
 \ forward branch, close with THEN.  $4C c, = jmp opcode: base's jmp, is
@@ -42,7 +44,13 @@ decimal
 \ --- forget ------------------------------------------------------------------------
 \ Remove a word and everything defined after it.  Do not forget core words,
 \ words below a module, or anything whose buffers something else still uses.
+\ The stride is LEN + 4, not len + 3: an entry is the length byte, the name,
+\ and a THREE-byte xt (interpreter.asm walks it with `adc #4`). Headers grow
+\ DOWNWARD from $FEFF, so the entry before this one sits that far ABOVE it.
+\ Off by one, LATEST lands inside the previous header, its length byte reads
+\ as part of a name, and the whole chain is lost - FIND then fails for every
+\ word in the system, which looks nothing like a FORGET bug.
 : forget ( "name" -- )
   parse-name 2dup find-name ?dup 0= if notfound then nip nip
   dup >xt to here
-  dup c@ $1f and + 3 + to latest ;
+  dup c@ $1f and + 4 + to latest ;

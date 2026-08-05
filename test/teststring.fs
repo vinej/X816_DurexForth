@@ -3,6 +3,12 @@
 
 marker ---teststring---
 
+\ Standalone-safe: REQUIRE loads the Hayes tester only if it is not already
+\ in, so `include teststring` works on its own at the prompt and costs nothing
+\ inside the suite, where test.fs loaded it first.
+require tester
+
+
 include string
 
 decimal

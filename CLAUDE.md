@@ -61,6 +61,30 @@ user-confirmed on the MiSTer:
   card on the MiSTer and reported all tests passed — that run included
   the new far-data suite (testfar), so the SDRAM allocator is
   hardware-proven too, not just emulator-proven.
+- **The unrun module suites, tranche 1** (2026-08-05). Eight module test
+  files existed and NONE was in `test/test.fs` - the state testfloat was in.
+  STRING and EXTRAS are in the suite now and green; both needed
+  `require tester`, and EXTRAS needed two real fixes:
+  - **extras.fs redefined ELEVEN words base.fs already had**, every copy in
+    its pre-stage-B form: `>body` as `5 +` when the CREATE shape here puts
+    the body at xt+7, `field:` as 2 bytes when a cell is 4, plus
+    begin-structure/end-structure/+field/cfield:/defer/defer!/defer@/is/
+    action-of. The copies SHADOWED the working ones, so `defer!` wrote an
+    xt two bytes early, over the DOES> pointer, and the first call to a
+    deferred word hung the machine. Same mistake compat.fs made, same
+    answer: one word, one definition. The file now carries only what base.fs
+    does not.
+  - **FORGET's stride was len+3; an entry is len+4** (length byte, name,
+    THREE-byte xt - interpreter.asm walks it with `adc #4`). Headers grow
+    DOWN, so LATEST landed inside the previous header and the whole chain
+    was lost: FIND then failed for every word in the system, which looks
+    nothing like a FORGET bug. The symptom was `T{?` immediately after.
+  - **The remaining six are each a PORT, not a wiring job**, and the reason
+    is the same one float.fs had - they call the X16 ROM or KERNAL:
+    `advanced` and `system` want `bcall` (the banked-ROM call), `graphic`
+    wants `screen`, `bmx` wants `close`. advgfx and advsnd are unprobed.
+    That is where GRAPHIC.TXT's 11-open/0-done and ADVANCED's 20/0 live.
+
 - **INPUT IS DONE: joysticks and the mouse** (2026-08-05). `JOY JOY?
   JOY-SCAN JOY1..JOY4 MOUSE MX MY MB MWHEEL` are in base.fs, INPUT.TXT is
   8/8 ticked, `test/testinput.fs` is rewritten and in the suite.

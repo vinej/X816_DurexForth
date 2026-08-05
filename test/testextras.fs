@@ -2,38 +2,26 @@
 
 marker ---testextras---
 
+\ Standalone-safe: REQUIRE loads the Hayes tester only if it is not already
+\ in, so `include testextras` works on its own at the prompt and costs nothing
+\ inside the suite, where test.fs loaded it first.
+require tester
+
+
 include extras
 
 decimal
 
-cr .( testextras: structures ) cr
-begin-structure point
-  field:  p.x
-  field:  p.y
-  cfield: p.c
-end-structure
-T{ point -> 5 }T
-T{ 100 p.x 100 p.y 100 p.c -> 100 102 104 }T
-begin-structure mix
-  4 +field m.name
-  field:  m.val
-end-structure
-T{ mix -> 6 }T
-T{ 0 m.val -> 4 }T
-create pt1 point allot
-T{ 7 pt1 p.y !  pt1 p.y @ -> 7 }T
-
-cr .( testextras: defer / is / defer@ / action-of ) cr
-defer dtest
-T{ ' dup is dtest  1 dtest -> 1 1 }T
-T{ ' dtest defer@ ' dup = -> -1 }T
-T{ action-of dtest ' dup = -> -1 }T
-: aot action-of dtest ;
-T{ aot ' dup = -> -1 }T
-: dset ['] drop is dtest ;
-dset
-T{ 1 2 dtest -> 1 }T
-' dup is dtest
+\ STRUCTURES AND THE DEFER FAMILY MOVED OUT of this file, because they
+\ moved out of the module. extras.fs used to define eleven words base.fs
+\ already had, in their pre-stage-B forms -- >BODY as xt+5 when the CREATE
+\ shape here puts the body at xt+7, FIELD: as two bytes when a cell is
+\ four. Those copies shadowed the working ones, and DEFER! wrote an
+\ execution token over a DOES> pointer: the first call to a deferred word
+\ hung the machine. This file caught it the first time it was run.
+\ base.fs owns them now, and teststruct.fs covers the structure words with
+\ the sizes a 32-bit cell actually gives. What is left below is what
+\ extras.fs genuinely provides.
 
 cr .( testextras: ahead / ?comp / ?stack ) cr
 : tah ahead 99 . then 42 ;
