@@ -61,6 +61,35 @@ user-confirmed on the MiSTer:
   card on the MiSTer and reported all tests passed — that run included
   the new far-data suite (testfar), so the SDRAM allocator is
   hardware-proven too, not just emulator-proven.
+- **Module suites, tranche 3: ADVSND, GRAPHIC, ADVGFX** (2026-08-05). All
+  three are in the suite and green. Five bugs, and four of them are the SAME
+  bug wearing different clothes - **a 16-bit cell assumption**:
+  - advsnd's IMA tables are built with `,` and were indexed `2*`, so the
+    decoder read halves of neighbouring step sizes. Its predictor also
+    detected overflow by testing whether the sum came out SMALLER, which
+    only happens when 16-bit arithmetic wraps and never happens here, and
+    `adpcm!` let a negative predictor sign-extend past 16 bits.
+  - advgfx's flood-fill seed stack packed two cells at +0 and +2 with `!`,
+    which writes FOUR bytes - every push overwrote its own first value, and
+    FLOOD silently filled nothing.
+  - (extras' `field:` and advanced's ring buffer, earlier today, were the
+    same shape.) **Grep for `2*` near `+ @` before trusting any old module.**
+  - **TEN CODE WORDS ENDED WITH `rts,`** across advgfx, advsnd and bmx - the
+    trap this file's own conventions list first. Fixed everywhere.
+  - **advgfx's two CODE words were 6502-shaped in a 16-bit-A Forth**: one
+    `inx,` to pop a cell that spans two bytes of X, a 16-bit counter
+    decremented as two 8-bit halves, and VERA's data port read with a
+    16-bit load that takes two registers at once. Both are colon
+    definitions now - slower per quad, and they copy what they were asked.
+  - **GRAPHIC only needed `screen`**, which base.fs now has, built from
+    layer-mode/tilebase rather than a KERNAL call. **The bitmap lies on the
+    console**: 76,800 bytes from VRAM $00000 covers the character map AND
+    the font at $04000, so SCREEN keeps a copy of the font in far memory
+    across the trip and CLS repaints the map. A test that enters graphics
+    must leave `0 screen` behind it or every later file prints to a screen
+    nobody can read - which is also why a failing assertion inside graphics
+    mode is invisible, and has to be bisected with the exit code instead.
+
 - **FORTH RUNS FROM AN INTERRUPT** (2026-08-05). `asm/firq.asm` puts an
   execution token behind four kernel IRQ slots and rebuilds this Forth's
   conventions around the call; `' tick irq` arms a colon word on the

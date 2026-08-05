@@ -1,3 +1,7 @@
+\ rtl, not rts,. Every word in this Forth is entered with jsl and must
+\ leave with rtl: an rts ($60 against $6b) pops two bytes where three went
+\ on, so the bank byte stays and the NEXT rtl returns into nowhere - at a
+\ distance that depends on what ran in between. These were all rts.
 \ ADVSND - PSG envelopes, PCM streaming, ADPCM decode (ADVANCED.TXT).
 \ Cart: NEEDS ADVSND      SD card: INCLUDE ADVSND
 \ Ported from C:\quartus\projects\x16_library (audio/psg.asm ASR envelopes,
@@ -81,61 +85,33 @@ $9f3d sta,
 iny,
 pn dec,
 -branch bne,
-rts, end-code
+rtl, end-code
 
-2variable ps-rem   variable ps-addr   variable ps-bank   variable ps-on
-0 ps-on !
-variable pcm-loop  0 pcm-loop !
-variable ps-ra  variable ps-rb  2variable ps-rl          \ rewind snapshot
-
-: (ps-256s) ( addr u -- )          \ u >= 1 bytes via 256-byte chunks
-  begin ?dup while
-    dup 256 min >r
-    over r@ (pcm>f)
-    r@ - swap r> + swap
-  repeat drop ;
-: (ps-fill) ( u -- )               \ push u bytes, rolling $C000 back to $A000
-  begin ?dup while
-    $c000 ps-addr @ -  over min >r
-    ps-bank @ 0 c!                 \ RAM bank (IRQ path: trampoline restores it)
-    ps-addr @ r@ (ps-256s)
-    ps-addr @ r@ +  dup $c000 = if drop $a000 1 ps-bank +! then  ps-addr !
-    r> -
-  repeat ;
-: (ps-n) ( cap -- n )              \ min(cap, remaining), 16-bit
-  ps-rem 2@ if drop else min then ;
-: (ps-dec) ( n -- )  s>d dnegate ps-rem 2@ d+ ps-rem 2! ;
-: (ps-go) ( cap -- ) (ps-n) dup (ps-fill) (ps-dec) ;
-
-: (ps-irq) ( -- )                  \ the AFLOW service
-  ps-rem 2@ or if 3000 (ps-go) exit then
-  pcm-loop @ if                    \ data gone: rewind or disarm
-    ps-ra @ ps-addr !  ps-rb @ ps-bank !  ps-rl 2@ ps-rem 2!
-    3000 (ps-go)
-  else 0 aflow-irq  0 ps-on ! then ;
-
-: pcm-play ( bank addr ud rate -- )  \ addr = $A000..$BFFF window address
-  0 aflow-irq  0 ps-on !
-  $9f3b c@ $3f and $80 or $9f3b c!   \ flush stale FIFO bytes, keep the format
-  >r ps-rem 2!  ps-addr !  ps-bank !
-  ps-addr @ ps-ra !  ps-bank @ ps-rb !  ps-rem 2@ ps-rl 2!
-  ps-rem 2@ or 0= if r> drop exit then
-  0 $9f3c c!                         \ DAC off while priming
-  1 ps-on !
-  0 c@ >r  4000 (ps-go)  r> 0 c!     \ prime (main line: restore the RAM bank)
-  ps-rem 2@ or 0<>  pcm-loop @ or
-  if ['] (ps-irq) aflow-irq else 0 ps-on ! then
-  r> $9f3c c! ;                      \ 1-128; 128 = 48828 Hz
-
-: pcm-stop ( -- )                    \ disarm, silence, flush
-  0 aflow-irq  0 ps-on !  0 $9f3c c!
-  $9f3b c@ $3f and $80 or $9f3b c! ;
-: pcm-playing? ( -- flag )  ps-on @ 0<> ;
+\ --- PCM streaming: NOT HERE, and it cannot be ------------------------------
+\ This module used to carry an interrupt-fed PCM streamer - PCM-PLAY,
+\ PCM-STOP, PCM-PLAYING?, PCM-LOOP - and both halves of it are X16 shapes
+\ that this machine does not have:
+\   * It walked the X16's BANKED RAM window, $A000-$BFFF, switching banks
+\     by writing address 0. The X816 is flat 16 MB with no window and no
+\     bank register, and address 0 is the direct page - the test for it
+\     wrote there and took a BRK, which is exactly what it deserved.
+\   * It refilled the FIFO from VERA's audio-FIFO-low interrupt. AFLOW's
+\     enable bit does not stick on this hardware, so that interrupt never
+\     arrives; the kernel says the same thing from its side and excludes
+\     AFLOW from its acknowledge.
+\ Feeding the FIFO from a flat address is base.fs's PCM-WRITE, and pacing
+\ it needs either the AFLOW enable to start working or a polled loop on
+\ PCMFULL?. Rewriting the streamer around a bank register that does not
+\ exist would have been busywork with a plausible shape.
 
 \ --- IMA ADPCM decode (4-bit -> 8-bit signed, offline) ------------------------------
 \ The canonical IMA/DVI algorithm (WAV flavour, LOW nibble of each byte first).
 \ Too slow to feed the DAC live from Forth: decode whole banks up front, then
 \ PCM-PLAY the result.  ADPCM! loads a WAV block header's predictor and index.
+\ Both tables are built with `,` and a cell is FOUR bytes, so the index is
+\ scaled by 4. It was 2* - the stride from when a cell was two - which read
+\ the halves of neighbouring entries as step sizes and made the decoder
+\ produce plausible-looking noise instead of audio.
 create ad-st                       \ the 89-entry step table
 7 , 8 , 9 , 10 , 11 , 12 , 13 , 14 , 16 , 17 , 19 , 21 , 23 , 25 , 28 , 31 ,
 34 , 37 , 41 , 45 , 50 , 55 , 60 , 66 , 73 , 80 , 88 , 97 , 107 , 118 ,
@@ -152,10 +128,15 @@ variable ad-d                      \ output pointer
 
 : adpcm-init ( -- )  $8000 ad-p !  0 ad-x ! ;
 : adpcm! ( pred index -- )         \ state from an IMA WAV block header
-  0 max 88 min ad-x !  $8000 xor ad-p ! ;
+\ The predictor is a SIGNED 16-bit field in the block header and is kept
+\ here as unsigned 0..$FFFF. Masking is not decoration: with 32-bit cells
+\ a negative predictor sign-extends, and `$8000 xor` then leaves the top
+\ sixteen bits set instead of wrapping - the decoder read that as a huge
+\ positive sample and saturated on the spot.
+  0 max 88 min ad-x !  65535 and $8000 xor ad-p ! ;
 
 : (ad-nib) ( n -- )                \ advance the decoder by one 4-bit code
-  ad-x @ 2* ad-st + @ >r           ( n ) ( r: step )
+  ad-x @ 4 * ad-st + @ >r          ( n ) ( r: step )
   r@ 3 rshift                      \ diff = step>>3 (+s>>2 if b0)(+s>>1)(+s)
   over 1 and if r@ 2 rshift + then
   over 2 and if r@ 1 rshift + then
@@ -164,9 +145,13 @@ variable ad-d                      \ output pointer
   over 8 and if                    \ predictor +/- diff, saturated
     ad-p @ over u< if drop 0 else ad-p @ swap - then
   else
-    ad-p @ +  dup ad-p @ u< if drop $ffff then
+    \ Clamped, not wrapped: this detected overflow by testing whether the
+    \ sum came out SMALLER than the predictor, which only happens when the
+    \ addition wraps - and with 32-bit cells it never does. The predictor
+    \ walked past $FFFF and the samples went wherever it went.
+    ad-p @ +  65535 min
   then ad-p !
-  7 and 2* ad-it + @  ad-x @ +  0 max 88 min  ad-x ! ;
+  7 and 4 * ad-it + @  ad-x @ +  0 max 88 min  ad-x ! ;
 : (ad8) ( -- b )  ad-p @ 8 rshift $80 xor ;   \ current sample, signed 8-bit
 
 : adpcm>pcm ( src dst u -- dst' )  \ u input bytes -> 2u signed 8-bit samples

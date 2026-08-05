@@ -1,22 +1,30 @@
 === GRAPHIC - X16 graphics ===
 
-Bitmap drawing in 320x240x256 mode.
+Bitmap drawing in 320x240x256 mode.  NEEDS GRAPHIC (card: INCLUDE GRAPHIC).
 
-[ ] GINIT ( -- ) - enter 320x240x256 bitmap graphics mode.
-[ ] GCLS ( -- ) - clear the graphics screen.
-[ ] PSET ( x y color -- ) - set one pixel. 160 120 5 PSET
-[ ] LINE ( x1 y1 x2 y2 color -- ) - draw a line.
-[ ] FRAME ( x1 y1 x2 y2 color -- ) - rectangle outline.
-[ ] RECT ( x1 y1 x2 y2 color -- ) - filled rectangle. Fills VRAM directly with
+GINIT switches VERA layer 0 to a 320x240 8-bit bitmap through base.fs's
+SCREEN - there is no KERNAL call for it here - and 0 SCREEN puts the console
+back. THE BITMAP LIES ON TOP OF THE CONSOLE: 76,800 bytes from VRAM $00000
+covers the character map and the font at $04000, so the text screen is gone
+while you draw. SCREEN keeps a copy of the font and restores it, and CLS
+repaints the map, but anything you print in graphics mode goes to a screen
+nobody can read.
+
+[x] GINIT ( -- ) - enter 320x240x256 bitmap graphics mode.
+[x] GCLS ( -- ) - clear the graphics screen.
+[x] PSET ( x y color -- ) - set one pixel. 160 120 5 PSET
+[x] LINE ( x1 y1 x2 y2 color -- ) - draw a line.
+[x] FRAME ( x1 y1 x2 y2 color -- ) - rectangle outline.
+[x] RECT ( x1 y1 x2 y2 color -- ) - filled rectangle. Fills VRAM directly with
     hardware auto-increment (clipped to the 320x240 screen), so it is far
     faster than the KERNAL per-pixel fill - good for clearing regions or
     double-buffered redraws each frame.
-[ ] RING ( x1 y1 x2 y2 color -- ) - ellipse outline (inside the bounding box).
-[ ] OVAL ( x1 y1 x2 y2 color -- ) - filled ellipse.
-[ ] GTEXT ( x y color c-addr u -- ) - draw a string into the bitmap. 10 10 1 S"
+[x] RING ( x1 y1 x2 y2 color -- ) - ellipse outline (inside the bounding box).
+[x] OVAL ( x1 y1 x2 y2 color -- ) - filled ellipse.
+[x] GTEXT ( x y color c-addr u -- ) - draw a string into the bitmap. 10 10 1 S"
     HI" GTEXT
-[ ] CIRCLE ( x y r color -- ) - circle outline (centre x,y radius r).
-[ ] FCIRCLE ( x y r color -- ) - filled circle.
+[x] CIRCLE ( x y r color -- ) - circle outline (centre x,y radius r).
+[x] FCIRCLE ( x y r color -- ) - filled circle.
 
 Pen API (set the colour once with GCOLOR, then omit it):
   n GCOLOR  then  PLOT DRAW BOX FBOX ELL FELL CIRC DISC SAY

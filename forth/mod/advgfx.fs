@@ -20,6 +20,10 @@ variable ca-x  variable ca-y  variable cb-x  variable cb-y
   >r cb-y @ ca-y @ -  r> ca-x @ -  cb-x @ ca-x @ -  */  ca-y @ + ;
 : (xat) ( yc -- x )
   >r cb-x @ ca-x @ -  r> ca-y @ -  cb-y @ ca-y @ -  */  ca-x @ + ;
+\ rtl, not rts,. Every word in this Forth is entered with jsl and must
+\ leave with rtl: an rts ($60 against $6b) pops two bytes where three went
+\ on, so the bank byte stays and the NEXT rtl returns into nowhere - at a
+\ distance that depends on what ran in between. These were all rts.
 : (cpt) ( code -- x y )                 \ intersection point for one outcode bit
   dup 1 and if drop clxmin @ dup (yat) exit then
   dup 2 and if drop clxmax @ dup (yat) exit then
@@ -47,14 +51,18 @@ variable ca-x  variable ca-y  variable cb-x  variable cb-y
 \ FLOOD ( x y color -- ) fills the 4-connected region of the seed's colour on
 \ the 320x240 bitmap. Uses a 128-span seed stack; pathological shapes beyond
 \ that are filled incompletely.
-create (fsk) 512 allot   variable (fsp)
+\ 128 seeds of TWO CELLS each. The slot was 4 bytes with the pair at +0
+\ and +2, which is two 16-bit cells - and `!` writes FOUR here, so the
+\ second store landed on top of the first and every seed popped back as
+\ garbage. FLOOD then filled nothing at all, silently.
+create (fsk) 1024 allot   variable (fsp)
 variable ftgt  variable fcol  variable ffx  variable ffy
 variable fxl   variable fxr   variable fs-y  variable fs-in
 : (pix@) ( x y -- c ) bxy>ba vpeek ;
 : (fpush) ( x y -- )
   (fsp) @ 128 < if
-    (fsp) @ 4 * (fsk) + tuck 2 + ! !  1 (fsp) +! else 2drop then ;
-: (fpop) ( -- x y ) -1 (fsp) +!  (fsp) @ 4 * (fsk) + dup @ swap 2 + @ ;
+    (fsp) @ 8 * (fsk) + tuck 4 + ! !  1 (fsp) +! else 2drop then ;
+: (fpop) ( -- x y ) -1 (fsp) +!  (fsp) @ 8 * (fsk) + dup @ swap 4 + @ ;
 : (frun?) ( y x -- flag )               \ target-coloured pixel at x,y?
   dup 0< over 319 > or if 2drop 0 exit then
   swap (pix@) ftgt @ = ;
@@ -84,18 +92,19 @@ variable fxl   variable fxr   variable fs-y  variable fs-in
 \ --- VERA FX cached copy ----------------------------------------------------------
 \ FX-COPY ( sbank saddr dbank daddr u -- ) VRAM copy, 4 bytes per flush.
 \ The DESTINATION must be 4-byte aligned; the source may be anything.
-code (fxq) ( n -- )                     \ n >= 1 cache quads: 4 reads, 1 flush
-lsb lda,x w sta,
-msb lda,x w 1+ sta,
-inx,
-:-
-$9f24 lda, $9f24 lda, $9f24 lda, $9f24 lda,
-0 lda,# $9f23 sta,
-sec, w lda, 1 sbc,# w sta,
-w 1+ lda, 0 sbc,# w 1+ sta,
-w lda, w 1+ ora,
--branch bne,
-rts, end-code
+\ Colon, not CODE, and that is a correctness choice rather than taste. The
+\ assembly version here was 6502-shaped in a Forth whose words run with a
+\ SIXTEEN-bit accumulator: it popped its argument with one `inx,` where a
+\ cell is two bytes of X, decremented a 16-bit counter as though it were
+\ two 8-bit halves, and read VERA's data port with a 16-bit load, taking
+\ two registers at a time. Each read below is a byte, and the loop counts
+\ in Forth. Slower per quad, and it copies what it was asked to.
+: (fxq) ( n -- )                        \ n >= 1 cache quads: 4 reads, 1 flush
+  0 ?do
+    $9f24 ioc@ drop  $9f24 ioc@ drop
+    $9f24 ioc@ drop  $9f24 ioc@ drop
+    0 $9f23 ioc!
+  loop ;
 
 : fx-copy ( sbank saddr dbank daddr u -- )
   >r
@@ -141,17 +150,8 @@ rts, end-code
   dup 255 and $9f29 c!  8 rshift 7 and $9f2a c!
   dup 255 and $9f2b c!  8 rshift 7 and $9f2c c!  \ positions last: prefetch
   0 dcsel ;
-code (aspan) ( n -- )                   \ n >= 1 texels: DATA1 -> DATA0
-lsb lda,x w sta,
-msb lda,x w 1+ sta,
-inx,
-:-
-$9f24 lda, $9f23 sta,
-sec, w lda, 1 sbc,# w sta,
-w 1+ lda, 0 sbc,# w 1+ sta,
-w lda, w 1+ ora,
--branch bne,
-rts, end-code
+: (aspan) ( n -- )                      \ n >= 1 texels: DATA1 -> DATA0
+  0 ?do $9f24 ioc@ $9f23 ioc! loop ;
 : affine-span ( n -- ) ?dup if (aspan) then ;  \ port 0 aimed by the caller
 : affine-line ( bank addr n -- )        \ sample n texels to VRAM dst, +1 step
   >r vaddr r> affine-span ;

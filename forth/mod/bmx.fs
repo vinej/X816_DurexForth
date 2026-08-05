@@ -18,6 +18,10 @@ variable bmx-border   0 bmx-border !
 variable bmx-stride   320 bmx-stride !
 
 \ --- channel words (self-contained; SP saved on the hardware stack) ------------
+\ rtl, not rts,. Every word in this Forth is entered with jsl and must
+\ leave with rtl: an rts ($60 against $6b) pops two bytes where three went
+\ on, so the bank byte stays and the NEXT rtl returns into nowhere - at a
+\ distance that depends on what ran in between. These were all rts.
 code chkin ( file# -- ior )
 txa, pha,
 lsb lda,x tax,
@@ -28,7 +32,7 @@ $ffc6 jsr,
 tay, pla, tax, tya,
 lsb sta,x
 0 lda,# msb sta,x
-rts, end-code
+rtl, end-code
 
 code chkout ( file# -- ior )
 txa, pha,
@@ -40,13 +44,13 @@ $ffc9 jsr,
 tay, pla, tax, tya,
 lsb sta,x
 0 lda,# msb sta,x
-rts, end-code
+rtl, end-code
 
 code clrchn ( -- )
 txa, pha,
 $ffcc jsr,
 pla, tax,
-rts, end-code
+rtl, end-code
 
 code readst ( -- status )
 txa, pha,
@@ -54,7 +58,7 @@ $ffb7 jsr,
 tay, pla, tax, dex, tya,
 lsb sta,x
 0 lda,# msb sta,x
-rts, end-code
+rtl, end-code
 
 code chrin ( -- chr )
 txa, pha,
@@ -62,7 +66,7 @@ $ffcf jsr,
 tay, pla, tax, dex, tya,
 lsb sta,x
 0 lda,# msb sta,x
-rts, end-code
+rtl, end-code
 
 : (la>) ( -- ) source-id dup 0 > if chkin drop else drop clrchn then ;
 
@@ -81,7 +85,7 @@ bm-n 1+ lda, 0 sbc,# bm-n 1+ sta,
 bm-n lda, bm-n 1+ ora,
 -branch bne,
 pla, tax,
-rts, end-code
+rtl, end-code
 
 code (vram>n) ( n -- )                \ n >= 1 bytes: DATA0 -> CHROUT
 lsb lda,x bm-n sta,
@@ -96,7 +100,7 @@ bm-n 1+ lda, 0 sbc,# bm-n 1+ sta,
 bm-n lda, bm-n 1+ ora,
 -branch bne,
 pla, tax,
-rts, end-code
+rtl, end-code
 
 \ --- shared plumbing --------------------------------------------------------------
 create bmhdr 16 allot

@@ -31,16 +31,16 @@ Game math (NEEDS ADVANCED) - all of this is in, and tested by testadv.
     banked ROM. There is no ROM here past the boot page and no LZSA2 in the
     kernel, so the word could only jump into nothing. Compress with ZX0.
 
-Graphics (NEEDS ADVGFX, after GRAPHIC)
-[ ] CLIP-RECT CLIP-LINE CLINE - Cohen-Sutherland line clipping.
-[ ] FLOOD ( x y color -- ) - scanline flood fill, 128-span seed stack.
-[ ] FX-COPY ( sbank saddr dbank daddr u -- ) - cached 4-byte copies.
-[ ] AFFINE-ON AFFINE-RAY AFFINE-SPAN AFFINE-LINE AFFINE-OFF - rotozoom /
+Graphics (NEEDS ADVGFX, after GRAPHIC) - tested by testadvgfx.
+[x] CLIP-RECT CLIP-LINE CLINE - Cohen-Sutherland line clipping.
+[x] FLOOD ( x y color -- ) - scanline flood fill, 128-span seed stack.
+[x] FX-COPY ( sbank saddr dbank daddr u -- ) - cached 4-byte copies.
+[x] AFFINE-ON AFFINE-RAY AFFINE-SPAN AFFINE-LINE AFFINE-OFF - rotozoom /
     mode-7 sampling (see VERAFX).
 [ ] circle / disc - GRAPHIC's OVAL/OVALF cover these (unclipped).
 [ ] text onto the bitmap - not ported.
 
-Audio (NEEDS ADVSND)
+Audio (NEEDS ADVSND) - envelopes and ADPCM are tested by testadvsnd.
 [ ] ENV-START ENV-RELEASE ENV-STOP ENV-TICK - per-frame ASR envelopes on
     all 16 PSG voices; arm with ' ENV-TICK IRQ.
 [ ] PCM-PLAY ( bank addr ud rate -- ) PCM-STOP PCM-PLAYING? PCM-LOOP -

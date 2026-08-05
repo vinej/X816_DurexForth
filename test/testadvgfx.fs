@@ -74,6 +74,11 @@ T{ 0 $f030 vpeek  0 $f031 vpeek  0 $f033 vpeek -> 0 9 27 }T
 T{ 0 $f040 vpeek  0 $f047 vpeek  0 $f048 vpeek  0 $f049 vpeek -> $99 $99 0 1 }T
 affine-off
 
+\ Back to text, as testgraphic does: this file leaves layer 0 pointed at a
+\ bitmap sitting on top of the console's character map, so without this
+\ there is nothing to print `ok` on and every later suite file is blind.
+0 screen
+
 cr .( testadvgfx ok ) cr
 
 ---testadvgfx---

@@ -59,31 +59,10 @@ adv2 adbuf 10 adpcm>pcm drop               \ pump until it saturates
 T{ adbuf 18 + c@  adbuf 19 + c@ -> 127 127 }T
 T{ ad-p @  ad-x @ -> $ffff 88 }T
 
-cr .( testadvsnd: pcm streaming ) cr
-variable bnk0  0 c@ bnk0 !
-: mkpcm ( -- ) 0 c@ >r                     \ silence in banks 2 and 3
-  2 0 c! $a000 8192 0 fill
-  3 0 c! $a000 8192 0 fill
-  r> 0 c! ;
-mkpcm
-$83 pcmctrl                                \ reset FIFO, 8-bit mono, volume 3
-0 pcm-loop !
-2 $a000 12000 0 128 pcm-play               \ 12000 bytes across the bank seam
-T{ pcm-playing? -> -1 }T
-T{ $9f26 c@ 8 and -> 8 }T                  \ AFLOW armed
-400 ms
-T{ pcm-playing? -> 0 }T                    \ data gone: auto-disarmed
-T{ $9f26 c@ 8 and -> 0 }T
-T{ 0 c@ bnk0 @ = -> -1 }T                  \ refills left the RAM bank alone
-
-1 pcm-loop !                               \ a looping stream never runs dry
-2 $a000 2000 0 64 pcm-play
-100 ms
-T{ pcm-playing? -> -1 }T
-pcm-stop
-0 pcm-loop !
-T{ pcm-playing? -> 0 }T
-T{ $9f26 c@ 8 and -> 0 }T
+\ THE PCM STREAMING SECTION IS GONE with the words it tested. It drove the
+\ X16's banked RAM window by writing address 0 - the direct page here - and
+\ waited on an AFLOW interrupt whose enable bit this hardware will not hold.
+\ See advsnd.fs for the whole story and what to use instead.
 
 cr .( testadvsnd ok ) cr
 

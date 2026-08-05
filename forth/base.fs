@@ -699,6 +699,49 @@ create ymshadow 256 allot
   (ym-wait) $9f41 ioc! ;
 : ym@ ( reg -- value ) 255 and ymshadow + c@ ;
 
+( SCREEN - the bitmap mode the GRAPHIC module draws into.
+
+  There is no KERNAL SCREEN call here, so this is built from the layer
+  words this Forth already has. Mode 128 is 320x240x256 on layer 0, which
+  is what GINIT asks for; mode 0 puts the console back.
+
+  THE BITMAP AND THE CONSOLE SHARE VRAM. The kernel's text map starts at
+  $00000 and a 320x240 bitmap is 76,800 bytes from the same place, so
+  entering graphics scribbles over the characters. Mode 0 restores the
+  registers it saved and then CLS, which is what redraws them. )
+variable (scr-saved)
+variable (scr-cfg) variable (scr-hs) variable (scr-vs) variable (scr-tb)
+
+( THE BITMAP LANDS ON THE FONT. A 320x240 8-bit bitmap is 76,800 bytes
+  from VRAM $00000, and the console's characters are at $04000 - so
+  entering graphics eats them, and coming back gives a screen of
+  well-formed rubbish. CLS repairs the character MAP and can do nothing
+  about the glyphs, so the 2 KB is kept in far memory across the trip. )
+2048 far-buffer: (scr-font)
+: (font-save) ( -- ) 0 $4000 vaddr 2048 0 do v@ (scr-font) i + c! loop ;
+: (font-load) ( -- ) 0 $4000 vaddr 2048 0 do (scr-font) i + c@ v! loop ;
+: screen ( mode -- )
+  128 = if
+    (scr-saved) @ 0= if                 ( first time in: remember the text setup )
+      $9f2d ioc@ (scr-cfg) !  $9f2a ioc@ (scr-hs) !
+      $9f2b ioc@ (scr-vs) !  $9f2f ioc@ (scr-tb) !
+      (font-save)
+      1 (scr-saved) !
+    then
+    64 $9f2a ioc!  64 $9f2b ioc!        ( 640x480 halved to 320x240 )
+    0 7 layer-mode                      ( bitmap, 8 bits a pixel )
+    0 0 0 tilebase                      ( pixels from VRAM $00000, 320 wide )
+    0 layer-on
+  else
+    (scr-saved) @ if
+      (scr-cfg) @ $9f2d ioc!  (scr-hs) @ $9f2a ioc!
+      (scr-vs) @ $9f2b ioc!  (scr-tb) @ $9f2f ioc!
+      (font-load)
+      0 (scr-saved) !
+    then
+    0 layer-on cls
+  then ;
+
 ( INTERRUPTS - arming a Forth word on a VERA source.
 
   The kernel dispatches one slot per SOURCE and acknowledges it; firq.asm

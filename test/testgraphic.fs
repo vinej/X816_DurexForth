@@ -60,6 +60,12 @@ T{ 10 10 pix -> 0 }T
 
 0 screen page                     \ back to 80x60 text for the next tests
 
+\ BACK TO TEXT before anything is printed. GINIT points layer 0 at a
+\ bitmap that starts where the console's character map lives, so until
+\ this runs there is no console to print `ok` on - and every later suite
+\ file would report into a blank screen too.
+0 screen
+
 cr .( testgraphic ok ) cr
 
 ---testgraphic---
