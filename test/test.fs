@@ -6,7 +6,7 @@
 \ Stage A scope (16-bit cells, kernel console, kernel FS_*): the ANS core
 \ suites, exceptions, doubles, and the VERA words. Omitted until their
 \ words return: testbank/testromdisk/testvramdisk (no banking, no romdisk),
-\ testfile/testloadsave (fs words beyond INCLUDED), testfloat and the
+\ testfile/testloadsave (fs words beyond INCLUDED), the remaining
 \ mod/*.fs suites (modules load via require from disk), testx16 (charset
 \ and friends are parked), testinput (no joystick/mouse on the core),
 \ testaudio (audio module), testsee (C64 screen scraping).
@@ -42,6 +42,7 @@ cr .( >> testload) cr parse-name testload included
 cr .( >> teststruct) cr parse-name struct included
 cr .( >> testaudio) cr parse-name testaud included
 cr .( >> testfm) cr parse-name testfm included
+cr .( >> testfloat) cr parse-name testfloa included
 
 \ include-mechanism smoke test (loads the file "1")
 :noname s" include 1 2" evaluate

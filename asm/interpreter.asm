@@ -339,11 +339,12 @@ INTERPRET
     bne +
     lda QUOTE_VEC
     sta W2
+    lda QUOTE_VEC+2
     bra ++
 +   lda NOTFOUND_VEC
     sta W2
-++  lda #(BANK1 >> 16)
-    sta W2+2
+    lda NOTFOUND_VEC+2
+++  sta W2+2
     jml [W2]
 
     ; yep, it's a number...
@@ -397,8 +398,22 @@ print_word_not_found_error ; ( caddr u -- )
     lda #-13 ; undefined word
     jmp throw_a
 
+; These two hook cells are a FULL 32-BIT CELL each, and that is not padding
+; for its own sake. Forth reaches them as `'notfound !` and `'quote !`, and
+; ! stores four bytes - so a two-byte cell meant every store spilled into
+; whatever followed, which here is the CODE of the very word that hands out
+; the address. base.fs installs both hooks at boot, so `'notfound` and
+; `'quote` were quietly demolished the moment they were first used, and the
+; next reader of either executed the wreckage: FLOAT, which reads the old
+; handler to chain to it, aborted with a BRK before it printed anything.
+;
+; Four bytes also means the stored xt keeps its BANK byte, which a hook now
+; needs: Stage C spreads definitions across banks $01-$04, and the caller
+; above used to force bank $01 on every dispatch. A handler defined in a
+; module - (fnum) in float.fs is one - lands wherever HERE happened to be.
 NOTFOUND_VEC ; interpreter not-found hook (RAM cell, see INTERPRET)
     !word print_word_not_found_error
+    !word (BANK1 >> 16)
 
     +BACKLINK "'notfound", 9
     lda #NOTFOUND_VEC
@@ -406,6 +421,7 @@ NOTFOUND_VEC ; interpreter not-found hook (RAM cell, see INTERPRET)
 
 QUOTE_VEC ; "xxx" string-literal hook (RAM cell, see INTERPRET)
     !word print_word_not_found_error
+    !word (BANK1 >> 16)
 
     +BACKLINK "'quote", 6
     lda #QUOTE_VEC

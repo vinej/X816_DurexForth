@@ -61,6 +61,46 @@ user-confirmed on the MiSTer:
   card on the MiSTer and reported all tests passed — that run included
   the new far-data suite (testfar), so the SDRAM allocator is
   hardware-proven too, not just emulator-proven.
+- **FLOAT IS DONE, in software** (2026-08-05). `NEEDS FLOAT` /
+  `NEEDS FLOATX` now work: 5-byte MFLPT on a separate float stack, all 71
+  words of FLOAT.TXT ticked and machine-probed (0 absent), `test/testfloat.fs`
+  green including the transcendentals.
+  - **The X16 version of forth/mod/float.fs was ALL ROM CALLS** - every
+    operation a BCALL into the Math Library in ROM bank 4. There is no ROM
+    here past the boot page, so the arithmetic is written out in Forth.
+    The format earns its keep: restoring the implied leading 1 gives a
+    32-bit mantissa that fills a cell EXACTLY, so `um*` and `um/mod` (both
+    primitives) do multiply and divide in a dozen lines each. Series for
+    ln/exp/sin/atan, Newton for sqrt. Truncation, not rounding, so binary-
+    exact values stay exact - which is what testfloat's F= checks need.
+  - **The bug that made FLOAT unloadable was in the INTERPRETER, not in
+    float.fs** (asm/interpreter.asm). `NOTFOUND_VEC` and `QUOTE_VEC` were
+    `!word` - TWO bytes - but Forth reaches them through `'notfound !`, and
+    `!` stores FOUR. Every store spilled two bytes into what follows, which
+    is the CODE of the very word that hands out the address. base.fs installs
+    both hooks at boot, so `'notfound` and `'quote` were demolished the
+    moment they were first used, and the next reader executed the wreckage:
+    FLOAT reads the old handler to chain to it and aborted with a BRK before
+    printing anything. Both cells are a full 32-bit cell now and carry the
+    xt's BANK byte, which the dispatch uses instead of forcing bank $01 -
+    a hook defined in a module lands wherever HERE was.
+  - **floatx's `TO` override was written for the 6502 CREATE shape**: first
+    byte $20 (jsr), does>-pointer at xt+3, body at xt+5. On X816 it is $22
+    (jsl), the pointer is lo16 at xt+4 plus a bank byte at xt+6, and the body
+    is xt+7 - base.fs says so and its own `to` already did it right.
+  - **fsqrt's first guess halves the WRONG exponent if you are careless**:
+    a value with exponent byte e lies in [2^(e-129), 2^(e-128)), so the guess
+    comes from (e-128)/2, not (e-160)/2. Getting it wrong does not fail
+    loudly - Newton still converges, just not inside the loop, and sqrt(16)
+    came out around 130000.
+  - **AUTORUN is EVALUATEd, so a nested INCLUDE kills the rest of it.** An
+    AUTORUN of "include float" plus anything runs the include and then
+    silently stops, which reads exactly like the include wedging the machine.
+    Inside a source file the same sequence is fine - that is how test.fs
+    gets away with fifteen includes. Put debug commands in a FILE and make
+    AUTORUN one line that includes it. Cost a long detour.
+  - testfloat.fs predated the `require tester` convention and needed it.
+
 - **FM IS DONE, and it makes a sound** (2026-08-05). The note/patch
   API AUDIOFM.TXT had listed as absent for the whole port now exists as
   a module: `NEEDS FM` / `include fm` loads `forth/mod/fm.fs` —
@@ -410,9 +450,9 @@ user-confirmed on the MiSTer:
    `FMPLAY`/`FMCHORD` (play-strings, `playstring.s`, 961 lines) and
    `FMFREQ` (needs a log to reach the chip's pitch) are the only pieces
    still open, and both are marked `[ ]` with the reason in AUDIOFM.TXT.
-4. **Modules**: float (software math — no ROM FP on X816) and
-   replacements for the parked C64 words
-   (`ls`, `open`, `help`, `turnkey` — see base.fs comments).
+4. **Modules**: float is DONE (see State). What is left is replacements
+   for the parked C64 words (`ls`, `open`, `turnkey` — see base.fs
+   comments); `help` already landed.
 4. **helpdoc tracker: DONE and machine-verified (2026-08-04)** —
    416/587 ticked, and the checkboxes are no longer a hand-kept
    promise: a generated probe card runs `find-name` over every entry,

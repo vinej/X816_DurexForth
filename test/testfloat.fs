@@ -4,6 +4,12 @@
 \ the float words (else later unknown words would jump into freed memory).
 
 marker ---testfloat---
+
+\ Standalone-safe: REQUIRE loads each only if it is not already in, so
+\ `include testfloat` works on its own at the prompt and costs nothing inside
+\ the suite, where test.fs loaded the tester first.
+require tester
+
 'notfound @ constant nf0          \ original not-found handler, restored below
 
 include float

@@ -58,3 +58,6 @@ release/mister/_Computer/
 !release/mister/games/X816/*.rom
 
 
+
+# Emulator memory dumps (x16emu writes these next to the working dir)
+dump-*.bin

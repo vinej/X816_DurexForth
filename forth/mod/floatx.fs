@@ -67,16 +67,23 @@ fvariable f~tol
 \ --- FVALUE: a float VALUE, rewritten with TO ---------------------------------
 \   3 S>F FVALUE SPEED   SPEED F.   2 S>F TO SPEED
 : fvalue ( "name" -- ) ( F: r -- ) create here 5 allot f! does> f@ ;
+
+\ The X816 CREATE shape, which is NOT the 6502 one this file was written for:
+\ xt+0..3 is `jsl dodoes` - so the first byte is $22, not $20 - then the
+\ DOES> pointer as lo16 at xt+4 plus a bank byte at xt+6, and the body at
+\ xt+7. See base.fs, which says to keep the three in step.
+: (does@) ( xt -- u24 )            \ the DOES> pointer a created word carries
+  dup 4 + c@  over 5 + c@ 8 lshift or  swap 6 + c@ 16 lshift or ;
 0 s>f fvalue (fv)
-' (fv) 3 + @ constant (fvdoes)     \ the does>-code pointer all FVALUEs share
+' (fv) (does@) constant (fvdoes)   \ the does>-code pointer all FVALUEs share
 \ Extend core TO: created words dispatch on that pointer - FVALUE stores from
 \ the float stack, anything else keeps the 2VALUE behavior. VALUEs unchanged.
-: to ' dup c@ $20 = if
-    dup 3 + @ (fvdoes) = if
-      5 + state c@ if postpone literal postpone f! exit then f! exit then
-    5 + state c@ if postpone literal postpone 2! exit then 2!
+: to ' dup c@ $22 = if
+    dup (does@) (fvdoes) = if
+      7 + state c@ if postpone literal postpone f! exit then f! exit then
+    7 + state c@ if postpone literal postpone 2! exit then 2!
   else
-    1+ state c@ if postpone literal postpone (to) exit then (to)
+    state c@ if postpone literal postpone (to) exit then (to)
   then ; immediate
 
 \ --- BASIC-style aliases ( F: r -- f(r) ):   2 S>F SQR F.  ->  1.41421356 ----
