@@ -52,6 +52,15 @@
     time KEY polls - so at the prompt it prints the abort and returns a
     fresh prompt. Not a word; it works BECAUSE the loop is stuck.
 
+An uncaught -28 prints one of two words, and the difference is the
+message, not the code - CATCH sees -28 either way:
+    break   you pressed the key. The machine did as it was told.
+    brk     a BRK instruction executed. NOBODY MEANT THAT. It is a bug
+            in compiled code - a branch operand left as two $00 bytes
+            reads as BRK, which is how the OF bug hid for a whole stage.
+            If this appears without you touching the keyboard, the word
+            you just ran is compiling something wrong.
+
 --- power / debug ---
 [ ] MONITOR  ( -- )   enter the built-in machine-language monitor (exit with X;
                   it does NOT cleanly return - reset afterward).

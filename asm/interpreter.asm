@@ -60,7 +60,18 @@ nmi_handler
     beq +               ; bank $00: the kernel's trampolines and bank-0 code
     cmp #$0500
     bcs +               ; bank $05 up: kernel firmware, not program space
-    jmp brk_handler     ; Forth code: same abort, same -28 user interrupt
+    ; Forth code: abort, same -28 as a BRK. Say so first - the code is
+    ; shared but the word printed is not, because "the user pressed the
+    ; break key" and "an instruction nobody meant to run executed" are
+    ; opposite diagnoses. DBR is $00 on entry and the flag is bank-$01
+    ; data; the plb below fixes that for good (this never returns).
+    sep #$10
+!rs
+    phk
+    plb
+    lda #1
+    sta brk_from_key
+    jmp brk_abort       ; past brk_handler's own "not the key" store
 +   ; Declined - but not dropped. At an idle prompt the machine IS inside
     ; the kernel's key poll, so a combo pressed there lands here ~always.
     ; Park the request; kern_getc's poll loop (x816.asm) consumes it and
@@ -93,6 +104,8 @@ brk_handler
 !rs
     phk
     plb                 ; DBR = $01: what every absolute data ref assumes
+    stz brk_from_key    ; reached directly = a BRK opcode, not the key
+brk_abort               ; nmi_handler joins here, having set the flag
 
     ; A direct abort supersedes any parked one (an NMI that got declined
     ; in a kernel window and was then re-pressed into Forth code): clear
@@ -148,6 +161,11 @@ quit_reset
     sta TO_IN_W
     sta SOURCE_ID_LSB
     sta SOURCE_ID_MSB
+    ; Back to the default reading of -28. The message has already been
+    ; printed by the time QUIT runs, so this only affects the NEXT one:
+    ; a plain `-28 throw` from user code should say "brk", not inherit
+    ; "break" from a key press ten minutes ago.
+    sta brk_from_key
     sep #$20
 !as
     sta SAVE_INPUT_STACK_DEPTH

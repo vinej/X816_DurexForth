@@ -85,6 +85,20 @@ user-confirmed on the MiSTer:
   VIA1, mirroring runtime/smc.s's exact edges; both the RTL and the
   emulator pulse the NMI at the value byte's ACK, so the test's
   post-catch `(i2c-stop)` is what resyncs the abandoned bus.
+- **`break` vs `brk`** (2026-08-04, user: "Ctrl+Alt+PrtScr only shows
+  BRK"): the abort worked, the word was wrong. -28 is raised by both
+  the break key and a BRK opcode and CATCH must not distinguish them
+  (ANS "user interrupt") — but the printed word must, because they are
+  opposite diagnoses: `break` is the machine obeying you, `brk` is an
+  instruction nobody meant to execute (how the OF bug hid for a whole
+  stage). `brk_from_key` (x816.asm) is set by nmi_handler and by
+  kern_getc's parked path, cleared by brk_handler's direct entry and
+  by quit_reset; exception.asm picks `.user_break` or
+  `.user_interrupt`. **Verifying a message needs an UNCAUGHT abort**,
+  and base.fs wraps AUTORUN in CATCH — the probe card patches that one
+  line out (`' (autorun) catch (autorun-report)` → `(autorun)`) so the
+  real printer runs. The suite cannot cover this: catching is exactly
+  what stops it printing.
 - **CHARSET is DONE** (2026-08-04) — and it could not be a port. The
   X16's `charset ( n -- )` picked one of a dozen ROM fonts; there is
   no charset ROM here. The console is VERA layer 0 and its font is

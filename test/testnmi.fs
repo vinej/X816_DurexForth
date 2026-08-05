@@ -49,6 +49,11 @@ $9f03 constant (ddr)
 : (trynmi) ['] (runaway) catch (i2c-stop) ;
 
 cr .( testnmi: an NMI breaks a runaway loop with -28 ) cr
+\ -28 is what CATCH sees for BOTH sources, deliberately. What differs is
+\ the word an UNCAUGHT one prints - "break" here, "brk" for a BRK opcode
+\ (asm/exception.asm, brk_from_key). That cannot be asserted from inside
+\ CATCH, since catching is exactly what stops it printing; it is checked
+\ by running an uncaught abort of each kind and reading the screen.
 T{ (trynmi) -> -28 }T
 
 cr .( testnmi: the interpreter is intact afterwards ) cr

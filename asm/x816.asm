@@ -106,6 +106,16 @@ PUTCHR
 nmi_pending
     !word 0
 
+; brk_from_key - which source raised the -28 the interpreter is about to
+; report: 0 = a BRK opcode executed, non-zero = the user pressed the break
+; key (Ctrl+Alt+PrtScr). BOTH are ANS -28 "user interrupt" and CATCH cannot
+; tell them apart, which is right - but the WORD ON SCREEN must, because
+; they mean opposite things. "break" is the machine doing as it was told;
+; "brk" is an instruction nobody meant to execute, which is exactly how the
+; OF bug hid for a whole stage (doc/STAGEC.md). Read by exception.asm.
+brk_from_key
+    !word 0
+
 ; kern_getc - blocking key read, A = character (zero-extended). Polls
 ; CON_GETKEY rather than calling the blocking CON_GETC: the shell's own
 ; line reader polls, and polling from here keeps the block on our side of
@@ -131,6 +141,8 @@ kern_getc
 -   lda nmi_pending     ; a declined NMI parked an abort for this loop
     beq +
     stz nmi_pending     ; consume it - or every later KEY re-aborts
+    lda #1
+    sta brk_from_key    ; it was the key, however late it is delivered
     rep #$30
 !rl
     lda #0

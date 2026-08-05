@@ -152,7 +152,15 @@ THROW
     +VALUE BANK1 + .no_word
 +   cmp #-28
     bne .unknown_exception
-    +VALUE BANK1 + .user_interrupt
+    ; -28 is ANS "user interrupt" and BOTH the break key and a BRK opcode
+    ; raise it - CATCH cannot tell them apart, and should not. The word on
+    ; screen must: "break" is the machine obeying the key, "brk" is an
+    ; instruction nobody meant to execute. The flag is set by whichever
+    ; handler ran (asm/interpreter.asm, and kern_getc for a parked one).
+    lda brk_from_key
+    beq +
+    +VALUE BANK1 + .user_break
++   +VALUE BANK1 + .user_interrupt
 
 .unknown_exception
     jsl BANK1 + RVS
@@ -193,6 +201,9 @@ THROW
 .user_interrupt
     !byte 3
     !text "brk"
+.user_break
+    !byte 5
+    !text "break"
 
 +BACKLINK "(abort\")", 8 ; ( addr u -- )
     lda LSB,x
