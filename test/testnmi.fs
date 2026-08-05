@@ -16,6 +16,11 @@
 
 marker ---testnmi---
 
+\ Standalone-safe: REQUIRE loads the Hayes tester only if it is not
+\ already in, so `include testnmi` works on its own at the prompt and
+\ costs nothing inside the suite, where test.fs loaded it first.
+require tester
+
 decimal
 
 \ VIA1 PA0 = SDA, PA1 = SCL, open drain: DDRA 1-bit = drive low (ORA

@@ -216,6 +216,13 @@ user-confirmed on the MiSTer:
   MiSTer. Hash-verify card files against sources with pyfatfs after
   every refresh. A stale release is indistinguishable from a change
   that did not work.
+- **Every X816 test file starts with `require tester`** so it can be
+  included on its own at the prompt: `include testfile` used to die on
+  `T{?` because only test.fs pulled the Hayes tester in. REQUIRE is
+  idempotent against the same list `included` records, so inside the
+  suite it costs nothing. Put it AFTER the file's `marker`, so
+  unwinding the marker takes the tester with it when it was loaded
+  standalone.
 - **A new test file must be added to THREE places**, two of them
   outside this repo's test dir: `test/test.fs` (the include), the
   `SRC` list in `run-tests.sh` (emulator card), and `FORTH_SRC` in
