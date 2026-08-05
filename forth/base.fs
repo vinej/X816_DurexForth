@@ -127,9 +127,16 @@ parse-name asm included
 ( TO relies on this exact layout: low-word imm at xt+3, high at xt+8 )
 code dex, dex, split swap lda,# lsb sta,x lda,# msb sta,x rtl, ;
 : constant value ;
-( to free up space, pad could be
-  e.g. HERE+34 instead )
-$10500 constant pad ( golden RAM, as a flat bank-1 address )
+( PAD FOLLOWS HERE, which is what ANS says it is: a transient region
+  whose contents nothing may rely on across an ALLOT or a comma. It was
+  a FIXED address, $10500, chosen when the dictionary was small - and
+  the dictionary grew past it. HERE is $157CF at boot now, so every
+  write to the old pad landed on COMPILED CODE. Nothing in the boot
+  chain wrote there, which is the only reason it was survivable: it
+  waited for the first user to type `65 pad c!` and wonder why a word
+  defined ten minutes ago had stopped working. The file's own comment
+  proposed this fix before the collision happened. )
+: pad ( -- addr ) here 68 + ;
 : spaces ( n -- )
 begin ?dup while space 1- repeat ;
 
@@ -630,6 +637,50 @@ create (cwdbuf) 80 allot        ( KFS_PATH, what FS_GETCWD needs )
     dirent-name nip 14 swap - 0 max spaces
     dirent-dir? if ." <DIR>" else dirent-size u. then cr
   repeat dir-close drop ;
+
+( ANS STRUCTURES - STRUCTURE.TXT, which was 0/5.
+    begin-structure point
+      field: p.x
+      field: p.y
+    end-structure
+  POINT then pushes the total size and P.X / P.Y turn a base address
+  into a field address. A field is an OFFSET added to whatever you give
+  it, so the same names work on a near buffer or a far one. )
+: begin-structure ( "name" -- addr 0 ) create here 0 0 , does> @ ;
+: end-structure ( addr n -- ) swap ! ;
+: +field ( n1 n2 "name" -- n3 ) create over , + does> @ + ;
+: field: ( n1 "name" -- n2 ) 4 +field ;
+: cfield: ( n1 "name" -- n2 ) 1 +field ;
+
+( STRINGS - the rest of STRING.TXT. The BASIC-flavoured ones - LEFT,
+  RIGHT, MID, STR, VAL - are here because the page promises them; MID
+  counts from 1 like the BASIC it is named after, and everything else
+  counts from 0 like the rest of Forth. Anything returning a fresh
+  string builds it in PAD, which moves with HERE - copy it if you need
+  it to outlive the next definition. )
+: place ( addr len dst -- ) 2dup c! 1+ swap move ;
+variable (pdst) variable (plen)
+: +place ( addr len dst -- )
+  (pdst) ! (plen) !
+  (pdst) @ count + (plen) @ move
+  (pdst) @ dup c@ (plen) @ + swap c! ;
+: len ( c-addr u -- u ) nip ;
+: asc ( c-addr u -- code ) drop c@ ;
+: chr ( code -- c-addr 1 ) pad c! pad 1 ;
+: left ( c-addr u n -- c-addr n2 ) min ;
+: right ( c-addr u n -- c-addr2 n2 ) over min >r + r@ - r> ;
+: mid ( c-addr u start len -- c-addr2 len2 ) >r 1- /string r> min ;
+: rpt ( char n -- c-addr u )
+  200 min dup >r 0 ?do dup pad i + c! loop drop pad r> ;
+: str ( n -- c-addr u ) s>d tuck dabs <# #s rot sign #> ;
+: nhex ( u -- c-addr u ) base @ >r hex 0 <# #s #> r> base ! ;
+: nbin ( u -- c-addr u ) base @ >r 2 base ! 0 <# #s #> r> base ! ;
+: val ( c-addr u -- n )
+  over c@ '-' = dup >r if 1 /string then
+  0. 2swap >number 2drop drop r> if negate then ;
+: sliteral ( addr len -- )
+  postpone lits dup c, tuck here swap move allot ; immediate
+: linput ( c-addr +n -- +n2 ) accept ;
 
 ( LOAD AND SAVE - raw bytes to and from memory or VRAM.
 

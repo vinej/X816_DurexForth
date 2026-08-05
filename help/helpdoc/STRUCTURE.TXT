@@ -1,9 +1,22 @@
 === STRUCTURE - Structures ===
 
-[ ] BEGIN-STRUCTURE ( "name" -- addr 0 ) - begin a structure definition.
+A field is an OFFSET, added to whatever base address you hand it. There
+is no hidden pointer, so the same field names work on a near buffer, a
+far (SDRAM) one, or an address you computed yourself.
+
     BEGIN-STRUCTURE POINT
-[ ] END-STRUCTURE ( addr n -- ) - end it; name then pushes the total size.
-[ ] FIELD: ( u1 "name" -- u2 ) - declare a cell-sized field. FIELD: P.X  FIELD:
-    P.Y
-[ ] CFIELD: ( u1 "name" -- u2 ) - declare a byte-sized field.
-[ ] +FIELD ( u1 n "name" -- u2 ) - declare a field of n bytes.
+      FIELD:  P.X
+      FIELD:  P.Y
+      CFIELD: P.FLAG
+    END-STRUCTURE
+    CREATE PT POINT ALLOT
+    11 PT P.X !   PT P.Y @
+
+[x] BEGIN-STRUCTURE ( "name" -- addr 0 ) - begin a structure definition.
+[x] END-STRUCTURE ( addr n -- ) - end it; the name then pushes the total
+    size, which is what you ALLOT.
+[x] FIELD: ( u1 "name" -- u2 ) - a cell-sized field. A cell is 4 bytes
+    here, so three of these make a 12-byte structure.
+[x] CFIELD: ( u1 "name" -- u2 ) - a byte-sized field.
+[x] +FIELD ( u1 n "name" -- u2 ) - a field of n bytes, which is how you
+    embed an array: 20 +FIELD R.NAME

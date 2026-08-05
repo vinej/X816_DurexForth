@@ -192,6 +192,26 @@ user-confirmed on the MiSTer:
   the only proof it reached VERA and not just a variable. The tests
   restore `1 0 color cls` BEFORE asserting, because a coloured
   background makes every cell decode as `?` in the GIF harness.
+- **PAD had grown into the dictionary** (2026-08-04). `pad` was the
+  fixed address `$10500`, chosen when the dictionary was small; HERE is
+  `$157CF` at boot now, so every write to PAD landed on COMPILED CODE.
+  Nothing in the boot chain wrote there, which is the only reason it
+  was survivable - it was waiting for the first user to type
+  `65 pad c!` and find a word defined ten minutes earlier had stopped
+  working. base.fs's own comment had proposed the fix years before the
+  collision: `pad` now follows HERE (`here 68 +`), which is what ANS
+  says PAD is. Guarded in teststruct: PAD is above HERE, a write does
+  not disturb an earlier word, and PAD moves when HERE does.
+- **STRUCTURE and the rest of STRING** (2026-08-04): STRUCTURE.TXT was
+  0/5 and STRING.TXT 9/29; both are pure Forth over words that already
+  existed. `begin-structure end-structure field: cfield: +field`, and
+  `place +place len asc chr left right mid rpt str nhex nbin val
+  sliteral linput`. A field is an OFFSET with no hidden base, so the
+  same names work on a near buffer or a far one - teststruct asserts
+  that against SDRAM. Tracker 401/584.
+  **Trap**: inside `hex`, the tester's EXPECTED value is parsed in hex
+  too - `T{ s" ff" val -> 255 }T` compares against $255 and fails while
+  the word is perfectly correct. Write both sides in the same base.
 - **`break` vs `brk`** (2026-08-04, user: "Ctrl+Alt+PrtScr only shows
   BRK"): the abort worked, the word was wrong. -28 is raised by both
   the break key and a BRK opcode and CATCH must not distinguish them
@@ -339,7 +359,7 @@ user-confirmed on the MiSTer:
    replacements for the parked C64 words
    (`ls`, `open`, `help`, `turnkey` — see base.fs comments).
 4. **helpdoc tracker: DONE and machine-verified (2026-08-04)** —
-   381/584 ticked, and the checkboxes are no longer a hand-kept
+   401/584 ticked, and the checkboxes are no longer a hand-kept
    promise: a generated probe card runs `find-name` over every entry,
    both directions, so `[x]`-but-absent and `[ ]`-but-present are both
    empty. Re-run it after any word changes (the generator is a few
