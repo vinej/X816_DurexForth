@@ -699,6 +699,38 @@ create ymshadow 256 allot
   (ym-wait) $9f41 ioc! ;
 : ym@ ( reg -- value ) 255 and ymshadow + c@ ;
 
+( INTERRUPTS - arming a Forth word on a VERA source.
+
+  The kernel dispatches one slot per SOURCE and acknowledges it; firq.asm
+  rebuilds this Forth's conventions around the call. What is left here is
+  the part VERA owns: a source that is not ENABLED never interrupts, and
+  the enable bits are ours to set.
+
+  A handler runs with interrupts masked and must not enable them, must not
+  THROW - there is no CATCH between it and the kernel - and must put back
+  VERA's CTRL and address ports if it touches them. Keep it short: it runs
+  inside somebody else's word.
+
+  Only IRQ is proven. See the note below the example.
+
+    : tick  1 frames +! ;   ' tick irq        \ every vertical blank
+    0 irq                                     \ and off again )
+\ VERA2 IS NOT CLASSIC VERA HERE, and this is the part that is NOT yet
+\ established. The contract names $9F26 IEN and $9F27 ISR, and the kernel
+\ uses them - but on this core writing 9 to $9F26 reads back 65, and
+\ rtl/vera2_regs.sv shows other fields at those indices. So the ENABLE
+\ path for the raster, sprite-collision and audio-FIFO sources is unknown,
+\ and words that pretended to set it would arm a handler on a source that
+\ never fires, which is worse than not offering them.
+\ VSYNC needs no enable from us: kirq.s switches it on at boot for the
+\ kernel's own frame counter, which is why IRQ below is verified and the
+\ other three are arming-only. When the VERA2 interrupt registers are
+\ pinned down, give these the enable and they are done.
+: irq ( xt -- ) 0 (irq!) ;              \ vertical blank; 0 disarms
+: line-irq   ( xt line -- ) drop 1 (irq!) ;
+: sprcol-irq ( xt -- ) 2 (irq!) ;
+: aflow-irq  ( xt -- ) 3 (irq!) ;
+
 ( INPUT - SNES pads and the SMC mouse, both on VIA1 port A.
 
   The pads are a shift register, exactly as the X16 KERNAL drives them:

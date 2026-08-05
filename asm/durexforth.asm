@@ -362,6 +362,7 @@ MINUS_ONE
 ; CON_*) in the platform-hooks phase. See X816_core doc/DUREXFORTH.md.
 !src "coreadd.asm"
 !src "rstack.asm"
+!src "firq.asm"
 
 BOOT_STRING
 !src "../build/version.asm"

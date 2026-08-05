@@ -61,6 +61,40 @@ user-confirmed on the MiSTer:
   card on the MiSTer and reported all tests passed — that run included
   the new far-data suite (testfar), so the SDRAM allocator is
   hardware-proven too, not just emulator-proven.
+- **FORTH RUNS FROM AN INTERRUPT** (2026-08-05). `asm/firq.asm` puts an
+  execution token behind four kernel IRQ slots and rebuilds this Forth's
+  conventions around the call; `' tick irq` arms a colon word on the
+  vertical blank. `test/testirq.fs` is in the suite.
+  - **What the kernel hands a handler is not what Forth wants**: M=0/X=0
+    (16-bit index), D=$0000, DBR=$00, reached by jsl. Forth needs X=1 and
+    DBR=$01. D is the only one already right.
+  - **The data stack pointer comes from the dispatcher's frame at 11,s.**
+    brk_handler deliberately refuses to read that frame and takes its depth
+    from its own CATCH instead - but an interrupt has no CATCH and must run
+    on the stack it landed on. So this couples to kirq.s's KPROLOGUE +
+    kirq_call shape exactly as nmi_handler already does, and the two share
+    the layout comment. Nothing writes the copy back: KEPILOGUE pulls X, so
+    a handler that leaves rubbish loses it at the rti.
+  - **W/W2/W3 are saved around the call.** `@` is `lda [W],y`; an interrupt
+    between the store to W and the load through it would return to a
+    pointer belonging to the handler. One static save area is enough - the
+    dispatcher masks interrupts and a handler must not enable them.
+  - Verified by measurement: the handler ran 114 times inside one loop, and
+    the interrupted loop still counted to exactly its 400000. That second
+    number is the real test.
+  - **ONLY VSYNC IS PROVEN, and the reason is a real unknown.** VERA2 is not
+    classic VERA here: the contract calls $9F26 IEN, but writing 9 reads
+    back 65 and `rtl/vera2_regs.sv` shows other fields at those indices. So
+    the ENABLE path for raster, sprite-collision and audio-FIFO is unknown,
+    and base.fs deliberately does NOT pretend to set it - LINE-IRQ,
+    SPRCOL-IRQ and AFLOW-IRQ arm the kernel slot and nothing else. VSYNC
+    needs no enable from us because kirq.s switches it on for the kernel's
+    own frame counter. **Pinning down VERA2's interrupt registers is the
+    next question, and it is one for the core.**
+  - **ADVSND is unblocked as far as that goes**: it loads now, and its
+    envelopes pass. It stops on a NUMERIC bug in the ADPCM decoder, which is
+    its own investigation.
+
 - **Module suites, tranche 2: ADVANCED** (2026-08-05). `testadv` is in the
   suite and green - the PRNG, the sine table, ATAN2, LERP, ring buffers and
   the ZX0 depacker, all of which were pure Forth already and had simply
