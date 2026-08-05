@@ -36,7 +36,11 @@ KIRQ_BRK = 9
 KERN_FS_OPEN  = $00fe40             ; C:X = path, Y = mode -> C = handle
 KERN_FS_CLOSE = $00fe44             ; C = handle
 KERN_FS_READ  = $00fe48             ; C:X = parameter block -> C = bytes read
+KERN_FS_WRITE = $00fe4c             ; C:X = parameter block -> C = bytes written
 KERN_FS_SEEK  = $00fe50             ; C:X = parameter block
+KERN_FS_SIZE  = $00fe54             ; C = handle -> C:X = 32-bit size
+KERN_FS_DELETE = $00fe58            ; C:X = path
+KERN_FS_RENAME = $00fe5c            ; C:X = parameter block (old, new)
 
 ; Direct-page staging for the width crossing. $E0-$EF is unclaimed by the
 ; Forth core (planes $32-$D1, W/W2/W3 $D4-$DF).

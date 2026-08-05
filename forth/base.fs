@@ -487,6 +487,103 @@ $4800 constant font2  ( the next 2 KB slot - free VRAM, yours )
 : glyph@ ( base n c-addr -- ) >r glyph-addr 0 swap vaddr r>
   8 0 do dup i + v@ swap c! loop drop ;
 
+( ANS COMPARE - STRING.TXT promised it, and file code needs it: the
+  honest way to check what came back off the card is to compare the
+  bytes, not just the count. Returns -1, 0 or 1: the shorter string
+  loses only when it is a prefix of the longer one, so "ab" sorts
+  before "abc" but after "aa". )
+variable (cmp-a1) variable (cmp-u1)
+variable (cmp-a2) variable (cmp-u2)
+: compare ( c-addr1 u1 c-addr2 u2 -- n )
+  (cmp-u2) ! (cmp-a2) ! (cmp-u1) ! (cmp-a1) !
+  (cmp-u1) @ (cmp-u2) @ min 0 ?do
+    (cmp-a1) @ i + c@ (cmp-a2) @ i + c@
+    2dup < if 2drop unloop -1 exit then
+    > if unloop 1 exit then
+  loop
+  (cmp-u1) @ (cmp-u2) @
+  2dup < if 2drop -1 exit then
+  > if 1 exit then 0 ;
+
+( ANS FILE ACCESS over the primitives in asm/file.asm.
+
+  The primitives speak the kernel's language: one 32-bit CELL for an
+  offset or a size - a cell holds a whole FAT32 file position, so no
+  double is needed - and the kernel's own KERR_* number as the ior,
+  0 meaning success. These words put the ANS shapes on top, which
+  mostly means widening those cells to the doubles ANS specifies.
+
+  ior values, from X816_core doc/KERNEL.md: 1 no such call, 2 not
+  found, 3 no space, 4 bad argument, 5 I/O error, 6 exists, 7 not
+  empty. They are NOT the Forth THROW codes; -37 is what the include
+  path throws, and these words return rather than throw, per ANS. )
+0 constant r/o
+1 constant w/o
+2 constant r/w
+
+( OPEN-FILE OPENS: it never destroys. This kernel has exactly two
+  modes - read an existing file, or CREATE one, truncating whatever
+  was there - runtime/kfs.c calls fat32_create when mode is
+  KFS_WRITE.
+  There is no "open for writing, keep the contents" and no append, so
+  W/O OPEN-FILE cannot be honoured and is REFUSED rather than quietly
+  emptying the caller's file. Truncation is a thing you have to ask
+  for by name, and CREATE-FILE is that name. R/W is refused for the
+  same reason plus a second: passing any unknown mode to FS_OPEN gets
+  a READ-ONLY handle back, so a program that ignored the ior would
+  write nowhere and never learn. )
+: open-file ( c-addr u fam -- fileid ior )
+  r/o = if r/o fs-open exit then
+  2drop 0 1 ;
+( fam is accepted and ignored - there is one kind of created file. )
+: create-file ( c-addr u fam -- fileid ior ) drop w/o fs-open ;
+: close-file ( fileid -- ior ) fs-close ;
+: read-file ( c-addr u1 fileid -- u2 ior ) fs-read ;
+: write-file ( c-addr u fileid -- ior ) fs-write nip ;
+: delete-file ( c-addr u -- ior ) fs-delete ;
+: rename-file ( c-addr1 u1 c-addr2 u2 -- ior ) fs-rename ;
+: file-size ( fileid -- ud ior ) fs-size >r 0 r> ;
+: file-position ( fileid -- ud ior ) >r 0 1 r> fs-seek >r 0 r> ;
+: reposition-file ( ud fileid -- ior ) >r drop 0 r> fs-seek nip ;
+( No flush call exists, so this reports "no such call" rather than
+  returning 0 and leaving you to believe something was flushed.
+  CLOSE-FILE is the sync point on this machine. RESIZE-FILE has no
+  kernel call behind it either, and says so the same way. )
+: flush-file ( fileid -- ior ) drop 1 ;
+: resize-file ( ud fileid -- ior ) drop 2drop 1 ;
+( Does it exist? Open it read-only and put it straight back. x is the
+  ANS implementation-defined extra, and 0 here says "nothing to add". )
+: file-status ( c-addr u -- x ior )
+  r/o fs-open dup 0= if
+    drop close-file drop 0 0
+  else swap drop 0 swap then ;
+
+variable (rl-fid) variable (rl-ior) variable (rl-n)
+variable (rl-a) variable (rl-max)
+create (rl-c) 1 allot
+create (rl-nl) 1 allot  10 (rl-nl) c!
+( One kernel crossing per BYTE, which is slow and deliberate: the
+  read-ahead cache in fs.asm belongs to the interpreter's source
+  file, and borrowing it here would corrupt an INCLUDE that happens
+  to be running. Buy speed with your own buffer and READ-FILE. )
+: read-line ( c-addr u1 fileid -- u2 flag ior )
+  (rl-fid) ! (rl-max) ! (rl-a) !
+  0 (rl-n) ! 0 (rl-ior) !
+  begin (rl-n) @ (rl-max) @ < while
+    (rl-c) 1 (rl-fid) @ fs-read     ( got ior )
+    ?dup if (rl-ior) ! drop (rl-n) @ -1 (rl-ior) @ exit then
+    0= if (rl-n) @ dup 0<> 0 exit then    ( end of file )
+    (rl-c) c@
+    dup 10 = if drop (rl-n) @ -1 0 exit then
+    dup 13 = if drop else
+      (rl-a) @ (rl-n) @ + c!  1 (rl-n) +!
+    then
+  repeat
+  (rl-n) @ -1 0 ;
+: write-line ( c-addr u fileid -- ior )
+  dup >r write-file ?dup if r> drop exit then
+  (rl-nl) 1 r> write-file ;
+
 cr
 ( the machine's two spaces: program in the four single-cycle banks
   via HERE/ALLOT, data in SDRAM from bank $05 up to $DF via

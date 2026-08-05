@@ -1,10 +1,20 @@
 === FILE - Files ===
 
-INCLUDE/REQUIRE and the DOS words are always resident.  The ANS file word set
-is an on-demand module - cart: NEEDS FILE, SD card: INCLUDE FILE.
-fileid = KERNAL logical file 2..7 (up to 6 files open at once); positioning
-uses the CBDOS P (seek) and T (tell) commands, so it needs the FAT32 SD card.
-File access methods combine with BIN: e.g. R/O BIN.
+The ANS file words are BUILT IN here - there is no module to load. They sit
+on the kernel's FS_* calls (X816_core doc/KERNEL.md 5.2) through the
+primitives in asm/file.asm; there is no CBDOS, no device 8 and no logical
+file numbers, because there is no IEC bus.
+
+fileid is a KERNEL HANDLE, 1..5, and FIVE IS THE WHOLE POOL - shared with
+the interpreter, which holds one handle per NESTED SOURCE. Booting is
+already four deep (base.fs is open while it includes AUTORUN, which
+includes a suite, which includes a test), so a program that opens files
+from inside nested includes can run out. Running out reports ior 3, which
+reads as "no space" but means "no handle": close what you opened.
+
+ior is the kernel's own error number, NOT a Forth THROW code: 0 success,
+1 no such call, 2 not found, 3 no space/handle, 4 bad argument, 5 I/O
+error, 6 exists, 7 not empty. These words RETURN it; they do not throw.
 
 [x] INCLUDE ( "name" -- ) - load and interpret a file by name. INCLUDE GAME.FTH
 [x] INCLUDED ( addr len -- ) - load and interpret the file named by a string. S"
@@ -13,26 +23,52 @@ File access methods combine with BIN: e.g. R/O BIN.
     (max 8 KB; staged in the highest RAM bank; do not nest).
 [x] REQUIRE ( "name" -- ) - include a file only once, by name.
 [x] REQUIRED ( addr len -- ) - include a file only once, by string.
-[ ] OPEN-FILE ( addr len fam -- fileid ior ) - open a file; ior 0 = success.
-[ ] CLOSE-FILE ( fileid -- ior ) - close a file.
-[ ] CREATE-FILE ( addr len fam -- fileid ior ) - create/overwrite a file (R/W
-    creates, then reopens in CBDOS modify mode).
-[ ] DELETE-FILE ( addr len -- ior ) - delete a file (DOS S: command).
-[ ] RENAME-FILE ( a1 u1 a2 u2 -- ior ) - rename a1/u1 to a2/u2 (DOS R:new=old).
-[ ] RESIZE-FILE ( ud fileid -- ior ) - unsupported on CBDOS: always ior -1.
-[ ] READ-FILE ( addr u fileid -- u2 ior ) - read up to u bytes.
-[ ] WRITE-FILE ( addr u fileid -- ior ) - write u bytes.
-[ ] READ-LINE ( addr u fileid -- u2 flag ior ) - read a line (ends at CR or LF;
-    flag false only at end of file).
-[ ] WRITE-LINE ( addr u fileid -- ior ) - write u bytes + CR.
-[ ] FILE-POSITION ( fileid -- ud ior ) / REPOSITION-FILE ( ud fileid -- ior ) -
-    get/set position (CBDOS T / P commands).
-[ ] FILE-SIZE ( fileid -- ud ior ) - size in bytes (CBDOS T command).
-[ ] FILE-STATUS ( addr len -- x ior ) - query a named file (x = 0; ior 0 =
-    the file exists).
-[ ] FLUSH-FILE ( fileid -- ior ) - no-op (CBDOS flushes on close).
-[ ] R/O ( -- fam ) read-only, W/O write-only, R/W read/write (CBDOS modify
-    mode - the file must exist), BIN ( fam -- fam ) binary modifier (no-op).
+[x] OPEN-FILE ( addr len fam -- fileid ior ) - open an EXISTING file. Only
+    R/O is accepted; W/O and R/W return ior 1 and open nothing. That is not
+    an oversight: this kernel's only write mode CREATES, truncating whatever
+    was there, so honouring W/O here would silently empty the caller's file.
+    Ask for that by name with CREATE-FILE.
+[x] CREATE-FILE ( addr len fam -- fileid ior ) - create a file, TRUNCATING it
+    if it already exists. fam is accepted and ignored: there is one kind of
+    created file, and it is open for writing.
+[x] CLOSE-FILE ( fileid -- ior ) - close a file. This is also the SYNC point:
+    the size in the directory entry is written back here.
+[x] DELETE-FILE ( addr len -- ior ) - delete a file.
+[x] RENAME-FILE ( a1 u1 a2 u2 -- ior ) - rename a1/u1 to a2/u2.
+[x] READ-FILE ( addr u fileid -- u2 ior ) - read up to u bytes. A SHORT read
+    is not an error: u2 below u, and 0 with ior 0, is how end of file
+    arrives. addr is a full 24-bit address, so reading straight into far
+    (SDRAM) space works with no bounce buffer.
+[x] WRITE-FILE ( addr u fileid -- ior ) - write u bytes at the current
+    position. Writes append while the file stays open.
+[x] READ-LINE ( addr u fileid -- u2 flag ior ) - read a line, stopping at LF
+    and discarding a CR before it. flag is false ONLY at end of file: a last
+    line with no terminator still reads as a line, and the call after it
+    reports the end. One kernel crossing per byte - buy speed with your own
+    buffer and READ-FILE if it matters.
+[x] WRITE-LINE ( addr u fileid -- ior ) - write u bytes followed by LF.
+[x] FILE-POSITION ( fileid -- ud ior ) / REPOSITION-FILE ( ud fileid -- ior ) -
+    get/set the position. Seeking backwards is supported and costs a re-walk
+    of the cluster chain, which fat32.c only follows forwards.
+[x] FILE-SIZE ( fileid -- ud ior ) - size in bytes.
+[x] FILE-STATUS ( addr len -- x ior ) - does it exist? x is 0; ior 0 means
+    yes. Implemented by opening read-only and closing again, so it costs a
+    handle for the duration and nothing afterwards.
+[x] R/O ( -- fam ) read-only. W/O write-only and R/W read/write are DEFINED
+    and REFUSED by OPEN-FILE, as above; W/O is what CREATE-FILE does anyway.
+    There is no BIN: every file here is bytes, and no mode changes that.
+[x] COMPARE ( a1 u1 a2 u2 -- n ) - listed here too because checking a file
+    read back is what it is for. -1, 0 or 1. (Also in STRING.)
+[ ] INCLUDE-FILE ( fileid -- ) - interpret an already-open file. NOT
+    implemented: the interpreter's source stack (asm/io.asm) is entered by
+    INCLUDED, which opens the file itself, and handing it a handle somebody
+    else opened means opening those internals up. INCLUDED does the job.
+[x] RESIZE-FILE ( ud fileid -- ior ) - PRESENT AND REFUSES: no kernel call
+    exists, so it returns ior 1 rather than 0. Ticked because it is a real
+    word with a defined answer, not a missing one - a caller gets a refusal
+    it can test, not an undefined-word error.
+[x] FLUSH-FILE ( fileid -- ior ) - the same, for the same reason.
+    CLOSE-FILE is the sync point on this machine.
 
 --- X16 directory navigation (device 8) ---
 [ ] CD  ( c-addr u -- )   change directory (sends "CD:<name>" to the DOS).

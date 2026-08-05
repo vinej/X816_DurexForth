@@ -349,6 +349,7 @@ MINUS_ONE
 !src "io.asm"
 !src "lowercase.asm"
 !src "fs.asm"
+!src "file.asm"
 !src "exception.asm"
 !src "format.asm"
 !src "video.asm"

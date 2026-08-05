@@ -85,6 +85,35 @@ user-confirmed on the MiSTer:
   VIA1, mirroring runtime/smc.s's exact edges; both the RTL and the
   emulator pulse the NMI at the value byte's ACK, so the test's
   post-catch `(i2c-stop)` is what resyncs the abandoned bus.
+- **ANS FILE wordset** (2026-08-04): `asm/file.asm` binds the kernel's
+  FS_OPEN/CLOSE/READ/WRITE/SEEK/SIZE/DELETE/RENAME as `fs-*`
+  primitives (kernel KERR_* as the ior, one 32-bit CELL for an offset -
+  a cell holds a whole FAT32 position), and base.fs puts the ANS
+  shapes on top: OPEN-FILE CREATE-FILE CLOSE-FILE READ-FILE
+  WRITE-FILE READ-LINE WRITE-LINE FILE-POSITION REPOSITION-FILE
+  FILE-SIZE FILE-STATUS DELETE-FILE RENAME-FILE FLUSH-FILE
+  RESIZE-FILE, plus COMPARE. Proven by `test/testfile.fs`, which
+  WRITES TO THE CARD like the kernel's own KFSTEST.
+  **OPEN-FILE accepts only R/O**: the kernel's one write mode CREATES
+  (truncating), so honouring W/O would silently empty the caller's
+  file - truncation must be asked for by name, and CREATE-FILE is
+  that name. FLUSH-FILE and RESIZE-FILE have no kernel call and
+  return ior 1 rather than 0; they are ticked `[x]` because they are
+  present and answer, which is what the tracker means.
+  **KFS_FILES went 4 -> 5** (X816_Calypsi runtime/kfs.h), and five is
+  the CEILING: `files[]` is in zdata and six fails to link against
+  x816-lib.scm's tighter direct page. Four was exhausted by NESTING
+  alone - the interpreter holds one handle per nested source and boot
+  is already four deep (base.fs open -> AUTORUN -> test -> testfile),
+  so the first OPEN-FILE inside the suite got KERR_NOSPACE, which
+  reads as "the card is full".
+  **Two traps**: a cell is TWO BYTES OF X (the stack spans an LSB and
+  an MSB plane), so dropping three cells is `adc #6`, not 12 - the
+  wrong one walked the stack pointer off the top and reported -4 far
+  from the cause. And the Hayes tester records the WHOLE stack at
+  `->`, so every `T{ ... }T` must leave exactly what it compares:
+  `T{ dup -> 0 }T` after a two-item result is WRONG NUMBER, not a
+  check of the top item.
 - **`break` vs `brk`** (2026-08-04, user: "Ctrl+Alt+PrtScr only shows
   BRK"): the abort worked, the word was wrong. -28 is raised by both
   the break key and a BRK opcode and CATCH must not distinguish them
@@ -221,11 +250,11 @@ user-confirmed on the MiSTer:
 2. **Board run**: the turbo/MS/NMI batch is emulator-green only; the
    user takes `release/mister/` to the MiSTer (the card already
    carries TURBO and TESTNMI in `include test`).
-3. **Modules**: float (software math — no ROM FP on X816), ANS file
-   words beyond INCLUDED, replacements for the parked C64 words
+3. **Modules**: float (software math — no ROM FP on X816) and
+   replacements for the parked C64 words
    (`ls`, `open`, `help`, `turnkey` — see base.fs comments).
 4. **helpdoc tracker: DONE and machine-verified (2026-08-04)** —
-   346/572 ticked, and the checkboxes are no longer a hand-kept
+   363/574 ticked, and the checkboxes are no longer a hand-kept
    promise: a generated probe card runs `find-name` over every entry,
    both directions, so `[x]`-but-absent and `[ ]`-but-present are both
    empty. Re-run it after any word changes (the generator is a few

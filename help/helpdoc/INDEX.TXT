@@ -5,7 +5,7 @@ Every entry on these pages carries [x] or [ ]. [x] means the word IS in
 this machine and [ ] means it is not yet - and as of 2026-08-04 that is
 not a hand-kept promise: each page was probed word by word against the
 live dictionary, so the two lists agree with what FIND-NAME can see.
-346 of 572 are present. The unticked remainder is mostly whole modules
+363 of 574 are present. The unticked remainder is mostly whole modules
 (FLOAT, GRAPHIC, AUDIO*, LOADSAVE) plus the four files durexforth.asm
 does not assemble - INPUT, KEYBOARD's last three, CONTROL's clock and
 I2C - each of which says so on its own page.
@@ -26,7 +26,7 @@ I2C - each of which says so on its own page.
  DICTIONARY  ' ['] POSTPONE IMMEDIATE LITERAL MARKER
  FLOW        IF ELSE THEN BEGIN DO LOOP CASE CATCH ...
  RETURN      >R R> R@ I J  RL> L>R  (return stack & 3-byte addrs)
- FILE        OPEN-FILE READ-LINE INCLUDE R/O W/O  CD DIR
+ FILE        OPEN-FILE CREATE-FILE READ-LINE WRITE-FILE  INCLUDE
  STRUCTURE   BEGIN-STRUCTURE FIELD: +FIELD  (records)
  SYSTEM      BYE VER ENVIRONMENT? UNUSED IRQ FREE
  VIDEO       BORDER CLS LOCATE VPOKE V!  + CHARSET/GLYPH! (font)

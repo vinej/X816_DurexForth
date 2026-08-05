@@ -66,6 +66,7 @@ SRC = [("forth", n, n) for n in ["base", "asm", "wordlist", "labels",
           ("testcoreadd", "coreadd"), ("testfar", "testfar"),
           ("testbrk", "testbrk"), ("testturbo", "turbo"),
           ("testnmi", "testnmi"), ("testfont", "testfont"),
+          ("testfile", "testfile"),
           ("test", "test"), ("1", "1")]]
 for d, n, card in SRC:
     with open(os.path.join(d, n + ".fs"), "rb") as f:
