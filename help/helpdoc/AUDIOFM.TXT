@@ -1,16 +1,30 @@
-=== AUDIOFM - PSG & YM2151 FM synths (note/play API) ===
+=== AUDIOFM - PSG and YM2151 ===
 
-Two synths: the VERA PSG (16 voices 0-15) and the YM2151 FM chip (8 channels
-0-7). Volumes 0-63. note = (octave<<4) | (1..12), 0 = release.
-For raw YM register writes see HELP AUDIOYM; for sampled sound HELP AUDIOPCM.
+Two synths: the VERA PSG, 16 voices 0-15, and the YM2151 FM chip, 8
+channels 0-7. Both are on this machine.
 
-VERA PSG:
-[ ]   PSGINIT  ( -- )              reset all PSG voices
-[ ]   PSGFREQ  ( freq voice -- )   set raw frequency
+THE NOTE API IS NOT. PSGNOTE, FMINIT, FMINST, FMNOTE and the play-string
+words were the X16 ROM's audio driver - a note table and 163 instrument
+patches living in ROM. There is no such ROM here, so they are unticked
+and they do not exist: porting that driver is a job of its own, and a
+word that existed and did nothing would be worse than its absence.
+
+What IS here is every register the chips have. The PSG voice words below
+are direct VRAM writes; for the YM2151 see HELP AUDIOYM, and for sampled
+sound HELP AUDIOPCM.
+
+VERA PSG - voice registers, 4 bytes each at VRAM $1F9C0:
+[x]   PSGINIT  ( -- )              silence and zero all 16 voices
+[x]   PSG!     ( value n -- )      write PSG register n (0-63) directly
+[x]   PSG@     ( n -- value )      read one back
+[x]   PSGFREQ  ( freq voice -- )   set the raw 16-bit frequency word
 [ ]   PSGNOTE  ( note voice -- )   play a packed note (0 = release)
-[ ]   PSGVOL   ( vol voice -- )    volume 0-63 (both channels)
-[ ]   PSGWAV   ( wave voice -- )   waveform 0-3 (pulse/saw/triangle/noise)
-[ ]   PSGPAN   ( pan voice -- )    stereo pan (1=left 2=right 3=both)
+[x]   PSGVOL   ( vol voice -- )    volume 0-63, and it sets BOTH channels -
+                               so it overrides an earlier PSGPAN
+[x]   PSGWAV   ( wave voice -- )   waveform 0-3 (pulse/saw/triangle/noise);
+                               keeps the pulse width in the same byte
+[x]   PSGPAN   ( pan voice -- )    stereo pan (1=left 2=right 3=both);
+                               keeps the volume in the same byte
 [ ]   PSGPLAY  ( c-addr u voice -- )   play a play-string (blocking)
 [ ]   PSGCHORD ( c-addr u voice -- )   play a chord string (blocking)
 
@@ -26,4 +40,6 @@ YM2151 FM:
 [ ]   FMPLAY   ( c-addr u channel -- )  play a play-string (blocking)
 [ ]   FMCHORD  ( c-addr u channel -- )  play a chord string (blocking)
 
-Example:  FMINIT  0 0 FMINST  63 0 FMVOL  S" CDEFG" 0 FMPLAY
+A beep, with no driver involved:
+    PSGINIT  1181 0 PSGFREQ  63 0 PSGVOL  0 0 PSGWAV   \ ~440 Hz
+    0 0 PSGVOL                                        \ and silence

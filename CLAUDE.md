@@ -212,6 +212,22 @@ user-confirmed on the MiSTer:
   **Trap**: inside `hex`, the tester's EXPECTED value is parsed in hex
   too - `T{ s" ff" val -> 255 }T` compares against $255 and fails while
   the word is perfectly correct. Write both sides in the same base.
+- **Audio: the hardware half** (2026-08-04). AUDIOFM/YM/PCM were 0/26.
+  Now bound: VERA PSG (`psg! psg@ psginit psgfreq psgvol psgwav
+  psgpan` over the 64 bytes at VRAM `$1F9C0`), VERA PCM (`pcmctrl
+  pcmrate pcm! pcmfull? pcmempty? pcm-write` at `$9F3B-$9F3D`), and
+  the YM2151 (`ym!` at `$9F40/41` with a bounded busy-wait, `ym@` from
+  a 256-byte SHADOW because the chip answers writes only).
+  **The note API is deliberately NOT ported**: PSGNOTE/FMINIT/FMINST/
+  FMNOTE and the play-strings were the X16 ROM's audio driver, a note
+  table plus 163 instrument patches. That is a job, not a binding, and
+  a word that existed and did nothing would be worse than its absence.
+  AUDIOFM says so on the page.
+  `test/testaudio.fs` replaces the upstream one (which opened with
+  `include audio`); it verifies by READING BACK - the PSG is VRAM so
+  it peeks, AUDIO_CTRL/RATE read back, and YM@ is checked against the
+  shadow. AUDIO_CTRL's readback carries two bits the write side does
+  not have: bit 7 full, bit 6 EMPTY, which is why `pcmempty?` exists.
 - **`break` vs `brk`** (2026-08-04, user: "Ctrl+Alt+PrtScr only shows
   BRK"): the abort worked, the word was wrong. -28 is raised by both
   the break key and a BRK opcode and CATCH must not distinguish them
@@ -359,7 +375,7 @@ user-confirmed on the MiSTer:
    replacements for the parked C64 words
    (`ls`, `open`, `help`, `turnkey` — see base.fs comments).
 4. **helpdoc tracker: DONE and machine-verified (2026-08-04)** —
-   401/584 ticked, and the checkboxes are no longer a hand-kept
+   416/587 ticked, and the checkboxes are no longer a hand-kept
    promise: a generated probe card runs `find-name` over every entry,
    both directions, so `[x]`-but-absent and `[ ]`-but-present are both
    empty. Re-run it after any word changes (the generator is a few

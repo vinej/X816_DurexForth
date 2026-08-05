@@ -40,6 +40,7 @@ cr .( >> testdir) cr parse-name testdir included
 cr .( >> testhelp) cr parse-name testhelp included
 cr .( >> testload) cr parse-name testload included
 cr .( >> teststruct) cr parse-name struct included
+cr .( >> testaudio) cr parse-name testaud included
 
 \ include-mechanism smoke test (loads the file "1")
 :noname s" include 1 2" evaluate

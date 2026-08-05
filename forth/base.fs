@@ -638,6 +638,59 @@ create (cwdbuf) 80 allot        ( KFS_PATH, what FS_GETCWD needs )
     dirent-dir? if ." <DIR>" else dirent-size u. then cr
   repeat dir-close drop ;
 
+( AUDIO - the parts that are HARDWARE.
+
+  VERA's PSG is 64 bytes of VRAM at $1F9C0, four per voice: frequency
+  low, frequency high, then panning and volume, then waveform and pulse
+  width. VERA's PCM FIFO is three I/O registers. The YM2151 is an
+  address/data port pair at $9F40. All of that is on this machine and
+  needs nothing from anybody's ROM.
+
+  What is NOT here: the note-playing API - PSGNOTE, FMINIT, FMINST and
+  the rest - because those are the X16 ROM's audio driver, 163 built-in
+  instrument patches and a note table included. Porting them is a
+  separate job, not a binding, and pretending otherwise would leave
+  words that exist and do nothing. AUDIOFM says so on the page. )
+
+$f9c0 constant psgbase          ( VRAM $1F9C0 = bank 1, offset $F9C0 )
+: psg! ( value n -- ) psgbase + 1 swap rot vpoke ;
+: psg@ ( n -- value ) psgbase + 1 swap vpeek ;
+: psginit ( -- ) 64 0 do 0 i psg! loop ;
+: psgfreq ( freq voice -- )
+  4 * >r dup 255 and r@ psg! 8 rshift r> 1+ psg! ;
+( Volume sets BOTH channels, which is what the page promises; PSGPAN
+  keeps the volume and PSGWAV keeps the pulse width, so the two halves
+  of a shared byte can be set in either order. )
+: psgvol ( vol voice -- ) 4 * 2 + >r 63 and $c0 or r> psg! ;
+: psgpan ( pan voice -- )
+  4 * 2 + >r 3 and 6 lshift r@ psg@ 63 and or r> psg! ;
+: psgwav ( wave voice -- )
+  4 * 3 + >r 3 and 6 lshift r@ psg@ 63 and or r> psg! ;
+
+: pcmctrl ( n -- ) $9f3b ioc! ;
+: pcmrate ( n -- ) $9f3c ioc! ;
+: pcm! ( byte -- ) $9f3d ioc! ;
+( AUDIO_CTRL reads back TWO status bits the write side does not have:
+  bit 7 full, bit 6 EMPTY. Empty is the one a feeder wants - it means
+  the sound has already stopped, not that it is about to. )
+: pcmfull? ( -- flag ) $9f3b ioc@ $80 and 0<> ;
+: pcmempty? ( -- flag ) $9f3b ioc@ $40 and 0<> ;
+: pcm-write ( addr count -- ) 0 ?do dup i + c@ pcm! loop drop ;
+
+( The YM2151 answers writes only - there is no register readback in the
+  chip - so YM@ reports a SHADOW that YM! keeps. It is what the chip was
+  last told, which is the only honest thing available.
+  The wait for the busy flag is BOUNDED: a chip that never clears it
+  would otherwise hang the machine, and a hang is a worse failure than a
+  write that went out slightly early. )
+create ymshadow 256 allot
+: (ym-wait) ( -- ) 1000 0 do $9f40 ioc@ $80 and 0= if leave then loop ;
+: ym! ( value reg -- )
+  2dup ymshadow + c!
+  (ym-wait) dup $9f40 ioc! drop
+  (ym-wait) $9f41 ioc! ;
+: ym@ ( reg -- value ) 255 and ymshadow + c@ ;
+
 ( ANS STRUCTURES - STRUCTURE.TXT, which was 0/5.
     begin-structure point
       field: p.x
