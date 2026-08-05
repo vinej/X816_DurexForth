@@ -631,6 +631,67 @@ create (cwdbuf) 80 allot        ( KFS_PATH, what FS_GETCWD needs )
     dirent-dir? if ." <DIR>" else dirent-size u. then cr
   repeat dir-close drop ;
 
+( LOAD AND SAVE - raw bytes to and from memory or VRAM.
+
+  No device number: there is no IEC bus, so there is nothing to
+  address. No PRG header either - the X16's two-byte load address is a
+  CBM convention, and an X816 program image is a different shape
+  entirely - magic plus an entry at $01:0004, per X816_core
+  doc/KERNEL.md. These move BYTES: what you save is what you get back.
+
+  Memory addresses are full 24-bit cells, so BLOAD straight into
+  far-allot space works with no bounce buffer - READ-FILE hands the
+  kernel the address and the data lands there. VRAM is a separate
+  address space reached through a port, so the VRAM pair does bounce
+  through a 256-byte buffer. )
+variable (bfd) variable (baddr) variable (blen)
+variable (vb) variable (va)
+create (vbuf) 256 allot
+
+: bload ( c-addr u addr -- u ior )
+  (baddr) !
+  r/o open-file ?dup if nip 0 swap exit then (bfd) !
+  (bfd) @ file-size
+  ?dup if >r 2drop 0 r> (bfd) @ close-file drop exit then
+  drop                                  ( the low cell is the whole size )
+  (baddr) @ swap (bfd) @ read-file
+  (bfd) @ close-file drop ;
+
+: bsave ( c-addr u addr len -- ior )
+  (blen) ! (baddr) !
+  r/o create-file ?dup if nip exit then (bfd) !
+  (baddr) @ (blen) @ (bfd) @ write-file
+  (bfd) @ close-file drop ;
+
+: (vpush) ( u -- ) 0 ?do (vbuf) i + c@ v! loop ;
+: (vpull) ( u -- ) 0 ?do v@ (vbuf) i + c! loop ;
+
+: vload ( c-addr u bank vaddr -- u ior )
+  (va) ! (vb) !
+  r/o open-file ?dup if nip 0 swap exit then (bfd) !
+  (vb) @ (va) @ vaddr
+  0 (blen) !
+  begin
+    (vbuf) 256 (bfd) @ read-file        ( got ior )
+    ?dup if (bfd) @ close-file drop nip (blen) @ swap exit then
+    dup 0= if drop true else dup (blen) +! (vpush) false then
+  until
+  (bfd) @ close-file drop
+  (blen) @ 0 ;
+
+: vsave ( c-addr u bank vaddr len -- ior )
+  (blen) ! (va) ! (vb) !
+  r/o create-file ?dup if nip exit then (bfd) !
+  (vb) @ (va) @ vaddr
+  begin (blen) @ 0 > while
+    (blen) @ 256 min
+    dup (vpull)
+    dup negate (blen) +!
+    (vbuf) swap (bfd) @ write-file
+    ?dup if (bfd) @ close-file drop exit then
+  repeat
+  (bfd) @ close-file drop 0 ;
+
 ( HELP - the manual, on the card, in /HELP.
 
   Card names are the topic TRUNCATED TO EIGHT characters and

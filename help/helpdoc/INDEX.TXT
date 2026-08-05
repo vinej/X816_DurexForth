@@ -5,7 +5,7 @@ Every entry on these pages carries [x] or [ ]. [x] means the word IS in
 this machine and [ ] means it is not yet - and as of 2026-08-04 that is
 not a hand-kept promise: each page was probed word by word against the
 live dictionary, so the two lists agree with what FIND-NAME can see.
-376 of 583 are present. The unticked remainder is mostly whole modules
+380 of 584 are present. The unticked remainder is mostly whole modules
 (FLOAT, GRAPHIC, AUDIO*, LOADSAVE) plus the four files durexforth.asm
 does not assemble - INPUT, KEYBOARD's last three, CONTROL's clock and
 I2C - each of which says so on its own page.
@@ -41,7 +41,7 @@ I2C - each of which says so on its own page.
  AUDIOPCM    PCM FIFO  PCMCTRL PCMRATE PCM! PCM-WRITE
  VERAFX      VERA FX  DCSEL FX-MULT  (+ VERAFX toolkit)
  ADVANCED    game math, rotozoom, streaming sound, BMX (modules)
- LOADSAVE    LOAD SAVE VLOAD VSAVE BLOAD SPRSAVE ...
+ LOADSAVE    BLOAD BSAVE VLOAD VSAVE  (raw bytes, no PRG header)
  BANK        bulk RAM-bank I/O  BANKLOAD BANK>MEM ...
  IMAGE       SAVE-IMAGE LOAD-IMAGE  (fast turnkey reload)
  KERNAL      SYSCALL  (call any KERNAL routine)

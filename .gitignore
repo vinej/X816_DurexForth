@@ -29,6 +29,7 @@ build/*
 !build/mkcard.py
 !build/annotate.py
 !build/extract-durexfth.py
+!build/parencheck.py
 deploy
 
 # release/ holds the published binaries for users who don't rebuild - commit

@@ -38,6 +38,7 @@ cr .( >> testfont) cr parse-name testfont included
 cr .( >> testfile) cr parse-name testfile included
 cr .( >> testdir) cr parse-name testdir included
 cr .( >> testhelp) cr parse-name testhelp included
+cr .( >> testload) cr parse-name testload included
 
 \ include-mechanism smoke test (loads the file "1")
 :noname s" include 1 2" evaluate

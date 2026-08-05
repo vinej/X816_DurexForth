@@ -1,26 +1,48 @@
-=== LOADSAVE - X16 load and save ===
+=== LOADSAVE - load and save raw bytes ===
 
-dev is the device number (usually 8 for the SD card). Names are ( c-addr u )
-strings.
+No device number and no PRG header. There is no IEC bus, so there is
+nothing to address; and the X16's two-byte load-address header is a CBM
+convention, while an X816 program image is a different shape entirely
+(see X816_core doc/KERNEL.md). These words move BYTES: what you save is
+exactly what you get back.
 
-[ ] LOAD ( c-addr u dev -- ) - load a PRG file to the address in its 2-byte
-    header.
-[ ] BLOAD ( c-addr u dev addr -- ) - load a PRG file, relocating it to addr.
-[ ] VLOAD ( c-addr u dev bank vaddr -- ) - load a PRG file into VRAM, its 2-byte
-    header skipped (BASIC VLOAD name,dev,bank,addr).
-[ ] SAVE ( c-addr u dev start end -- ) - save memory start..end as a PRG file
-    (BASIC BSAVE).
-[ ] BVLOAD ( c-addr u dev bank vaddr -- ) - load a headerless file straight into
-    VRAM.
-[ ] BVERIFY ( c-addr u dev addr -- flag ) - verify a headerless file against
-    memory; -1 = match.
-[ ] VSAVE ( c-addr u dev bank vaddr len -- ) - save len bytes of VRAM to a PRG
-    file (read it back with VLOAD).
-[ ] TILESAVE ( c-addr u vaddr len -- ) - save len bytes of a bank-1 tileset.
-[ ] TILELOAD ( c-addr u vaddr -- ) - load a tileset into bank-1 VRAM at vaddr.
-[ ] TMAPSAVE ( c-addr u -- ) - save the layer-1 tilemap (self-sizing).
-[ ] TMAPLOAD ( c-addr u -- ) - load the layer-1 tilemap back to its VRAM address.
+Memory addresses are full 24-bit cells, so BLOAD straight into far
+(SDRAM) space needs no bounce buffer - the kernel is handed the address
+and the data lands there. VRAM is a separate address space reached
+through a port, so the VRAM pair streams through a 256-byte buffer.
+
+ior is the kernel's error number, 0 on success - the same values the
+FILE page lists.
+
+[x] BLOAD ( c-addr u addr -- u2 ior ) - load a whole file to addr. u2 is
+    the byte count read. On failure u2 is 0 and nothing is written.
+[x] BSAVE ( c-addr u addr len -- ior ) - save len bytes from addr,
+    CREATING the file and truncating any file of that name.
+[x] VLOAD ( c-addr u bank vaddr -- u2 ior ) - load a whole file into
+    VRAM at bank:vaddr. bank is the 17th address bit.
+[x] VSAVE ( c-addr u bank vaddr len -- ior ) - save len bytes of VRAM.
+    Reading VRAM does not disturb it.
+
+    \ Save a custom font and put it back next boot
+    S" MYFONT.BIN" 0 FONT2 2048 VSAVE DROP
+    S" MYFONT.BIN" 0 FONT2 VLOAD 2DROP  FONT2 CHARSET
+
+--- X16 words that did not port ---
+Each of these took a device number, a PRG header, or a CBM DOS channel.
+LOAD/SAVE are BLOAD/BSAVE without the header; BVLOAD/BVERIFY have no
+counterpart yet; TILESAVE/TILELOAD/TMAPSAVE/TMAPLOAD are VSAVE/VLOAD
+with the tile or map address, which you now pass yourself.
+[ ] LOAD ( c-addr u dev -- ) - load a PRG file to the address in its
+    2-byte header.
+[ ] SAVE ( c-addr u dev start end -- ) - save memory as a PRG file.
+[ ] BVLOAD ( c-addr u dev bank vaddr -- ) - headerless load into VRAM.
+[ ] BVERIFY ( c-addr u dev addr -- flag ) - verify a file against memory.
+[ ] TILESAVE ( c-addr u vaddr len -- ) - save a tileset.
+[ ] TILELOAD ( c-addr u vaddr -- ) - load a tileset.
+[ ] TMAPSAVE ( c-addr u -- ) - save the tilemap.
+[ ] TMAPLOAD ( c-addr u -- ) - load the tilemap.
 
 --- durexForth: raw binary load / save ---
-[ ] LOADB ( nameptr namelen dst -- endaddr ) - load a binary file to dst; 0 on failure, else the byte after the last written.
-[ ] SAVEB ( start end nameptr namelen -- ) - save memory start..end (end exclusive) to a file.
+[ ] LOADB ( nameptr namelen dst -- endaddr ) - superseded by BLOAD,
+    which reports a count and an ior instead of overloading 0.
+[ ] SAVEB ( start end nameptr namelen -- ) - superseded by BSAVE.

@@ -26,6 +26,11 @@ WOUT=$(cygpath -m "$OUT" 2>/dev/null || echo "$OUT")
 KERNEL="../X816_Calypsi/examples/shell/kernel.bin"
 [ -f "$KERNEL" ] || { echo "kernel.bin missing -- run sh build.sh in X816_Calypsi/examples/shell"; exit 1; }
 
+# Pre-flight: a ( comment that ends at an inner ) runs its own prose as
+# code. It has cost five build cycles, and it is far cheaper to find in a
+# text file than in a screenshot of a machine that crashed at boot.
+python build/parencheck.py forth/*.fs forth/mod/*.fs test/*.fs || exit 1
+
 ./build.sh || exit 1
 
 NEG=0
@@ -68,6 +73,7 @@ SRC = [("forth", n, n) for n in ["base", "asm", "wordlist", "labels",
           ("testnmi", "testnmi"), ("testfont", "testfont"),
           ("testfile", "testfile"), ("testdir", "testdir"),
           ("testhelp", "testhelp"),
+          ("testload", "testload"),
           ("test", "test"), ("1", "1")]]
 for d, n, card in SRC:
     with open(os.path.join(d, n + ".fs"), "rb") as f:

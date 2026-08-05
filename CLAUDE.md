@@ -159,6 +159,25 @@ user-confirmed on the MiSTer:
   ticked features that are NOT words (a key combo and a boot hook), so
   FIND-NAME cannot see them and the probe skips them by name rather
   than marking them absent.
+- **BLOAD/BSAVE/VLOAD/VSAVE** (2026-08-04): raw bytes to and from
+  memory and VRAM, over the file words. No device number and no PRG
+  header - no IEC bus to address, and an X816 image is a different
+  shape. BLOAD into far (SDRAM) space needs no bounce buffer, which
+  `test/testload.fs` asserts directly; the VRAM pair streams through a
+  256-byte buffer, so every test size is 300 to cross that boundary.
+- **`build/parencheck.py`, and run-tests.sh runs it first.** Two traps
+  had cost seven build cycles between them and both are now caught in
+  a text file instead of a screenshot of a dead machine:
+  a `(` comment ending at an inner `)` and running its own prose as
+  code, and a compile-only loop word (`do`/`begin`/`while`/...) typed
+  outside a colon definition, which compiles into HERE, never runs,
+  and surfaces as a WRONG NUMBER somewhere later. Getting it quiet
+  took three passes: it must strip comments with the SAME state
+  machine the interpreter uses - a `\` inside a `(` comment is text,
+  not a line comment - skip `.( ... )` display text, skip TESTING
+  lines, and know that base.fs DEFINES `(` and `.(` themselves. A
+  checker that cries wolf is worse than no checker; it is silent on
+  the whole tree and both negative controls still fire.
 - **`break` vs `brk`** (2026-08-04, user: "Ctrl+Alt+PrtScr only shows
   BRK"): the abort worked, the word was wrong. -28 is raised by both
   the break key and a BRK opcode and CATCH must not distinguish them
@@ -306,7 +325,7 @@ user-confirmed on the MiSTer:
    replacements for the parked C64 words
    (`ls`, `open`, `help`, `turnkey` — see base.fs comments).
 4. **helpdoc tracker: DONE and machine-verified (2026-08-04)** —
-   376/583 ticked, and the checkboxes are no longer a hand-kept
+   380/584 ticked, and the checkboxes are no longer a hand-kept
    promise: a generated probe card runs `find-name` over every entry,
    both directions, so `[x]`-but-absent and `[ ]`-but-present are both
    empty. Re-run it after any word changes (the generator is a few
