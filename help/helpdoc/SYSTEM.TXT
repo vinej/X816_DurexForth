@@ -15,20 +15,31 @@
     hook in base.fs. A missing AUTORUN is silent (-37 is caught); any
     OTHER error it raises is reported, because a swallowed one looks
     exactly like a machine that stopped for no reason.
-[ ] BYE ( -- ) - leave Forth (ROM build restarts the cold boot).
-[ ] VER ( -- n ) - version number, high byte x 256 + low. VER .
-[ ] X16 / C64 / F256 ( -- flag ) - build/platform flags (true for the current
-    target).
-[ ] USR ( i*x addr -- j*x ) - call machine code at addr (X16), passing/returning
-    the stack.
-[ ] RANDOM ( -- n ) - a 16-bit pseudo-random number (KERNAL entropy).
-[ ] RND ( u -- n ) - pseudo-random number in 0..u-1 (BASIC-style). 6 RND 1+  ->  a
-    die roll.
-[ ] IRQ ( xt -- ) - arm a Forth word to run once per 60 Hz frame; 0 IRQ disarms.
-    Callback must be short and stack-neutral. ' TICK IRQ
-[ ] FREE ( -- ) - print the free dictionary space. On the wide-dictionary builds
-  it shows the near + far (RAM-bank) pools; on all other builds, the single
-  low-RAM pool (the UNUSED value).
+[x] BYE ( -- ) - reset the machine through the SMC, the same command
+    Ctrl+Alt+Del raises. There is no ROM to cold-start back into, so this is
+    a real reset and not a return to a monitor. NEEDS SYSTEM.
+[x] VER ( -- n ) - version number, high byte x 256 + low. VER .
+[x] X816 / X16 / C64 / F256 ( -- flag ) - platform flags. X816 is true and
+    X16 IS FALSE: the hardware is X16-shaped - the same VERA, VIAs and YM -
+    and is not an X16, so code testing X16 to decide whether a KERNAL exists
+    gets the right answer and does not call into nothing.
+[ ] USR ( i*x addr -- j*x ) - call machine code at addr. NOT HERE, and not
+    for want of trying: durexForth carries an assembler, so machine code is
+    an ordinary word - `code myword ... end-code` - which is more than USR
+    offered and gets the calling convention right. Words are entered by jsl
+    and leave by rtl, registers are 16 bits, and X is the data stack pointer
+    and must come back untouched; USR's `lda #7 / rts` example breaks all
+    three.
+[x] RANDOM ( -- n ) - a 32-bit xorshift, seeded once from the free-running
+    millisecond timer. The X16 took this from a KERNAL entropy call; there
+    is none here. RANDOM8 and RANDOM16 mask it down.
+[x] RND ( u -- n ) - pseudo-random number in 0..u-1 (BASIC-style). 6 RND 1+
+    -> a die roll.
+[x] IRQ ( xt -- ) - arm a Forth word to run once per frame; 0 IRQ disarms.
+    In base.fs, no module needed. The handler must be short, stack-neutral,
+    must not THROW and must not enable interrupts. See HELP ADVANCED for
+    LINE-IRQ and SPRCOL-IRQ. ' TICK IRQ
+[x] FREE ( -- ) - print the free dictionary space.
 [x] WORDS ( -- ) - list the words in the context wordlist.
 --- durexForth ---
 [x] NOTFOUND ( caddr u -- ) - handler for an unrecognised word (prints the name + "?").
