@@ -191,6 +191,20 @@ T{ 0. s" ff" >number swap drop -> ff 0 0 }T     \ ...and convert in hex
 decimal
 T{ 5. s" 9" >number swap drop -> 59 0 0 }T      \ accumulates into ud1
 
+cr .( testcoreadd: TYPE of an EMPTY string emits nothing ) cr
+\ Regression. The stack guard branched to the emit path instead of the
+\ count test, so TYPE always emitted one character - and a count of zero
+\ then went to -1 and ran until it wrapped, spraying 2^32 bytes of memory
+\ at the screen. Only ZERO-length strings were affected, which is why
+\ every other test passed for months. Asserting the CURSOR DID NOT MOVE
+\ is the check: a count that emitted anything moves the column, and a
+\ count that ran away scrolls the screen and takes the pass banner with
+\ it, so this fails loudly either way.
+T{ pos pad 0 type pos = -> true }T
+T{ pos s" " type pos = -> true }T
+\ ...and a non-empty one still emits exactly its own length.
+T{ pos s" abc" type pos swap - -> 3 }T
+
 cr .( testcoreadd ok ) cr
 
 ---testcoreadd---

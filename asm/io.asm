@@ -33,10 +33,19 @@ TYPE ; ( caddr u -- )
     ; garbage-length memory to the screen before the interpreter's
     ; post-word underflow check could fire; refuse up front instead.
     ; (X = X_INIT is empty, X_INIT-2 holds one cell.)
+    ; The branch target is NAMED, and that is the whole point. It used to
+    ; be `bcc +`, and ACME resolves a bare + to the NEXT + label - which is
+    ; the EMIT path below, not the count test. So the guard jumped straight
+    ; past the "is the count zero?" check: TYPE always emitted one
+    ; character, and for a count of ZERO the following /STRING took it to
+    ; -1 and the loop ran until it wrapped. An empty string sprayed the
+    ; screen with 2^32 bytes of memory. Found by HELP, which types blank
+    ; lines out of a text file like any other line.
     cpx #X_INIT-2
-    bcc +
+    bcc .type_loop
     lda #-4 ; throws "stack" (stack underflow)
     jmp throw_a
+.type_loop
 -   lda LSB,x
     ora MSB,x
     bne +

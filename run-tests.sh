@@ -67,12 +67,24 @@ SRC = [("forth", n, n) for n in ["base", "asm", "wordlist", "labels",
           ("testbrk", "testbrk"), ("testturbo", "turbo"),
           ("testnmi", "testnmi"), ("testfont", "testfont"),
           ("testfile", "testfile"), ("testdir", "testdir"),
+          ("testhelp", "testhelp"),
           ("test", "test"), ("1", "1")]]
 for d, n, card in SRC:
     with open(os.path.join(d, n + ".fs"), "rb") as f:
         data = f.read()
     with fs.open("/" + card.upper(), "wb") as g:
         g.write(data)
+
+# The help pages, so `help <topic>` can be tested like anything else.
+# Card names are the topic truncated to EIGHT characters, uppercased -
+# the kernel's FAT32 reader skips long filenames. Same rule as
+# ../X816_core/tools/mksdcard.py; if these two ever disagree, the suite
+# passes and the real card cannot find its own help.
+fs.makedir("/HELP")
+for name in sorted(os.listdir("help/helpdoc")):
+    if name.endswith(".TXT"):
+        with open(os.path.join("help/helpdoc", name), "rb") as f,              fs.open("/HELP/" + name[:-4][:8].upper() + ".TXT", "wb") as g:
+            g.write(f.read())
 
 if neg:
     # A failing assertion through the same tester the real suite uses: the

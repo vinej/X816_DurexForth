@@ -631,6 +631,63 @@ create (cwdbuf) 80 allot        ( KFS_PATH, what FS_GETCWD needs )
     dirent-dir? if ." <DIR>" else dirent-size u. then cr
   repeat dir-close drop ;
 
+( HELP - the manual, on the card, in /HELP.
+
+  Card names are the topic TRUNCATED TO EIGHT characters and
+  uppercased: the kernel's FAT32 reader skips long filenames on
+  purpose, so ARITHMETIC.TXT would be invisible and travels as
+  ARITHMET.TXT instead. All forty topics truncate uniquely, and both
+  card builders check that - run-tests.sh and X816_core's mksdcard.py.
+
+  A page is longer than a screen, so output pauses. Any key continues;
+  ESC or Q stops. HELP on its own shows the index. )
+create (hpath) 24 allot
+create (hline) 100 allot
+variable (hlen)
+0 value (hfd)
+0 value (hrow)
+
+: (hupper) ( c -- c ) dup 'a' 'z' 1+ within if $20 - then ;
+
+( Build "/HELP/TOPIC.TXT" - six characters, up to eight more, four
+  more - and hand back the whole thing as a string. )
+: (hpath!) ( c-addr u -- c-addr u )
+  8 min dup (hlen) !
+  s" /HELP/" (hpath) swap move
+  0 ?do
+    dup i + c@ (hupper) (hpath) 6 + i + c!
+  loop drop
+  s" .TXT" (hpath) 6 + (hlen) @ + swap move
+  (hpath) (hlen) @ 10 + ;
+
+( true = the reader asked to stop. ESC or Q; anything else carries on. )
+: (hpause) ( -- flag )
+  ." -- more --" key dup $1b = swap
+  dup 'q' = swap 'Q' = or or cr ;
+
+: (hshow) ( -- )
+  0 to (hrow)
+  begin
+    (hline) 100 (hfd) read-line      ( u2 flag ior )
+    if 2drop true                    ( an ior: stop )
+    else
+      if                             ( a line )
+        (hline) swap type cr
+        (hrow) 1+ to (hrow)
+        (hrow) 22 = if 0 to (hrow) (hpause) else false then
+      else drop true                 ( end of file: stop )
+      then
+    then
+  until ;
+
+: help ( "topic" -- )
+  parse-name dup 0= if 2drop s" INDEX" then
+  (hpath!) r/o open-file ( fileid ior )
+  if drop cr ." no help for that - try HELP INDEX" cr exit then
+  to (hfd)
+  cr (hshow)
+  (hfd) close-file drop ;
+
 cr
 ( the machine's two spaces: program in the four single-cycle banks
   via HERE/ALLOT, data in SDRAM from bank $05 up to $DF via

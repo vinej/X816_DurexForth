@@ -136,6 +136,29 @@ user-confirmed on the MiSTer:
   Also: a shared body with a `jsl` operand patched at a computed
   offset was tried for chdir/mkdir/rmdir and was wrong by nine bytes;
   three plain copies are the cheaper thing to be sure of.
+- **HELP works, and it found a real bug** (2026-08-04). The 40 help
+  pages now ship in `/HELP` on the card and `help <topic>` reads them
+  with the ordinary file words, pausing every 22 lines (any key
+  continues, ESC/Q stops). Card names are the topic TRUNCATED TO 8
+  chars and uppercased - the FAT32 reader skips long filenames, so
+  ARITHMETIC.TXT travels as ARITHMET.TXT; all forty truncate uniquely
+  and BOTH card builders enforce it (run-tests.sh, mksdcard.py).
+  **The bug: `TYPE` with a count of ZERO sprayed 2^32 bytes at the
+  screen.** io.asm's stack guard read `bcc +`, and ACME resolves a
+  bare `+` to the NEXT `+` label - which was the EMIT path, not the
+  count test. So TYPE always emitted one character, and zero then went
+  to -1 via /STRING and ran until it wrapped. Only empty strings were
+  affected, which is why everything passed for months; HELP found it
+  by typing the blank lines in a text file. The guard now branches to
+  a NAMED label. Regression test in testcoreadd (assert the cursor
+  column does not move), end-to-end guard in testhelp.
+  **testhelp never calls `help` on a real page** - it would block the
+  suite at the 22-line pause - so the display loop is driven against a
+  three-line file the test writes itself.
+- **Tracker probe exclusions**: `ctrl+alt+prtscr` and `autorun` are
+  ticked features that are NOT words (a key combo and a boot hook), so
+  FIND-NAME cannot see them and the probe skips them by name rather
+  than marking them absent.
 - **`break` vs `brk`** (2026-08-04, user: "Ctrl+Alt+PrtScr only shows
   BRK"): the abort worked, the word was wrong. -28 is raised by both
   the break key and a BRK opcode and CATCH must not distinguish them
@@ -283,7 +306,7 @@ user-confirmed on the MiSTer:
    replacements for the parked C64 words
    (`ls`, `open`, `help`, `turnkey` — see base.fs comments).
 4. **helpdoc tracker: DONE and machine-verified (2026-08-04)** —
-   374/583 ticked, and the checkboxes are no longer a hand-kept
+   376/583 ticked, and the checkboxes are no longer a hand-kept
    promise: a generated probe card runs `find-name` over every entry,
    both directions, so `[x]`-but-absent and `[ ]`-but-present are both
    empty. Re-run it after any word changes (the generator is a few

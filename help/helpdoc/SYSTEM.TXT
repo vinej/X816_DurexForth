@@ -1,12 +1,20 @@
 === SYSTEM - System and environment ===
 
 [x] ENVIRONMENT? ( addr len -- false | i*x true ) - query a system attribute.
-[ ] HELP ( "topic" -- ) - always resident. HELP alone shows the topic index;
-    HELP STRING shows one page (the .TXT pages ship on the SD card), paged
-    with MORE.
-[ ] AUTORUN - if a file named AUTORUN exists on the SD card, it is INCLUDEd
-    at every boot before the banner (create it with EDIT; delete it to
-    disable). Errors in it abort to the prompt.
+[x] HELP ( "topic" -- ) - always resident. HELP alone shows the topic
+    index; HELP STRING shows one page. The pages live in /HELP on the card
+    and are read with the ordinary file words, so a card without them says
+    so rather than hanging.
+    Output pauses every 22 lines: any key continues, ESC or Q stops.
+    Card names are the topic TRUNCATED TO EIGHT characters and uppercased -
+    the kernel's FAT32 reader skips long filenames, so HELP ARITHMETIC
+    reads /HELP/ARITHMET.TXT. All forty topics truncate uniquely, and both
+    card builders fail loudly if that ever stops being true.
+[x] AUTORUN - if a file named AUTORUN exists on the SD card, it is
+    INCLUDEd at every boot before the banner. Not a word: it is a boot
+    hook in base.fs. A missing AUTORUN is silent (-37 is caught); any
+    OTHER error it raises is reported, because a swallowed one looks
+    exactly like a machine that stopped for no reason.
 [ ] BYE ( -- ) - leave Forth (ROM build restarts the cold boot).
 [ ] VER ( -- n ) - version number, high byte x 256 + low. VER .
 [ ] X16 / C64 / F256 ( -- flag ) - build/platform flags (true for the current
