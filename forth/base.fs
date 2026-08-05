@@ -715,21 +715,42 @@ create ymshadow 256 allot
 
     : tick  1 frames +! ;   ' tick irq        \ every vertical blank
     0 irq                                     \ and off again )
-\ VERA2 IS NOT CLASSIC VERA HERE, and this is the part that is NOT yet
-\ established. The contract names $9F26 IEN and $9F27 ISR, and the kernel
-\ uses them - but on this core writing 9 to $9F26 reads back 65, and
-\ rtl/vera2_regs.sv shows other fields at those indices. So the ENABLE
-\ path for the raster, sprite-collision and audio-FIFO sources is unknown,
-\ and words that pretended to set it would arm a handler on a source that
-\ never fires, which is worse than not offering them.
-\ VSYNC needs no enable from us: kirq.s switches it on at boot for the
-\ kernel's own frame counter, which is why IRQ below is verified and the
-\ other three are arming-only. When the VERA2 interrupt registers are
-\ pinned down, give these the enable and they are done.
-: irq ( xt -- ) 0 (irq!) ;              \ vertical blank; 0 disarms
-: line-irq   ( xt line -- ) drop 1 (irq!) ;
-: sprcol-irq ( xt -- ) 2 (irq!) ;
-: aflow-irq  ( xt -- ) 3 (irq!) ;
+\ $9F26 IS the interrupt-enable register, and $9F60 is where VERA2's own
+\ registers live - a detail worth writing down because looking at the wrong
+\ one makes IEN appear not to work at all.
+\ READING $9F26 DOES NOT GIVE BACK WHAT YOU WROTE. Bits 0-3 are the enables,
+\ but bit 6 reads as the CURRENT SCANLINE's ninth bit and bit 7 as
+\ IRQLINE's, so a value read back is usually 64 or 65 higher than the
+\ enables alone. Read-modify-write is still safe - a write uses only bits
+\ 0-3 and 7 - but anything COMPARING a read to an expected value has to
+\ mask, and a test that did not was the thing that made this look broken.
+\ AFLOW'S ENABLE DOES NOT STICK. Writing 8 here reads back as 0 enables;
+\ writing 4 or 1 reads back faithfully. kirq.s says the same thing from the
+\ other end - it excludes AFLOW from its acknowledge because "writing its
+\ bit does nothing". So AFLOW-IRQ arms the kernel slot and does not pretend
+\ to enable a source that will not enable, which leaves ADVSND's PCM
+\ streaming waiting on the hardware rather than on this file.
+$9f26 constant vera-ien
+$9f27 constant vera-isr
+: (ien+) ( mask -- ) vera-ien ioc@ or vera-ien ioc! ;
+: (ien-) ( mask -- ) invert vera-ien ioc@ and vera-ien ioc! ;
+
+: irq ( xt -- )                 ( vertical blank; 0 disarms )
+  dup if 1 (ien+) else 1 (ien-) then 0 (irq!) ;
+
+\ The raster line is nine bits: the low eight are written to $9F27 - a write
+\ there is IRQLINE, not the status a read gives - and bit 8 rides in bit 7
+\ of IEN, which the read-modify-write above carries along for free.
+: line-irq ( xt line -- )
+  dup 255 and vera-isr ioc!
+  256 and if $80 (ien+) else $80 (ien-) then
+  dup if 2 (ien+) else 2 (ien-) then 1 (irq!) ;
+
+: sprcol-irq ( xt -- ) dup if 4 (ien+) else 4 (ien-) then 2 (irq!) ;
+: aflow-irq  ( xt -- ) 3 (irq!) ;      ( arming only - see above )
+
+( Which sprites collided, from the top nibble of the status register. )
+: collisions ( -- n ) vera-isr ioc@ 4 rshift 15 and ;
 
 ( INPUT - SNES pads and the SMC mouse, both on VIA1 port A.
 

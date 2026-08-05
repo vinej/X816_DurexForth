@@ -3,9 +3,17 @@
 Ported from C:\quartus\projects\x16_library (see that tree for the
 assembly originals and their names).
 
-System / IRQ (in the core - see SYSTEM)
-[ ] LINE-IRQ ( xt line -- ) - run xt each frame at a raster line.
-[ ] SPRCOL-IRQ ( xt -- ) / COLLISIONS - sprite-collision interrupt.
+System / IRQ (base.fs - no module needed)
+[x] IRQ ( xt -- ) - run xt on every vertical blank; 0 disarms. A handler
+    must not THROW and must not enable interrupts, and must put back
+    VERA's CTRL and address ports if it touches them: it runs inside
+    whatever word was executing when the interrupt landed.
+[x] LINE-IRQ ( xt line -- ) - run xt each frame at a raster line.
+[x] SPRCOL-IRQ ( xt -- ) / COLLISIONS - sprite-collision interrupt.
+[ ] AFLOW-IRQ ( xt -- ) - arms the slot, but the audio-FIFO enable bit
+    does not stick on this hardware (writing 8 to $9F26 reads back as no
+    enables), so it will not fire. The kernel excludes AFLOW from its
+    acknowledge for the same reason.
     Register save/restore words are not needed: the core IRQ dispatcher
     saves W/W2/W3, the RAM bank, VERA CTRL and both data-port addresses
     around every armed word.

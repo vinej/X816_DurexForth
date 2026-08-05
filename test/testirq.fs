@@ -54,22 +54,30 @@ T{ junkruns @ 0> -> true }T
 T{ spin @ -> 60000 }T                   \ three burns now, still exact
 0 irq
 
-cr .( testirq: the other three sources arm without firing ) cr
-\ NOT asserted: that they fire, or that any enable bit moved. VERA2 is not
-\ classic VERA here - $9F26 does not behave as IEN on this core - so the
-\ enable path for raster, sprite-collision and audio-FIFO is still unknown
-\ and base.fs deliberately does not pretend to set it. VSYNC needs no
-\ enable from us because the kernel switches it on for its own frame
-\ counter, which is exactly why IRQ above is the one that is proven.
-\ What IS checked is that arming and disarming the other three neither
-\ throws nor disturbs the VSYNC handler that is already running.
+cr .( testirq: LINE and SPRCOL enable, AFLOW cannot ) cr
+\ Every comparison MASKS. Reading $9F26 returns the enables in bits 0-3 but
+\ bit 6 is the current scanline's ninth bit and bit 7 is IRQLINE's, so a
+\ raw equality check against a read is comparing against a moving raster.
 : noop ;
 ' noop 100 line-irq
-' noop sprcol-irq
-' noop aflow-irq
+T{ vera-ien ioc@ 2 and -> 2 }T
 0 100 line-irq
+T{ vera-ien ioc@ 2 and -> 0 }T
+' noop sprcol-irq
+T{ vera-ien ioc@ 4 and -> 4 }T
 0 sprcol-irq
+T{ vera-ien ioc@ 4 and -> 0 }T
+\ AFLOW arms the slot and deliberately does NOT touch the enable, because
+\ the bit does not stick: writing 8 here reads back as no enables at all,
+\ and kirq.s excludes AFLOW from its acknowledge for the same reason. If
+\ this ever starts holding, AFLOW-IRQ gains an enable and ADVSND's PCM
+\ streaming comes with it - so assert the current truth, and find out.
+T{ 8 vera-ien ioc! vera-ien ioc@ 8 and -> 0 }T
+' noop aflow-irq
 0 aflow-irq
+\ VSYNC must be left ON: the kernel's frame counter runs on it.
+1 (ien+)
+T{ vera-ien ioc@ 1 and -> 1 }T
 T{ depth d0 @ - -> 0 }T
 
 cr .( testirq: a slot that does not exist is refused ) cr

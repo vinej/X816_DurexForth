@@ -82,15 +82,21 @@ user-confirmed on the MiSTer:
   - Verified by measurement: the handler ran 114 times inside one loop, and
     the interrupted loop still counted to exactly its 400000. That second
     number is the real test.
-  - **ONLY VSYNC IS PROVEN, and the reason is a real unknown.** VERA2 is not
-    classic VERA here: the contract calls $9F26 IEN, but writing 9 reads
-    back 65 and `rtl/vera2_regs.sv` shows other fields at those indices. So
-    the ENABLE path for raster, sprite-collision and audio-FIFO is unknown,
-    and base.fs deliberately does NOT pretend to set it - LINE-IRQ,
-    SPRCOL-IRQ and AFLOW-IRQ arm the kernel slot and nothing else. VSYNC
-    needs no enable from us because kirq.s switches it on for the kernel's
-    own frame counter. **Pinning down VERA2's interrupt registers is the
-    next question, and it is one for the core.**
+  - **THE ENABLE REGISTER, run to ground.** $9F26 IS the interrupt enable;
+    VERA2's own registers are at $9F60, and reading `rtl/vera2_regs.sv` -
+    which decodes THAT block - is what briefly made IEN look fictional.
+    Measured, not inferred: write 1 read 1, write 4 read 4, write 8 read
+    **0**. So VSYNC, LINE and SPRCOL enable normally and `AFLOW's bit does
+    not stick`; kirq.s says the same from the other end, excluding AFLOW
+    from its acknowledge because "writing its bit does nothing".
+  - **A READ OF $9F26 IS NOT WHAT YOU WROTE.** Bits 0-3 are the enables,
+    bit 6 is the CURRENT SCANLINE's ninth bit and bit 7 is IRQLINE's - so
+    a read comes back 64 or 65 high and anything comparing against it must
+    mask. A test that did not is what made the whole register look broken.
+    Read-modify-write is still safe: a write uses only bits 0-3 and 7.
+  - So IRQ, LINE-IRQ and SPRCOL-IRQ set their enable; AFLOW-IRQ arms the
+    slot and does not pretend. ADVSND's PCM streaming waits on the hardware
+    rather than on base.fs.
   - **ADVSND is unblocked as far as that goes**: it loads now, and its
     envelopes pass. It stops on a NUMERIC bug in the ADPCM decoder, which is
     its own investigation.
