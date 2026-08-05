@@ -69,19 +69,26 @@ variable at-nx  variable at-ny
 \ --- ring buffer (power-of-2 capacity) ----------------------------------------
 \   32 ring myq    7 myq >ring    myq ring> . -> 7    myq ring# . -> 0
 \ Free-running head/tail counters; keep ring# below the capacity yourself.
+\ Layout: mask at +0, head at +4, tail at +8, the bytes from +12. Those
+\ offsets were 0/2/4/6 - three CELLS, written when a cell was two bytes.
+\ A cell is four now, so head and tail overlapped each other and the data,
+\ and RING# answered nonsense the first time it was ever run.
 : ring ( size "name" -- ) create dup 1- , 0 , 0 , allot ;
-: ring# ( rng -- n ) dup 2 + @ swap 4 + @ - ;     \ bytes queued
+: ring# ( rng -- n ) dup 4 + @ swap 8 + @ - ;     \ bytes queued
 : >ring ( c rng -- )
-  dup >r 2 + dup @ dup 1+ rot !
-  r@ @ and r> 6 + + c! ;
-: ring> ( rng -- c )
   dup >r 4 + dup @ dup 1+ rot !
-  r@ @ and r> 6 + + c@ ;
+  r@ @ and r> 12 + + c! ;
+: ring> ( rng -- c )
+  dup >r 8 + dup @ dup 1+ rot !
+  r@ @ and r> 12 + + c@ ;
 
 \ --- decompression ----------------------------------------------------------------
-\ KERNAL LZSA2: mem-decompress ( src dst -- end ) - end = one past last byte
-: mem-decompress ( src dst -- end )
-  $04 ! $02 !  0 0 0 0 $feed bcall drop 2drop  $04 @ ;
+\ MEM-DECOMPRESS IS GONE, and it is the only thing this file lost. It was
+\ `bcall $feed` - the X16 KERNAL's LZSA2 depacker, in banked ROM. There is
+\ no ROM here past the boot page and no LZSA2 anywhere in the kernel, so the
+\ word could only ever have jumped into nothing. A word that exists and does
+\ nothing is worse than its absence: ZX0-DECOMPRESS below is a real depacker,
+\ written in Forth, and `zx0`/`salvador` are what to compress with.
 
 \ ZX0 v2 (what `zx0` / `salvador` emit by default). RAM to RAM, forward
 \ copies, cannot decompress in place. Load-time speed (pure Forth).

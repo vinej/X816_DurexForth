@@ -8,7 +8,10 @@ marker ---testadvsnd---
 require tester
 
 
-include audio
+\ NOT `include audio`: there is no audio module here. That file was the X16
+\ ROM's audio driver, and the register-level words it wrapped - PSG! PSG@
+\ PSGFREQ PSGVOL PCMCTRL YM! YM@ and the rest - are in base.fs, always
+\ present. The note and patch API is `include fm`.
 include advsnd
 
 decimal

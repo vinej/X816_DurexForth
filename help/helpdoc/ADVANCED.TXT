@@ -10,13 +10,18 @@ System / IRQ (in the core - see SYSTEM)
     saves W/W2/W3, the RAM bank, VERA CTRL and both data-port addresses
     around every armed word.
 
-Game math (NEEDS ADVANCED)
-[ ] RND-SEED RND16 RND8 - 16-bit xorshift PRNG (zero seed nudged off).
-[ ] SIN8 COS8 SIN8U COS8U - 256-entry sine table, result -127..127 / 0..255.
-[ ] ATAN2 ( dx dy -- angle ) - 0-255, 0 = east, 64 = down.
-[ ] LERP ( a b t -- n ) - t = 0-255.
-[ ] RING RING> >RING RING# - power-of-2 ring buffers.
-[ ] ZX0-DECOMPRESS / MEM-DECOMPRESS - ZX0 and LZSA2 depackers.
+Game math (NEEDS ADVANCED) - all of this is in, and tested by testadv.
+[x] RND-SEED RND16 RND8 - 16-bit xorshift PRNG (zero seed nudged off).
+[x] SIN8 COS8 SIN8U COS8U - 256-entry sine table, result -127..127 / 0..255.
+[x] ATAN2 ( dx dy -- angle ) - 0-255, 0 = east, 64 = down.
+[x] LERP ( a b t -- n ) - t = 0-255.
+[x] RING RING> >RING RING# - power-of-2 ring buffers. The head, tail and
+    data sit at +4, +8 and +12: three CELLS, and a cell is four bytes here.
+    They were 2/4/6 until testadv was first run.
+[x] ZX0-DECOMPRESS - ZX0 v2 (what `zx0` / `salvador` emit), in Forth.
+[ ] MEM-DECOMPRESS - was `bcall $feed`, the KERNAL's LZSA2 depacker in
+    banked ROM. There is no ROM here past the boot page and no LZSA2 in the
+    kernel, so the word could only jump into nothing. Compress with ZX0.
 
 Graphics (NEEDS ADVGFX, after GRAPHIC)
 [ ] CLIP-RECT CLIP-LINE CLINE - Cohen-Sutherland line clipping.

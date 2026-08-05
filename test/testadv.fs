@@ -52,8 +52,8 @@ T{ zb c@ zb 1+ c@ zb 2 + c@ -> 65 66 67 }T
 T{ zv2 zb zx0-decompress zb - -> 8 }T      \ new-offset match -> "ABCABCAB"
 T{ zb 3 + c@ zb 6 + c@ zb 7 + c@ -> 65 65 66 }T
 
-cr .( testadv: mem-decompress exists ) cr
-T{ ' mem-decompress 0<> -> -1 }T
+\ MEM-DECOMPRESS is not tested because it no longer exists: it was the
+\ KERNAL's LZSA2 depacker in banked ROM, and this machine has neither.
 
 cr .( testadv ok ) cr
 

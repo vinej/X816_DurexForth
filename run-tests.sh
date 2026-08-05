@@ -76,7 +76,8 @@ SRC = [("forth", n, n) for n in ["base", "asm", "wordlist", "labels",
           ("testload", "testload"), ("teststruct", "struct"), ("testaudio", "testaud"),
           ("testfm", "testfm"), ("testfloat", "testfloa"), ("testinput", "testinp"),
           ("teststring", "teststri"), ("testextras", "testextr"),
-          ("test", "test"), ("1", "1")]] +       [("forth/mod", n, n) for n in ["fm", "float", "floatx", "string", "extras"]]
+          ("testadv", "testadv"),
+          ("test", "test"), ("1", "1")]] +       [("forth/mod", n, n) for n in ["fm", "float", "floatx", "string", "extras", "advanced"]]
 for d, n, card in SRC:
     with open(os.path.join(d, n + ".fs"), "rb") as f:
         data = f.read()

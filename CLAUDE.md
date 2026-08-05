@@ -61,6 +61,31 @@ user-confirmed on the MiSTer:
   card on the MiSTer and reported all tests passed — that run included
   the new far-data suite (testfar), so the SDRAM allocator is
   hardware-proven too, not just emulator-proven.
+- **Module suites, tranche 2: ADVANCED** (2026-08-05). `testadv` is in the
+  suite and green - the PRNG, the sine table, ATAN2, LERP, ring buffers and
+  the ZX0 depacker, all of which were pure Forth already and had simply
+  never been run. Two fixes:
+  - **The ring buffer's fields were at 0/2/4/6** - three CELLS from when a
+    cell was two bytes. Head and tail overlapped each other and the data;
+    RING# answered nonsense. They are at 0/4/8/12 now. Same stale-cell-size
+    bug as extras.fs's `field:`, and worth grepping for elsewhere.
+  - **MEM-DECOMPRESS is GONE, not fixed**: it was `bcall $feed`, the X16
+    KERNAL's LZSA2 depacker in banked ROM. No ROM, no LZSA2 in the kernel,
+    so it could only ever jump into nothing. ZX0-DECOMPRESS is real and in
+    Forth, and the page now says to compress with `zx0`/`salvador`.
+  - **ADVSND is blocked on ONE word: `aflow-irq`.** Its envelopes and ADPCM
+    are fine; the PCM streamer arms a callback on VERA's audio-FIFO-low
+    interrupt. The kernel has the slot (`KIRQ_AFLOW` = 3) and asm/x816.asm
+    has `kern_irq_set`, but there is no Forth-callable IRQ layer at all -
+    no `irq` word, nothing that can enter Forth from an interrupt and put
+    the machine back. That layer is the parked `asm/irq.asm`, and it is the
+    single highest-value thing left: ADVSND, ADVANCED.TXT's whole System/IRQ
+    section, and CONTROL.TXT all sit behind it.
+  - ADVGFX is blocked behind GRAPHIC, which wants `screen`; BMX wants
+    `close`; SYSTEM wants `bcall`.
+  - testadvsnd also had a stale `include audio` - there is no audio module,
+    the register words live in base.fs and the note API is `include fm`.
+
 - **The unrun module suites, tranche 1** (2026-08-05). Eight module test
   files existed and NONE was in `test/test.fs` - the state testfloat was in.
   STRING and EXTRAS are in the suite now and green; both needed
