@@ -61,6 +61,43 @@ user-confirmed on the MiSTer:
   card on the MiSTer and reported all tests passed — that run included
   the new far-data suite (testfar), so the SDRAM allocator is
   hardware-proven too, not just emulator-proven.
+- **INPUT IS DONE: joysticks and the mouse** (2026-08-05). `JOY JOY?
+  JOY-SCAN JOY1..JOY4 MOUSE MX MY MB MWHEEL` are in base.fs, INPUT.TXT is
+  8/8 ticked, `test/testinput.fs` is rewritten and in the suite.
+  - **The backlog's premise was WRONG and cost the first hour.** This file
+    said "the SMC already serves joystick and mouse over I2C, so INPUT is
+    the tractable one". The SMC serves the MOUSE that way ($21). It does
+    NOT serve joysticks: `smc_x16.sv` latches joy_a/joy_b off the UART and
+    then sinks them into `unused_state_sink` - no I2C command reads them.
+    Joysticks are SNES shift registers on VIA1 port A, exactly as the X16
+    KERNAL drives them (`snes_pad`, X816_core rtl/x16_periph.sv): PA2
+    latches, PA3 clocks, PA7..PA4 are the four data lines, 24 bits MSB
+    first and ACTIVE LOW. Check the RTL before believing a note like that.
+  - **Both devices share one port**, so JOY-SCAN read-modify-writes DDRA
+    and leaves PA0/PA1 (SDA, SCL) exactly as found. testinput asserts it:
+    getting it wrong breaks the mouse from a mile away.
+  - **An empty pad slot reads back as 0, and 0 is not "nothing pressed".**
+    The wire is active low, so JOY inverts - and a raw scan word of 0 (no
+    such pad number) inverted to all twelve buttons at once. `0 JOY` said
+    4095. A present-but-idle pad cannot produce 0 because byte 1 carries a
+    non-zero ID nibble, so 0 is safe to special-case.
+  - The X816_Library stub said "the core wires neither device to anything
+    yet" - stale for the pads, so `src_acme/input/input.asm` now has the
+    real scan (image-backed state through DBR-safe helpers, gathered in dp
+    scratch so the scan costs 12 banked stores, not 96). Its MOUSE stays
+    absence-reporting and says why: `comms/i2c.asm` wraps the X16 KERNAL's
+    I2C jump table, which does not exist here. A bit-banged master in
+    `comms/` is the piece to write. durexForth did not need it - base.fs
+    grew its own I2C words, promoted from testnmi's bit-bang.
+  - **The emulator's SMC is a SUBSET of the RTL's**, which reads as a bug
+    in your I2C until you check: $22 (mouse ID) answers 3 in both, but
+    $0a/$1b are unimplemented and return $FF, and the version registers
+    $30-$32 hold the emulator's own numbers, not the RTL's 48.1.0.
+    Validate a bit-banged master against $22, not against those.
+  - **MX in the emulator is not 0 at boot**: the emulator delivers a
+    pointer of its own, so a run can legitimately start with a packet
+    waiting. The test asserts bounds and behaviour, never a fixed value.
+
 - **FLOAT IS DONE, in software** (2026-08-05). `NEEDS FLOAT` /
   `NEEDS FLOATX` now work: 5-byte MFLPT on a separate float stack, all 71
   words of FLOAT.TXT ticked and machine-probed (0 absent), `test/testfloat.fs`
@@ -437,11 +474,10 @@ user-confirmed on the MiSTer:
 
 1. **Platform hooks: all DONE** — BRK, NMI and charset (see State).
    Nothing is left in this line item; the next platform-shaped gaps
-   are the four unassembled files, `asm/input.asm` `asm/irq.asm`
-   `asm/clock.asm` `asm/sysx.asm`, whose words all reached KERNAL
-   entries. The SMC already serves joystick and mouse over I2C, so
-   INPUT is the tractable one — rewrite against the SMC, do not
-   unpark.
+   are `asm/irq.asm` `asm/clock.asm` `asm/sysx.asm`, whose words all
+   reached KERNAL entries. INPUT is DONE (see State) and was NOT a
+   port of asm/input.asm — the pads are SNES shift registers on VIA1,
+   not an SMC I2C service, which is what this line used to claim.
 2. **Board run**: the turbo/MS/NMI batch is emulator-green only; the
    user takes `release/mister/` to the MiSTer (the card already
    carries TURBO and TESTNMI in `include test`).

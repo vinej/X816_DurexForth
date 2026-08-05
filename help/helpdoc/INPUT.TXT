@@ -1,18 +1,59 @@
-=== INPUT - X16 input devices ===
+=== INPUT - joysticks and the mouse ===
 
-NONE OF THIS PAGE IS IN THE MACHINE. asm/input.asm still holds the C64/X16
-shapes below, but durexforth.asm does not assemble it - every word here
-reached a KERNAL entry that the X816 has no equivalent for. The core does
-carry joystick and mouse data (the SMC serves both over I2C, X816_core
-rtl/smc_x16.sv), so these can come back; each needs rewriting against the
-SMC rather than unparking. Same for asm/irq.asm, asm/clock.asm and
-asm/sysx.asm - see ADVANCED, CONTROL and KEYBOARD.
+Both are in the machine now, and neither goes through a KERNAL: the SNES
+pads are a shift register on VIA1 port A, and the mouse is a register read
+from the SMC over the I2C bus on the same two pins of that port.
 
-[ ] JOY ( n -- buttons ) - read joystick/gamepad n (0 = keyboard, 1-4 = gamepads);
-    button bits active-high, 0 if absent.
-[ ] MOUSE ( mode -- ) - configure the mouse pointer (0 = off, 1 = on, -1 =
-    auto-scale).
-[ ] MX ( -- x ) - mouse X position.
-[ ] MY ( -- y ) - mouse Y position.
-[ ] MB ( -- buttons ) - mouse buttons (bit0 left, bit1 right, bit2 middle).
-[ ] MWHEEL ( -- delta ) - signed mouse-wheel movement since the last read.
+This page used to say "NONE OF THIS PAGE IS IN THE MACHINE", on the
+grounds that the core wired no input devices. That stopped being true: the
+core carries snes_pad (X816_core rtl/x16_periph.sv), fed from the MiSTer
+joystick, and the SMC serves mouse packets (rtl/smc_x16.sv, command $21).
+asm/input.asm is still parked and still unassembled - none of this is a
+port of it, and the words below are Forth in base.fs.
+
+[x] JOY ( n -- buttons ) - read pad n (1-4; 0 is the X16's
+    keyboard-as-joystick and has nothing behind it here, so it reads 0).
+    Buttons come back ACTIVE HIGH, which is the other way up from the
+    wire:
+        bit 0 RIGHT    bit 4 START    bit  8 R
+        bit 1 LEFT     bit 5 SELECT   bit  9 L
+        bit 2 DOWN     bit 6 Y        bit 10 X
+        bit 3 UP       bit 7 B        bit 11 A
+    An absent pad reads 0 - the same as a present pad with nothing
+    pressed, so use JOY? when the difference matters.
+[x] JOY? ( n -- flag ) - true when a pad actually answered the scan. It
+    is detectable because an absent line floats high, so the pad's third
+    byte comes back $FF instead of $00.
+[x] JOY-SCAN ( -- ) - sample all four pads into JOY1..JOY4 as raw 24-bit
+    words, active low, exactly as they came off the wire. JOY does this
+    for you; call it directly only if you want all four in one snapshot.
+[x] JOY1 JOY2 JOY3 JOY4 ( -- addr ) - those raw words.
+
+[x] MOUSE ( mode -- ) - 0 turns the mouse off, anything else on (mode -1
+    is accepted and behaves as 1: there is one screen mode here, so there
+    is no scaling to choose). Turning it on zeroes the position and asks
+    the SMC for a wheel-capable mouse.
+    IT DOES NOT DRAW A POINTER. The X16 KERNAL drew one with a hardware
+    sprite; here the sprite words are yours to call, which is better than
+    a pointer you cannot move out of your own way. See HELP SPRITE.
+[x] MX ( -- x )  MY ( -- y ) - pointer position, clamped to 0-639 and
+    0-479. Y counts DOWN the screen, so it is the PS/2 delta negated.
+[x] MB ( -- buttons ) - bit0 left, bit1 right, bit2 middle.
+[x] MWHEEL ( -- delta ) - signed wheel movement, and reading it clears
+    the accumulator, so two reads in a row give the second one nothing.
+
+Each of MX MY MB MWHEEL polls the SMC first, so reading all four costs
+four polls; that is fine at human speed and wasteful in a tight loop.
+
+A pad-driven loop, ending when START is pressed:
+    : GO BEGIN 1 JOY  DUP 8 AND IF ." up " THEN
+                      DUP 2 AND IF ." left " THEN
+                      16 AND UNTIL ;
+
+THE PADS AND THE MOUSE SHARE ONE PORT. JOY-SCAN read-modify-writes the
+direction register and leaves PA0/PA1 exactly as it found them, so a scan
+cannot wreck an I2C transfer in progress - testinput asserts that, because
+getting it wrong would break the mouse from a mile away.
+
+Still absent, and honestly so: KEYBOARD and CONTROL (asm/irq.asm,
+asm/clock.asm, asm/sysx.asm are unassembled - see those pages).

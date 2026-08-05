@@ -699,6 +699,127 @@ create ymshadow 256 allot
   (ym-wait) $9f41 ioc! ;
 : ym@ ( reg -- value ) 255 and ymshadow + c@ ;
 
+( INPUT - SNES pads and the SMC mouse, both on VIA1 port A.
+
+  The pads are a shift register, exactly as the X16 KERNAL drives them:
+  PA2 latches, PA3 clocks, and each pad presents one bit on a line of
+  its own - PA7 for pad 1 down to PA4 for pad 4. Twenty-four bits come
+  out MSB first and every one of them is ACTIVE LOW:
+
+    byte 0   B Y SELECT START UP DOWN LEFT RIGHT
+    byte 1   A X L R  then four 1 bits, the pad's ID
+    byte 2   $00 if a pad answered, $FF if the line just floated high
+
+  PA0 and PA1 are the I2C bus to the SMC, which is where the mouse
+  comes from, so the direction register is read-modify-written and
+  those two bits are left exactly as they were. )
+$9f01 constant via1-pa
+$9f03 constant via1-ddr
+
+variable joy1 variable joy2 variable joy3 variable joy4
+: (joy-clock) ( -- bits )       ( one clock, sampling all four lines )
+  0 via1-pa ioc! via1-pa ioc@ 8 via1-pa ioc! ;
+: (joy-roll) ( bits mask var -- bits )
+  >r over and 0<> 1 and r@ @ 2* or r> ! ;
+: joy-scan ( -- )               ( sample every pad; JOY does this for you )
+  via1-ddr ioc@ $f0 invert and $0c or via1-ddr ioc!
+  8 via1-pa ioc!                ( latch low, clock high )
+  $0c via1-pa ioc!              ( latch high: the pads load )
+  0 via1-pa ioc!
+  0 joy1 ! 0 joy2 ! 0 joy3 ! 0 joy4 !
+  24 0 do
+    (joy-clock)
+    $80 joy1 (joy-roll)  $40 joy2 (joy-roll)
+    $20 joy3 (joy-roll)  $10 joy4 (joy-roll)
+    drop
+  loop ;
+
+( JOY returns the buttons ACTIVE HIGH, which is the other way up from
+  the wire: bits 0-7 are B Y SELECT START UP DOWN LEFT RIGHT and bits
+  8-11 are A X L R. An absent pad reads as all ones, so its third byte
+  is $FF and JOY answers 0 - the same "nothing pressed" a present pad
+  gives, but tell them apart with JOY? if you need to. Joystick 0 is
+  the X16's keyboard-as-joystick and has nothing behind it here. )
+: (joy@) ( n -- raw )
+  dup 1 = if drop joy1 @ exit then
+  dup 2 = if drop joy2 @ exit then
+  dup 3 = if drop joy3 @ exit then
+      4 = if joy4 @ exit then 0 ;
+: joy? ( n -- flag )            ( is a pad actually attached? )
+  joy-scan (joy@) dup 0= if drop false exit then 255 and 0= ;
+: joy ( n -- buttons )
+  joy-scan (joy@)
+  dup 0= if exit then           ( no such pad: not "every button at once" )
+  dup 255 and if drop 0 exit then
+  dup 16 rshift 255 and 255 xor          ( raw byte0' )
+  swap 8 rshift 255 and 255 xor 4 rshift 8 lshift or ;
+
+( The mouse is an SMC register read over the bit-banged I2C bus - the
+  same bus, the same two pins. Open drain: a 1 in the DIRECTION
+  register drives the line low, a 0 releases it to the pull-up, and the
+  output register stays 0 throughout. )
+: (i2c-idle) 0 via1-ddr ioc! ;
+: (i2c-sda)  1 via1-ddr ioc! ;
+: (i2c-scl)  2 via1-ddr ioc! ;
+: (i2c-both) 3 via1-ddr ioc! ;
+: (i2c-start) 0 via1-pa ioc! (i2c-idle) (i2c-sda) (i2c-both) ;
+: (i2c-stop)  (i2c-both) (i2c-sda) (i2c-idle) ;
+: (i2c-bit) ( f -- )
+  if (i2c-scl) (i2c-idle) (i2c-scl) else (i2c-both) (i2c-sda) (i2c-both) then ;
+: (i2c>) ( b -- )               ( send MSB first, then clock the ACK slot )
+  8 0 do dup $80 and 0<> (i2c-bit) 2* loop drop
+  (i2c-scl) (i2c-idle) (i2c-scl) ;
+: (i2c-rbit) ( -- f )           ( release SDA, clock once, sample )
+  (i2c-scl) (i2c-idle) via1-pa ioc@ 1 and 0<> (i2c-scl) ;
+variable (i2cack)
+: (i2c<) ( ackf -- b )
+  (i2cack) ! 0
+  8 0 do 2* (i2c-rbit) if 1 or then loop
+  (i2cack) @ if (i2c-both) (i2c-sda) (i2c-both)
+  else (i2c-scl) (i2c-idle) (i2c-scl) then ;
+
+variable mouse-on  variable mouse-x  variable mouse-y
+variable mouse-b   variable mouse-w
+create (mpkt) 4 allot
+
+( MOUSE turns the data path on and off. It does NOT draw a pointer:
+  the X16 KERNAL drew one with a hardware sprite, and on this machine
+  the sprite words are yours to call - which is better than a pointer
+  you cannot move out of the way. Mode -1 is accepted and behaves as 1;
+  there is no scaling to choose between with one screen mode. )
+: mouse ( mode -- )
+  dup 0= if drop 0 mouse-on ! exit then
+  drop 1 mouse-on !
+  0 mouse-x ! 0 mouse-y ! 0 mouse-b ! 0 mouse-w !
+  (i2c-start) $84 (i2c>) $20 (i2c>) 3 (i2c>) (i2c-stop) ;
+
+( One SMC packet: status, dx, dy, wheel. The X and Y signs live in the
+  status byte, PS/2 fashion, and Y counts UP the screen there and down
+  here - so it is subtracted. An empty mailbox answers with a zero
+  status, which is also what "no buttons, no movement" looks like, and
+  costs nothing to apply. )
+: (mouse-poll) ( -- )
+  mouse-on @ 0= if exit then
+  (i2c-start) $84 (i2c>) $21 (i2c>) (i2c-stop)
+  (i2c-start) $85 (i2c>)
+  true (i2c<) (mpkt) c!
+  true (i2c<) (mpkt) 1+ c!
+  true (i2c<) (mpkt) 2 + c!
+  false (i2c<) (mpkt) 3 + c!
+  (i2c-stop)
+  (mpkt) c@ dup 7 and mouse-b !
+  dup 16 and if (mpkt) 1+ c@ 256 - else (mpkt) 1+ c@ then
+  mouse-x @ + 0 max 639 min mouse-x !
+  32 and if (mpkt) 2 + c@ 256 - else (mpkt) 2 + c@ then
+  mouse-y @ swap - 0 max 479 min mouse-y !
+  (mpkt) 3 + c@ dup 8 and if 16 - then mouse-w @ + mouse-w ! ;
+
+: mx ( -- x ) (mouse-poll) mouse-x @ ;
+: my ( -- y ) (mouse-poll) mouse-y @ ;
+: mb ( -- buttons ) (mouse-poll) mouse-b @ ;
+: mwheel ( -- delta )           ( signed, and cleared by reading it )
+  (mouse-poll) mouse-w @ 0 mouse-w ! ;
+
 ( ANS STRUCTURES - STRUCTURE.TXT, which was 0/5.
     begin-structure point
       field: p.x
