@@ -141,8 +141,10 @@ V_STOREW ; ( w -- ) low byte first
     +VIO_END
     rtl
 
-; X816: SCREEN (KERNAL screen_mode) and COLOR (the KERNAL's $0376 shadow)
-; are gone - the kernel console owns the text mode and its attributes.
+; X816: SCREEN (KERNAL screen_mode) is gone - the kernel console owns the
+; text mode. COLOR came back at the end of this file, over the kernel's
+; CON_COLOR, because the console attribute is the kernel's to own: the
+; blinking cursor undraws with it.
 
 ; ioc@ - fetch a byte from bank $00, where the I/O page lives. A plain C@
 ; goes through the cell's own bank byte; this word forces bank $00, which
@@ -343,4 +345,32 @@ TATTR ; ( x y -- attr )
     sta LSB, x
     stz MSB, x
     +VIO_END
+    rtl
+
+; color ( fg bg -- ) - set the text colours used from here on. The kernel
+; owns the console attribute (runtime/console.c con_attr) because the
+; blinking cursor has to undraw with it; this is the only way to change it
+; without the two disagreeing, which is what the old duplicated constant
+; risked. Text already on screen keeps the attribute it was drawn with.
+    +BACKLINK "color", 5
+COLOR
+    lda LSB, x                  ; background
+    sta KTMP2
+    lda LSB+2, x                ; foreground
+    sta KTMP
+    inx
+    inx
+    inx
+    inx
+    phx
+    phy
+    rep #$30
+!rl
+    lda KTMP
+    ldx KTMP2
+    jsl KERN_COLOR
+    sep #$10
+!rs
+    ply
+    plx
     rtl

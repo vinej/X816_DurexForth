@@ -23,6 +23,7 @@ KERN_CLS    = $00fe10
 KERN_GOTOXY = $00fe14               ; C = column, X = row
 KERN_GETXY  = $00fe18               ; -> C = column, X = row
 KERN_CURSOR = $00fe20               ; C = 1 blink at the console cursor, 0 off
+KERN_COLOR  = $00fe24               ; C = foreground, X = background (0-15)
 KERN_EXIT   = $00fe84               ; C = status; does not return
 KERN_IRQ_SET = $00fec4              ; C = slot, X = handler lo16, Y = bank
                                     ;   -> C:X = the previous handler

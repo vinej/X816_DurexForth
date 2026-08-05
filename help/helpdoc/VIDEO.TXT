@@ -16,7 +16,15 @@ access set the address once with VADDR then stream with V!/V@.
 [x] synonym VWSTORE V!
 [ ] SCREEN ( mode -- ) - set the video mode. 0=80x60, 1=80x30, 2=40x60, 3=40x30,
     128=320x240x256. 0 SCREEN
-[ ] COLOR ( fg bg -- ) - set text foreground/background (0-15). 1 6 COLOR
+[x] COLOR ( fg bg -- ) - set the text colours used FROM NOW ON. 1 6 COLOR
+    is white on blue. Text already on screen keeps the attribute it was
+    drawn with - this is a pen, not a repaint - but CLS fills with the
+    current colour, so `2 4 COLOR CLS` gives a coloured screen.
+    The attribute byte is foreground in the low nibble, background in the
+    high one, and TATTR reads it back. Values are masked to 0-15.
+    It is a KERNEL call, not a poke: the blinking cursor has to undraw
+    with the same attribute, so the console owns it (X816_core
+    doc/KERNEL.md CON_COLOR).
 [x] BORDER ( color -- ) - set the display border color (0-15).
 [x] CLS ( -- ) - clear the text screen.
 [x] LOCATE ( row col -- ) - move the text cursor (BASIC LOCATE row,col).

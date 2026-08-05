@@ -178,6 +178,20 @@ user-confirmed on the MiSTer:
   lines, and know that base.fs DEFINES `(` and `.(` themselves. A
   checker that cries wolf is worse than no checker; it is silent on
   the whole tree and both negative controls still fire.
+- **COLOR** (2026-08-04): `color ( fg bg -- )` over a new kernel call
+  CON_COLOR (entry 9, `$00:FE24`). It is a KERNEL call and not a poke
+  because the blinking cursor must undraw with the same attribute -
+  and that value used to be a `#define` in console.c AND an `.equ` in
+  ccursor.s, whose own comment warned what happens when they drift.
+  Settable colour makes drifting normal, so there is one `con_attr`
+  now and ccursor.s reads it live, deriving the cursor's reversed
+  attribute by swapping nibbles (carry-juggling idiom - no scratch
+  byte, because that file's scratch is direct page and it is full).
+  CLS fills with the current colour; existing text keeps its own.
+  Tested in testvideo by reading the attribute byte back with TATTR -
+  the only proof it reached VERA and not just a variable. The tests
+  restore `1 0 color cls` BEFORE asserting, because a coloured
+  background makes every cell decode as `?` in the GIF harness.
 - **`break` vs `brk`** (2026-08-04, user: "Ctrl+Alt+PrtScr only shows
   BRK"): the abort worked, the word was wrong. -28 is raised by both
   the break key and a BRK opcode and CATCH must not distinguish them
@@ -325,7 +339,7 @@ user-confirmed on the MiSTer:
    replacements for the parked C64 words
    (`ls`, `open`, `help`, `turnkey` — see base.fs comments).
 4. **helpdoc tracker: DONE and machine-verified (2026-08-04)** —
-   380/584 ticked, and the checkboxes are no longer a hand-kept
+   381/584 ticked, and the checkboxes are no longer a hand-kept
    promise: a generated probe card runs `find-name` over every entry,
    both directions, so `[x]`-but-absent and `[ ]`-but-present are both
    empty. Re-run it after any word changes (the generator is a few
