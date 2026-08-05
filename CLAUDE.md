@@ -61,6 +61,30 @@ user-confirmed on the MiSTer:
   card on the MiSTer and reported all tests passed — that run included
   the new far-data suite (testfar), so the SDRAM allocator is
   hardware-proven too, not just emulator-proven.
+- **SYSTEM, and the CONTROL/FILE words the SMC made possible** (2026-08-05).
+  testsystem is in the suite; SEVEN of the eight module suites now run, and
+  the helpdoc stands at 494 ticked / 100 open, from 463/128 this morning.
+  - SYSCALL and USR are GONE with reasons, not skipped: no KERNAL to call,
+    and durexForth's own assembler beats USR - `code ... end-code` gets the
+    calling convention right, which USR's `lda #7 / rts` example did not.
+  - RANDOM is a 32-bit xorshift seeded from the ms timer; BYE, RESET and
+    POWEROFF are SMC commands over the I2C words base.fs grew for the mouse;
+    I2CPEEK/I2CPOKE expose that bus, and `$42 $22 I2CPEEK` answering 3 is
+    how they were verified.
+  - **X16 now reads FALSE and X816 true.** The old flag asserted x16 = -1,
+    a claim about a machine this is not - code branching on it to decide
+    whether a KERNAL exists would call into nothing.
+  - LS, OPEN and CLOSE landed too. LS's pattern is a SUBSTRING and says so:
+    the kernel hands back 8.3 names, and matching "*.TXT" would pretend to a
+    shell that is not here.
+  - **BMX is the one suite still out**, and it is a real port rather than a
+    fix: it drives the C64 KERNAL channel model - open with a logical file
+    and device, chkin, chrin a byte at a time, readst, clrchn - over a
+    ",S,R" filename. All of that has to become the ANS file words.
+  - Process note worth keeping: parencheck DOES catch `(ssn)` inside a `(`
+    comment; it was skipped after a late edit, and the boot died on the word
+    after the stray `)`. Run it after every edit, not once per session.
+
 - **Module suites, tranche 3: ADVSND, GRAPHIC, ADVGFX** (2026-08-05). All
   three are in the suite and green. Five bugs, and four of them are the SAME
   bug wearing different clothes - **a 16-bit cell assumption**:

@@ -118,8 +118,10 @@ OPEN-FILE/CLOSE-FILE.
 [ ] DOS ( "cmd<cr>" -- ) - send the rest of the line to the drive command channel, print the reply.
 [ ] SEND-CMD ( addr len -- ) - send a command string to the drive and print its response.
 [ ] RDERR ( -- ) - read and print the drive's error channel.
-[ ] LS ( "pattern" -- ) - list the directory (optional match pattern).
+[x] LS ( "pattern" -- ) - list the directory. The pattern is a plain
+    SUBSTRING, not a glob: names come back 8.3 from the kernel and matching
+    "*.TXT" would be pretending to a shell this machine has not got.
 [ ] RDIR ( addr -- ) - print a directory previously loaded at addr.
 
-[ ] OPEN ( c-addr u fam -- fileid ior ) - open a file (like OPEN-FILE).
-[ ] CLOSE ( fileid -- ior ) - close a file.
+[x] OPEN ( c-addr u fam -- fileid ior ) - open a file (like OPEN-FILE).
+[x] CLOSE ( fileid -- ior ) - close a file.

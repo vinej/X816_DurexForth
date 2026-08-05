@@ -40,8 +40,9 @@
 [ ] SETTIME ( y mo d h m s -- )  set the clock.  2025 7 8 14 30 0 SETTIME
 
 --- I2C bus (SMC, RTC, and other I2C devices) ---
-[ ] I2CPEEK ( dev reg -- byte )   read a byte from I2C device dev, register reg.
-[ ] I2CPOKE ( dev reg val -- )    write val to I2C device dev, register reg.
+[x] I2CPEEK ( dev reg -- byte )   read a byte from I2C device dev, register reg.
+    The SMC is device $42: $42 $22 I2CPEEK reads its mouse id.
+[x] I2CPOKE ( dev reg val -- )    write val to I2C device dev, register reg.
 
 --- break (X816 SMC NMI) ---
 [x] Ctrl+Alt+PrtScr - the RUN/STOP-RESTORE of this machine: raises an NMI
@@ -64,5 +65,6 @@ message, not the code - CATCH sees -28 either way:
 --- power / debug ---
 [ ] MONITOR  ( -- )   enter the built-in machine-language monitor (exit with X;
                   it does NOT cleanly return - reset afterward).
-[ ] RESET    ( -- )   hardware reset via the System Management Controller.
-[ ] POWEROFF ( -- )   power the machine off via the SMC.
+[x] RESET    ( -- )   hardware reset via the System Management Controller -
+             the same command Ctrl+Alt+Del raises.
+[x] POWEROFF ( -- )   power the machine off via the SMC.

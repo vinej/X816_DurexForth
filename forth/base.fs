@@ -638,6 +638,34 @@ create (cwdbuf) 80 allot        ( KFS_PATH, what FS_GETCWD needs )
     dirent-dir? if ." <DIR>" else dirent-size u. then cr
   repeat dir-close drop ;
 
+( LS - DIR with a pattern, which is what CONTROL/FILE.TXT call it. The
+  pattern is a plain SUBSTRING, not a glob: the kernel hands back 8.3 names
+  and matching "*.TXT" would be pretending to a shell this machine has not
+  got. LS on its own lists everything, exactly as DIR does. )
+variable (ssn)  variable (ssnu)
+: (substr?) ( hay hu needle nu -- flag )
+  dup 0= if 2drop 2drop true exit then
+  (ssnu) ! (ssn) !
+  begin dup (ssnu) @ >= while
+    2dup drop (ssnu) @ (ssn) @ (ssnu) @ compare 0= if 2drop true exit then
+    1 /string
+  repeat 2drop false ;
+
+: ls ( "pattern" -- )
+  parse-name (ssnu) ! (ssn) !           \ address first, then length
+  cr pwd
+  s" ." dir-open
+  if drop ." cannot open ." cr exit then
+  begin dup dir-next
+    ?dup if ." dir error " . drop cr exit then
+  while
+    dirent-name (ssn) @ (ssnu) @ (substr?) if
+      dirent-name type
+      dirent-name nip 14 swap - 0 max spaces
+      dirent-dir? if ." <DIR>" else dirent-size u. then cr
+    then
+  repeat dir-close drop ;
+
 ( AUDIO - the parts that are HARDWARE.
 
   VERA's PSG is 64 bytes of VRAM at $1F9C0, four per voice: frequency
@@ -915,6 +943,24 @@ create (mpkt) 4 allot
 : mb ( -- buttons ) (mouse-poll) mouse-b @ ;
 : mwheel ( -- delta )           ( signed, and cleared by reading it )
   (mouse-poll) mouse-w @ 0 mouse-w ! ;
+
+( CONTROL words that the SMC and the I2C bus make possible. RESET is the
+  command Ctrl+Alt+Del raises; POWEROFF is the one the OSD would. Both are
+  writes to the SMC at $42, the same device the mouse answers on. )
+: i2cpoke ( dev reg val -- )
+  >r swap 2* (i2c-start) (i2c>) (i2c>) r> (i2c>) (i2c-stop) ;
+: i2cpeek ( dev reg -- byte )
+  over 2* (i2c-start) (i2c>) (i2c>) (i2c-stop)
+  (i2c-start) 2* 1 or (i2c>) false (i2c<) (i2c-stop) ;
+: reset    ( -- ) $42 2 0 i2cpoke ;
+: poweroff ( -- ) $42 1 0 i2cpoke ;
+
+\ FILE.TXT's short names for the ANS pair. Not the C64's OPEN, which took a
+\ logical file, a device and a secondary address: there is no IEC bus here,
+\ so a file is a name and a mode and nothing else.
+: open  ( c-addr u fam -- fileid ior ) open-file ;
+: close ( fileid -- ior ) close-file ;
+
 
 ( ANS STRUCTURES - STRUCTURE.TXT, which was 0/5.
     begin-structure point
