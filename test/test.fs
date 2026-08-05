@@ -41,6 +41,7 @@ cr .( >> testhelp) cr parse-name testhelp included
 cr .( >> testload) cr parse-name testload included
 cr .( >> teststruct) cr parse-name struct included
 cr .( >> testaudio) cr parse-name testaud included
+cr .( >> testfm) cr parse-name testfm included
 
 \ include-mechanism smoke test (loads the file "1")
 :noname s" include 1 2" evaluate

@@ -4,9 +4,10 @@ The YM2151 sits at $9F40 (address) and $9F41 (data) - IKAOPM in the core,
 X816_core doc/MEMORY_MAP.md. Its 256 registers are in the YM2151
 datasheet: $08 KEYON, $20+ per channel, $60+ total level, and so on.
 
-There is no note-playing API on this machine; see HELP AUDIOFM for why.
-Raw register writes are the whole interface, which is enough for anything
-the chip can do - it is what a driver would be built out of.
+The note-playing API is a module - NEEDS FM, see HELP AUDIOFM - and it
+is built out of exactly these two words. Reach for the raw registers
+when you want something the driver does not offer: LFO waveforms, noise,
+per-operator detune, CSM.
 
 [x] YM! ( value reg -- ) - write a YM2151 register. Waits for the chip's
     busy flag before the address and before the data, BOUNDED: a chip
@@ -17,5 +18,9 @@ the chip can do - it is what a driver would be built out of.
     so this is a shadow, not a probe. reg is masked to 0-255.
 
 [ ] FMPOKE ( value reg -- ) - the X16 wrote registers through the ROM
-    audio driver so its volume shadows stayed in step. There is no such
-    driver here, so there is nothing to stay in step with: use YM!.
+    audio driver so its volume shadows stayed in step. Here YM! IS the
+    shadowing write - mod/fm.fs reads its own state back through YM@ -
+    so there is nothing for a second word to keep in step: use YM!.
+    One thing to know: FMVOL's attenuation is applied when it is set, so
+    a later YM! straight to a total-level register ($60-$7F) overrides
+    it until the next FMVOL or FMINST.

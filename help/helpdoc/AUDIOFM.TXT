@@ -3,14 +3,22 @@
 Two synths: the VERA PSG, 16 voices 0-15, and the YM2151 FM chip, 8
 channels 0-7. Both are on this machine.
 
-THE NOTE API IS NOT. PSGNOTE, FMINIT, FMINST, FMNOTE and the play-string
-words were the X16 ROM's audio driver - a note table and 163 instrument
-patches living in ROM. There is no such ROM here, so they are unticked
-and they do not exist: porting that driver is a job of its own, and a
-word that existed and did nothing would be worse than its absence.
+THE NOTE API IS A MODULE:  NEEDS FM   (SD card: INCLUDE FM)
 
-What IS here is every register the chips have. The PSG voice words below
-are direct VRAM writes; for the YM2151 see HELP AUDIOYM, and for sampled
+FMINIT, FMINST, FMNOTE and the rest were the X16 ROM's audio driver - a
+note table and 163 instrument patches living in ROM. There is no such
+ROM here, so the driver was ported: mod/fm.fs carries the patches, the
+drum tables and the note conversions, and it is generated from
+X816_Library's audio/ym.asm so there is one copy of that data, not two.
+
+The patches live in SDRAM rather than the dictionary. That is not a
+preference: `,` advances a SIXTEEN-bit HERE with no carry into the bank
+byte, and only `:` ever bumps to the next bank, so a 4 KB table
+compiled into the dictionary can run off its bank's ceiling and wrap to
+$0000 of the same bank.
+
+The register-level words below need no module. The PSG voice words are
+direct VRAM writes; for the YM2151 see HELP AUDIOYM, and for sampled
 sound HELP AUDIOPCM.
 
 VERA PSG - voice registers, 4 bytes each at VRAM $1F9C0:
@@ -18,7 +26,10 @@ VERA PSG - voice registers, 4 bytes each at VRAM $1F9C0:
 [x]   PSG!     ( value n -- )      write PSG register n (0-63) directly
 [x]   PSG@     ( n -- value )      read one back
 [x]   PSGFREQ  ( freq voice -- )   set the raw 16-bit frequency word
-[ ]   PSGNOTE  ( note voice -- )   play a packed note (0 = release)
+[x]   PSGNOTE  ( note voice -- )   play a packed note (0 = release).
+                               NEEDS FM. Frequency only - set PSGVOL,
+                               PSGWAV and PSGPW first, and mind that the
+                               pulse width PSGINIT leaves is a click.
 [x]   PSGVOL   ( vol voice -- )    volume 0-63, and it sets BOTH channels -
                                so it overrides an earlier PSGPAN
 [x]   PSGWAV   ( wave voice -- )   waveform 0-3 (pulse/saw/triangle/noise);
@@ -36,17 +47,39 @@ VERA PSG - voice registers, 4 bytes each at VRAM $1F9C0:
 [ ]   PSGPLAY  ( c-addr u voice -- )   play a play-string (blocking)
 [ ]   PSGCHORD ( c-addr u voice -- )   play a chord string (blocking)
 
-YM2151 FM:
-[ ]   FMINIT   ( -- )              init the chip + load default patches
-[ ]   FMINST   ( inst channel -- ) select an instrument patch 0-162
-[ ]   FMVOL    ( vol channel -- )  channel volume 0-63
-[ ]   FMNOTE   ( note channel -- ) play a packed note (0 = off)
-[ ]   FMFREQ   ( freq channel -- ) play a raw frequency in Hz (17-4434)
-[ ]   FMDRUM   ( drum channel -- ) play a drum sound (25-87)
-[ ]   FMVIB    ( speed depth -- )  global vibrato (0-127)
-[ ]   FMPAN    ( pan channel -- )  stereo pan (1=left 2=right 3=both)
+YM2151 FM - all of these are NEEDS FM:
+[x]   FMINIT   ( -- )              silence the chip, clear the volume
+                               and pan state, and give every channel
+                               instrument 0 - so FMNOTE on a fresh
+                               machine makes a sound rather than nothing
+[x]   FMINST   ( inst channel -- ) select an instrument patch 0-162.
+                               Out of range loads Silent, not garbage.
+                               Keeps the channel's existing panning
+[x]   FMVOL    ( vol channel -- )  channel volume 0-63, 63 loudest, to
+                               match PSGVOL. Applied to the CARRIER
+                               operators only: turning a modulator down
+                               changes the timbre, not the loudness
+[x]   FMNOTE   ( note channel -- ) play a packed note (0 = release)
+[x]   FMMIDI   ( note channel -- ) the same in MIDI numbering, 60 = C4
+[ ]   FMFREQ   ( freq channel -- ) a raw frequency in Hz. NOT here: the
+                               chip's pitch is logarithmic and this
+                               wants a log to reach it. FMNOTE covers
+                               every note; raw key codes go through YM!
+[x]   FMDRUM   ( drum channel -- ) play a drum sound (GM notes 25-87).
+                               Each drum is a whole instrument plus a
+                               fixed key code, so this costs a patch load
+[x]   FMVIB    ( speed depth -- )  global vibrato. The chip has ONE LFO
+                               shared by all eight channels. A non-zero
+                               depth also opens every channel's pitch
+                               sensitivity, or the LFO runs inaudibly
+[x]   FMPAN    ( pan channel -- )  stereo pan (1=left 2=right 3=both),
+                               keeping the instrument's feedback, which
+                               shares the same register
 [ ]   FMPLAY   ( c-addr u channel -- )  play a play-string (blocking)
 [ ]   FMCHORD  ( c-addr u channel -- )  play a chord string (blocking)
+                               Both are a string parser on top of the
+                               words above - a job of its own, not a
+                               binding.
 
 A beep, with no driver involved:
     PSGINIT  1181 0 PSGFREQ         \ ~440 Hz
@@ -58,3 +91,10 @@ One voice at full volume is about an eighth of the output's range, so a
 single PSG note is quiet by design: the mix leaves headroom for sixteen
 voices plus PCM and the YM2151. Use several voices, or the YM, to fill
 it. A sawtooth is the loudest single waveform - try 1 0 PSGWAV.
+
+The FM chip has no such problem. A piano chord, which is loud:
+    NEEDS FM
+    FMINIT                          \ every channel gets instrument 0
+    $41 0 FMNOTE  $45 1 FMNOTE  $48 2 FMNOTE      \ C, E, G
+    36 3 FMDRUM                     \ ...and a kick underneath
+    0 0 FMNOTE  0 1 FMNOTE  0 2 FMNOTE            \ release them
