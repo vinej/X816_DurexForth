@@ -28,7 +28,15 @@ MARKER, ...) are explained with examples in the [advanced
 [x] LATEST ( -- nt ) - name token of the most recently defined word.
 [x] HIDE ( "name" -- ) - remove a word from the dictionary search order.
 [x] SIZE ( "name" -- ) - print the byte length of a word's definition.
-[ ] SEE ( "name" -- ) - decompile a word to source-like text (SEE.FTH).
+[ ] SEE ( "name" -- ) - decompile a word. Open on purpose rather than
+    half-done: it needs an INVENTORY before it needs code, because the
+    code stream here is 4-byte `jsl xt` calls mixed with inline operands
+    of four different sizes (LIT 4, LITW 2, LITC 1, LITS 1+n, every
+    branch 2), a raw `jmp` from LEAVE, and tail-call elimination turning
+    the last call into a jump. Guess one operand size wrong and the
+    decompiler walks into the middle of an instruction and prints
+    confident rubbish from there on. forth/see.fs is the C64 original to
+    port and it assumes 2-byte cells and `jsr` throughout.
 [x] DOWORDS ( xt -- ) - call xt ( nt -- flag ) for each word; walk the dictionary.
 [x] NAME>STRING ( nt -- caddr u ) - the text of a name token.
 [x] FIND-NAME ( caddr u -- nt | 0 ) - look up a name, returning its name token.

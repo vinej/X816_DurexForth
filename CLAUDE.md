@@ -61,6 +61,59 @@ user-confirmed on the MiSTer:
   card on the MiSTer and reported all tests passed — that run included
   the new far-data suite (testfar), so the SDRAM allocator is
   hardware-proven too, not just emulator-proven.
+- **The remaining words, in one pass** (2026-08-06). 560 ticked / 14 open
+  / 24 not coming, from 505/92 that morning. What landed:
+  - **TIB, SP@, SP0, RP@, HANDLER** - assembly one-liners nobody had
+    asked for. SP@ is an INDEX, not an address, and says so: a cell
+    lives in two 16-bit planes, so no single address holds one, and
+    `(sp@ - sp0) / -2` is the depth. RP@ is S, all sixteen bits.
+  - **INCLUDE-FILE, line by line.** The X16 read 8 KB and EVALUATEd it,
+    which changes the language: a `\` comment then runs to the end of
+    the BUFFER. A colon definition still spans lines, so a line at a
+    time loses nothing but the surprise.
+  - **CLOSE-SOURCE cost a test to get right.** Seeking the handle to EOF
+    is not enough - the interpreter's READ-AHEAD still holds the next
+    line, so the line after the call ran anyway. `(fs-flush)` is exposed
+    for it (the same call PUSH_INPUT_SOURCE makes).
+  - **A wall clock in software**: TIME@/DATE@/SETTIME over the ms timer
+    with Hinnant's civil-from-days both ways, plus MS@ and SECONDS. No
+    RTC exists, so a power cycle forgets it and DATE@ reads 1970-01-01 -
+    honest beats plausible. 1970..2038, one cell of seconds.
+  - **The play-strings**: FMPLAY/FMCHORD/PSGPLAY/PSGCHORD parse the X16
+    PLAY language (notes, accidentals, dotted lengths, L T O < > V P I
+    S K) so a string written for one machine plays the same here.
+    Timing is frames off TICKS; the ROM kept a fractional-frame
+    accumulator against drift, and splitting the note's own total
+    between sound and silence removes the drift instead.
+  - **FMFREQ is real.** The chip is addressed in notes and Hz needs a
+    logarithm - but the MIDI frequency table PSGNOTE carries IS one
+    somebody already took, so it walks that and divides the remainder
+    into 64ths of a semitone. 440 Hz and MIDI 69 produce the same key
+    code with no fraction; 453 Hz lands 31/64 above it.
+  - **A missing THEN in PSGPLAY left a branch address on the stack** at
+    COMPILE time, and it surfaced as WRONG NUMBER in the FIRST assertion
+    of a test file three screens earlier. When a Hayes test reports a
+    depth nobody touched, count the IFs in what you just loaded.
+  - **`S" ` at the interpreter points into the input buffer**, which the
+    NEXT LINE overwrites. A parser probed across several lines reads the
+    test file itself - the first run of the play-string probe reported
+    every note as 64, which is the `.` and space of the following line.
+    testfm copies its strings before parsing them.
+  - **Ten entries were mismarked**, not missing: AFFINE-*, ENV-*,
+    ADPCM-*, FORGET, AHEAD, C", S\", [COMPILE], ?COMP, ?STACK, `,"` all
+    existed in modules the tracker had never loaded. Probe with the
+    modules IN, or the tracker measures base.fs and calls it the system.
+  - **SEE is open on purpose.** It needs an inventory before it needs
+    code: 4-byte `jsl` calls mixed with inline operands of four sizes,
+    a raw `jmp` from LEAVE, and tail-call elimination turning the last
+    call into a jump. One wrong operand size and the decompiler walks
+    into the middle of an instruction and prints confident rubbish.
+  - Also open and each says why on its page: KEYMAP (the kernel has one
+    scancode table), SAVE-PACK/TOP/TOP! (what an X816 turnkey image IS
+    belongs in the kernel repo first), PCM-PLAY (AFLOW's enable bit does
+    not stick), TSCrunch, and SCREEN's extra text modes - which the user
+    asked to hold until the kernel and the libraries carry the fonts.
+
 - **The load/save wrappers, and a third checkbox state** (2026-08-05).
   TILELOAD/TILESAVE/TMAPLOAD/TMAPSAVE, SPRITE-LOAD/SPRITE-SAVE and
   PAL-LOAD/PAL-SAVE are in base.fs, next to VLOAD/VSAVE and made of

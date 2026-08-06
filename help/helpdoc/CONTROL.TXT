@@ -16,7 +16,10 @@ any of it; HELP MEMORY has the map and the FAR-* allocator for SDRAM.
     1 kHz wall clock at either CPU speed - exact at 8 and 14 MHz alike).
     1000 MS ~ 1 s.
 [x] REBOOT ( -- ) - soft reboot through the reset vector.
-[ ] KEYMAP ( c-addr u -- ) - set the keyboard layout by name (core; case does
+[ ] KEYMAP ( c-addr u -- ) - KERNEL WORK FIRST: the X816 kernel decodes
+    scancodes with one built-in table, so there is no layout to select
+    until it carries several. When it does, this is a kernel call and a
+    one-line word. (core; case does
     not matter; unknown names abort). S" DE-DE" KEYMAP ; the ROM layouts are
     ABC/X16 (default) EN-US/INT EN-GB EN-CA EN-US/DVO SV-SE DE-DE DE-CH DA-DK
     IT-IT PL-PL NB-NO HU-HU ES-ES FI-FI PT-BR PT-PT CS-CZ JA-JP FR-FR FR-BE
