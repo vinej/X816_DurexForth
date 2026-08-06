@@ -69,11 +69,11 @@ variable bmx-stride   320 bmx-stride !
 create bmhdr 16 allot
 variable (bmfd)  variable (bmv)  variable (bmc)
 
-\ A 16-bit fetch, spelled out because a CELL IS 32 BITS: `bmhdr 6 + @`
-\ would take four bytes of the header and call it the width, and the two
-\ it stole are the height. W! is a primitive (the compiler patches
-\ two-byte operands with it); its counterpart never needed to exist.
-: (w@) ( addr -- u ) dup c@ swap 1+ c@ 8 lshift or ;
+\ Header fields are 16-bit and a CELL IS 32 BITS, so every one of them is
+\ read with W@ rather than @ : `bmhdr 6 + @` would take four bytes of the
+\ header and call it the width, and the two it stole are the height.
+\ (This file carried its own (W@) until base.fs's W! finally grew the
+\ fetch half it had been missing.)
 
 \ VERA's depth code is log2(bpp): 1 bpp = 0, 2 = 1, 4 = 2, 8 = 3.
 : (bm-code) ( bpp -- n ) 0 swap begin dup 1 > while 1 rshift swap 1+ swap repeat drop ;
@@ -148,7 +148,7 @@ variable (bmfd)  variable (bmv)  variable (bmc)
   \ was never loaded.
   bmx-palcount !
   bmhdr 4 + c@ bmx-bpp !
-  bmhdr 6 + (w@) bmx-width !   bmhdr 8 + (w@) bmx-height !
+  bmhdr 6 + w@ bmx-width !   bmhdr 8 + w@ bmx-height !
   bmhdr 11 + c@ bmx-palstart !
   bmhdr 15 + c@ bmx-border !  0 ;
 
@@ -159,7 +159,7 @@ variable (bmfd)  variable (bmv)  variable (bmc)
   (bm>pal) ?dup if (bm-close) exit then
   \ The header says where the pixels begin; SEEK there. The old code read
   \ the gap away a byte at a time because a channel could only go forwards.
-  bmhdr 12 + (w@) 0 (bmfd) @ reposition-file if (bm-close) 1 exit then
+  bmhdr 12 + w@ 0 (bmfd) @ reposition-file if (bm-close) 1 exit then
   bmx-width @ bmx-bpp @ * 8 /           ( bytes in one row )
   bmx-height @ 0 ?do
     (bm-aim)

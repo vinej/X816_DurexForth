@@ -81,6 +81,40 @@ W_STORE ; ( x addr -- ) store the low 16 bits of x
 
 ; -----
 
+    ; The fetch half of W! , and the reason it exists: a CELL IS 32 BITS
+    ; here, so `addr @` on a two-byte field takes four bytes and calls
+    ; the next field's low half part of this one. That has been the most
+    ; expensive class of bug in the whole port - stale 16-bit-cell code
+    ; in extras' FIELD:, advanced's ring buffer, advgfx's seed stack,
+    ; advsnd's ADPCM tables - and a 16-bit fetch is the missing tool.
+    ; C@ zero-extends, so W@ does; SW@ is for a field that was signed
+    ; when it was written.
+    +BACKLINK "w@", 2
+W_FETCH ; ( addr -- u ) fetch 16 bits, zero-extended
+    lda LSB, x
+    sta W
+    lda MSB, x
+    sta W + 2
+    lda [W]
+    sta LSB, x
+    stz MSB, x
+    rtl
+
+    +BACKLINK "sw@", 3
+SW_FETCH ; ( addr -- n ) fetch 16 bits, sign-extended
+    lda LSB, x
+    sta W
+    lda MSB, x
+    sta W + 2
+    lda [W]
+    sta LSB, x         ; STA leaves N from the LDA above
+    bpl +
+    lda #$ffff
+    sta MSB, x
+    rtl
++   stz MSB, x
+    rtl
+
     +BACKLINK "[", 1 | F_IMMEDIATE
 LBRAC
     lda #0

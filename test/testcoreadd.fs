@@ -205,6 +205,65 @@ T{ pos s" " type pos = -> true }T
 \ ...and a non-empty one still emits exactly its own length.
 T{ pos s" abc" type pos swap - -> 3 }T
 
+cr .( testcoreadd: the 16-bit words, W@ SW@ W! W, ) cr
+\ A cell is 32 bits and a byte is 8; everything between was hand-rolled
+\ until now, and the hand-rolling is where the bugs lived. These check
+\ the two things that actually go wrong: how many bytes are touched, and
+\ what happens to the top bit.
+create wb 8 allot
+$1234 wb w!  $5678 wb 2 + w!
+T{ wb w@ -> $1234 }T
+T{ wb 2 + w@ -> $5678 }T
+\ TWO bytes, not four: the neighbour is untouched, and @ over the pair
+\ sees both - which is the mistake W@ exists to prevent.
+T{ wb @ -> $56781234 }T
+T{ wb c@ wb 1+ c@ -> $34 $12 }T          \ little-endian, like everything here
+\ W! stores only the low half of the cell it is given.
+$deadbeef wb w!
+T{ wb w@ -> $beef }T
+T{ wb 2 + w@ -> $5678 }T                 \ ...and still does not spill
+
+\ W@ zero-extends, SW@ sign-extends. $FFFF is 65535 one way and -1 the
+\ other, and a file format decides which by what it wrote.
+$ffff wb w!
+T{ wb w@ -> 65535 }T
+T{ wb sw@ -> -1 }T
+$8000 wb w!
+T{ wb w@ -> 32768 }T
+T{ wb sw@ -> -32768 }T
+$7fff wb w!
+T{ wb w@ wb sw@ -> 32767 32767 }T        \ below the sign bit they agree
+
+\ W, compiles two bytes, and HERE moves by two.
+here $abcd w, here swap -
+T{ -> 2 }T
+T{ here 2 - w@ -> $abcd }T
+
+cr .( testcoreadd: W>N and C>N, and what SPLIT really does ) cr
+\ Sign extension for a value that did NOT come from memory. The bits
+\ cannot say whether they are signed, so the word that knows says it.
+T{ $ffff w>n -> -1 }T
+T{ $8000 w>n -> -32768 }T
+T{ $7fff w>n -> 32767 }T
+T{ 0 w>n -> 0 }T
+T{ $12345 w>n -> $2345 }T               \ only the low 16 bits are its business
+T{ $ff c>n -> -1 }T
+T{ $80 c>n -> -128 }T
+T{ $7f c>n -> 127 }T
+T{ $1ff c>n -> -1 }T
+\ And the comparison that goes wrong without it, which is the reason
+\ LOGIC has no 16-bit twins: $FFFF is a perfectly positive 65535 until
+\ somebody says it was signed.
+T{ $ffff 0< -> false }T
+T{ $ffff w>n 0< -> true }T
+
+\ SPLIT is two 16-BIT HALVES, low first - not the two bytes BIT.TXT used
+\ to claim. base.fs and asm.fs have always used it that way: SPLIT NIP
+\ is how a 24-bit address gives up its bank byte.
+T{ $12345678 split -> $5678 $1234 }T
+T{ $1234 split -> $1234 0 }T
+T{ $123456 split nip -> $12 }T
+
 cr .( testcoreadd ok ) cr
 
 ---testcoreadd---

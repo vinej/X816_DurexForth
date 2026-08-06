@@ -1,7 +1,17 @@
 === BIT - Bit and byte toolkit ===
 
-[x] SPLIT ( n -- bh bl ) - split a cell into its high and low bytes. $1234 SPLIT
-    ->  $12 $34
+[x] SPLIT ( n -- low high ) - split a cell into its two 16-BIT HALVES,
+    low first. $12345678 SPLIT  ->  $5678 $1234 ; $1234 SPLIT  ->  $1234 0
+    This entry said "high and low bytes" until 2026-08-06, which was true
+    when a cell was 16 bits and has been wrong since stage B. The system
+    itself never believed it: SPLIT NIP is how base.fs and asm.fs take
+    the bank byte off a 24-bit address.
+[x] W>N ( u -- n ) - sign-extend a 16-bit value that is already in a
+    cell. $FFFF W>N  ->  -1 ; $7FFF W>N  ->  32767
+[x] C>N ( c -- n ) - the same for a byte. $FF C>N  ->  -1
+    Use these when the value did NOT come from memory - a register pair,
+    a field picked apart with AND and RSHIFT. Out of memory, W@ and SW@
+    (HELP MEMORY) settle it at the fetch instead.
 [x] CATNIB ( nh nl -- byte ) - combine two nibbles: (nh<<4) | nl. $A $5 CATNIB  ->
     $A5
 [x] SBIT ( addr mask -- ) - set the masked bits of the byte at addr.

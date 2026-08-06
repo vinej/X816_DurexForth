@@ -7,6 +7,27 @@ every word below reaches all 16 MB - there is no banking and no window.
 [x] ! ( x addr -- ) - store a cell. 42 X !
 [x] C@ ( addr -- c ) - fetch a byte.
 [x] C! ( c addr -- ) - store a byte.
+[x] W@ ( addr -- u ) - fetch 16 bits, zero-extended into the cell.
+[x] SW@ ( addr -- n ) - the same, sign-extended: for a field that was
+    signed when it was written.
+[x] W! ( x addr -- ) - store the low 16 bits of x.
+[x] W, ( x -- ) - compile 16 bits into the dictionary at HERE.
+
+THE 16-BIT WORDS ARE NOT AN AFTERTHOUGHT. A cell is 32 bits here, so a
+two-byte field read with @ takes FOUR bytes and calls the next field's
+low half part of this one - and the field after it is then read from the
+wrong place, which is how the bug hides. Every 16-bit structure this
+port has met wanted these: BMX's image header, a sprite's attributes, a
+tilemap cell, the compiler's own branch operands (W! and W, are what it
+patches them with). If you are reading a file format or a hardware
+record, count the bytes in the SPEC and use the word that matches:
+
+    hdr 6 + w@     \ the width, two bytes, as the format defines it
+    hdr 6 + @      \ four bytes: the width AND the height, as one number
+
+Stale code from before the 32-bit cells is the same mistake wearing a
+different hat: `2*` next to `+ @` was correct when a cell was two bytes
+and is an off-by-half now.
 [x] 2@ ( addr -- x1 x2 ) - fetch a double / two cells.
 [x] 2! ( x1 x2 addr -- ) - store two cells.
 [x] +! ( n addr -- ) - add n to the cell at addr. 1 X +!

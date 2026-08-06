@@ -61,8 +61,11 @@ user-confirmed on the MiSTer:
   card on the MiSTer and reported all tests passed — that run included
   the new far-data suite (testfar), so the SDRAM allocator is
   hardware-proven too, not just emulator-proven.
-- **The remaining words, in one pass** (2026-08-06). 560 ticked / 14 open
-  / 24 not coming, from 505/92 that morning. What landed:
+- **The remaining words, in one pass** (2026-08-06). **570 ticked / 8
+  open / 23 not coming**, from 505/92 that morning. (The commit messages
+  of that day quote 560/14/24 - a count taken before the last five
+  AUDIOFM entries were ticked. Count from the files, not from memory.)
+  What landed:
   - **TIB, SP@, SP0, RP@, HANDLER** - assembly one-liners nobody had
     asked for. SP@ is an INDEX, not an address, and says so: a cell
     lives in two 16-bit planes, so no single address holds one, and
@@ -108,6 +111,24 @@ user-confirmed on the MiSTer:
     a raw `jmp` from LEAVE, and tail-call elimination turning the last
     call into a jump. One wrong operand size and the decompiler walks
     into the middle of an instruction and prints confident rubbish.
+  - **The 16-bit words, after the user asked whether the machine needed
+    them** (and it did): **W@** and **SW@** join the W! and W, that were
+    already primitives - a family that had been missing only its fetch,
+    which is why mod/bmx.fs carried a private (W@) and float, floatx and
+    base.fs each spelled out `dup c@ swap 1+ c@ 8 lshift or`. W@
+    zero-extends as C@ does; SW@ is for a field that was signed when it
+    was written. NOT S@/S! : W! and W, already own that job under the W
+    name, and S is the string prefix.
+  - **LOGIC needed no 16-bit twins and now says why.** A comparison sees
+    a CELL; it cannot know how wide the data was. Width is decided at
+    the fetch (W@ / SW@) or, for a value that never came from memory, by
+    **W>N** and **C>N** - two new sign-extenders in BIT. $FFFF 0< is
+    FALSE and correctly so: 65535 really is positive.
+  - **BIT.TXT was lying about SPLIT.** It documented `( n -- bh bl )`,
+    "the high and low BYTES" - true when a cell was 16 bits, wrong since
+    stage B. SPLIT is `( n -- low16 high16 )`, and the system always
+    knew: `split nip` is how base.fs and asm.fs take the bank byte off a
+    24-bit address. A ticked box is only as good as its text.
   - Also open and each says why on its page: KEYMAP (the kernel has one
     scancode table), SAVE-PACK/TOP/TOP! (what an X816 turnkey image IS
     belongs in the kernel repo first), PCM-PLAY (AFLOW's enable bit does

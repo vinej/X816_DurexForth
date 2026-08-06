@@ -14,6 +14,26 @@ Comparisons return TRUE (-1, all bits set) or FALSE (0).
 [x] U> ( u1 u2 -- flag ) - unsigned greater-than.
 [x] WITHIN ( n lo hi -- flag ) - is lo <= n < hi? 5 0 10 WITHIN  ->  -1
 
+--- these are CELL-wide, and that is the whole answer on 16 bits ---
+There is no 16-bit = or < here and there should not be. A comparison
+cannot see how wide the data WAS - it sees a cell - so the question is
+never "compare these as 16 bits", it is "what is in this cell". Two
+things decide that, and both happen before the comparison:
+
+  from memory   W@ zero-extends, SW@ sign-extends (HELP MEMORY)
+  from anywhere W>N and C>N sign-extend a value already in a cell
+                (HELP BIT)
+
+Get that right and every word on this page is correct as it stands. Get
+it wrong and no 16-bit comparison would have saved you: $FFFF read with
+W@ is 65535, and 65535 < 0 is FALSE because 65535 really is positive.
+The bug is at the fetch, which is where the fix belongs.
+
+AND, OR, XOR and INVERT do not care at all - they work on the bits in
+the cell, and INVERT of a 16-bit value simply has 32 bits set. Mask with
+65535 if you are putting it back into a 16-bit field, or use W! , which
+stores the low half and does the masking for you.
+
 --- more ---
 Each is the negation of one above, so they cost nothing and read better
 than 0= after a comparison.

@@ -1122,6 +1122,17 @@ variable (pdst) variable (plen)
 : rpt ( char n -- c-addr u )
   200 min dup >r 0 ?do dup pad i + c! loop drop pad r> ;
 : str ( n -- c-addr u ) s>d tuck dabs <# #s rot sign #> ;
+( SIGN EXTENSION, for a narrow value that is already in a cell.
+
+  W@ and SW@ settle this when the value comes out of MEMORY. These are
+  for when it does not: a pair of hardware registers read with IOC@, a
+  field picked apart with AND and RSHIFT, a byte off a VERA port. The
+  bits say nothing about their own signedness - $FFFF is 65535 and -1
+  at the same time - so the word that knows which one it is has to say
+  so, and this is how it says it. )
+: w>n ( u -- n ) 65535 and dup 32768 and if 65536 - then ;
+: c>n ( c -- n ) 255 and dup 128 and if 256 - then ;
+
 : nhex ( u -- c-addr u ) base @ >r hex 0 <# #s #> r> base ! ;
 : nbin ( u -- c-addr u ) base @ >r 2 base ! 0 <# #s #> r> base ! ;
 : val ( c-addr u -- n )
