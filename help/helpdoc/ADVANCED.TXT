@@ -27,9 +27,10 @@ Game math (NEEDS ADVANCED) - all of this is in, and tested by testadv.
     data sit at +4, +8 and +12: three CELLS, and a cell is four bytes here.
     They were 2/4/6 until testadv was first run.
 [x] ZX0-DECOMPRESS - ZX0 v2 (what `zx0` / `salvador` emit), in Forth.
-[ ] MEM-DECOMPRESS - was `bcall $feed`, the KERNAL's LZSA2 depacker in
-    banked ROM. There is no ROM here past the boot page and no LZSA2 in the
-    kernel, so the word could only jump into nothing. Compress with ZX0.
+MEM-DECOMPRESS is gone rather than unticked: it was `bcall $feed`, the
+    KERNAL's LZSA2 depacker in banked ROM. There is no banked ROM on a
+    flat 65816 and no LZSA2 in the kernel, so the word could only ever
+    have jumped into nothing. Compress with ZX0.
 
 Graphics (NEEDS ADVGFX, after GRAPHIC) - tested by testadvgfx.
 [x] CLIP-RECT CLIP-LINE CLINE - Cohen-Sutherland line clipping.
@@ -43,11 +44,12 @@ Graphics (NEEDS ADVGFX, after GRAPHIC) - tested by testadvgfx.
 Audio (NEEDS ADVSND) - envelopes and ADPCM are tested by testadvsnd.
 [ ] ENV-START ENV-RELEASE ENV-STOP ENV-TICK - per-frame ASR envelopes on
     all 16 PSG voices; arm with ' ENV-TICK IRQ.
-[ ] PCM-PLAY ( bank addr ud rate -- ) PCM-STOP PCM-PLAYING? PCM-LOOP -
-    background FIFO streaming from banked RAM off the AFLOW interrupt,
-    auto-disarm, looping.
+[ ] PCM-PLAY ( addr ud rate -- ) PCM-STOP PCM-PLAYING? PCM-LOOP -
+    background FIFO streaming off the AFLOW interrupt, auto-disarm,
+    looping. The X16 took a bank and an offset; a flat 24-bit address
+    says the same thing here. Blocked on AFLOW, above.
 [ ] ADPCM-INIT ADPCM! ADPCM>PCM ( src dst u -- dst' ) - IMA ADPCM, low
-    nibble first, 8-bit signed out. Offline only: decode whole banks up
+    nibble first, 8-bit signed out. Offline only: decode whole buffers up
     front, then PCM-PLAY the result (Forth is too slow to feed the DAC
     live).
 

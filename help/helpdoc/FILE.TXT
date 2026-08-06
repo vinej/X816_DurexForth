@@ -19,8 +19,9 @@ error, 6 exists, 7 not empty. These words RETURN it; they do not throw.
 [x] INCLUDE ( "name" -- ) - load and interpret a file by name. INCLUDE GAME.FTH
 [x] INCLUDED ( addr len -- ) - load and interpret the file named by a string. S"
     GAME.FTH" INCLUDED
-[ ] INCLUDE-FILE ( fileid -- ) - interpret the rest of an already-open file
-    (max 8 KB; staged in the highest RAM bank; do not nest).
+[ ] INCLUDE-FILE ( fileid -- ) - interpret the rest of an already-open
+    file. The X16 staged it through the 8 KB bank window and could not
+    nest; here it would be an ordinary buffer in flat memory.
 [x] REQUIRE ( "name" -- ) - include a file only once, by name.
 [x] REQUIRED ( addr len -- ) - include a file only once, by string.
 [x] OPEN-FILE ( addr len fam -- fileid ior ) - open an EXISTING file. Only

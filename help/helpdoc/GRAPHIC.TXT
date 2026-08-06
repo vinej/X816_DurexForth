@@ -31,7 +31,6 @@ Pen API (set the colour once with GCOLOR, then omit it):
 Low-level (draw straight to VRAM): BPSET BHLINE BVLINE BLINE BFILL BRECT BCLS.
 
 GRAPHIC is an on-demand module: on a cartridge load it with NEEDS GRAPHIC
-(stored in cart ROM bank 40, staged through the highest RAM bank, only the
-compiled words cost dictionary space); from the SD card use INCLUDE GRAPHIC.
+(only the compiled words cost dictionary space); from the SD card use INCLUDE GRAPHIC.
 Filled shapes stream their rows through the native FX-FILL (VERA cache
 writes), so fills are fast with no floating point anywhere.

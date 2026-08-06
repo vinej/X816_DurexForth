@@ -7,10 +7,10 @@
   EDIT saves/restores the data-stack zeropage the editor uses, resets the RAM
   bank to 0, closes the editor's files, and hides the mouse on exit; file I/O
   and console output after EDIT work normally.
-[ ] SETBANK ( bank -- ) - select the RAM bank visible at $A000-$BFFF.
-[ ] B@ ( bank off -- byte ) - read a byte from banked RAM (off = 0..8191 into
-    $A000). Preserves the $00 bank register.
-[ ] B! ( byte bank off -- ) - store a byte into banked RAM. Preserves $00.
+SETBANK, B@ and B! are gone rather than unticked: they selected and
+reached the X16's 8 KB RAM window at $A000, and a 65816 addressing
+sixteen megabytes flat has no window to select. Ordinary @ and ! reach
+any of it; HELP MEMORY has the map and the FAR-* allocator for SDRAM.
 [x] SLEEP ( jiffies -- ) - wait jiffies 1/60-second ticks. 60 SLEEP waits ~1 s.
 [x] MS ( u -- ) - wait u milliseconds on the free-running ms timer ($9F90,
     1 kHz wall clock at either CPU speed - exact at 8 and 14 MHz alike).

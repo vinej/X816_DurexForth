@@ -22,5 +22,5 @@ Typical paced feeder:
   128 PCMRATE                  \ ~48 kHz
   BEGIN  ...next-byte... PCMFULL? 0= WHILE  PCM!  REPEAT
 
-For hands-off background streaming from banked RAM (AFLOW-interrupt
+For hands-off background streaming from memory (AFLOW-interrupt
 refills, looping, ADPCM) see ADVANCED / the ADVSND module: NEEDS ADVSND.

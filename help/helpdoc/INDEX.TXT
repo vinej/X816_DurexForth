@@ -42,11 +42,22 @@ I2C - each of which says so on its own page.
  VERAFX      VERA FX  DCSEL FX-MULT  (+ VERAFX toolkit)
  ADVANCED    game math, rotozoom, streaming sound, BMX (modules)
  LOADSAVE    BLOAD BSAVE VLOAD VSAVE  (raw bytes, no PRG header)
- BANK        bulk RAM-bank I/O  BANKLOAD BANK>MEM ...
  IMAGE       SAVE-IMAGE LOAD-IMAGE  (fast turnkey reload)
- KERNAL      SYSCALL  (call any KERNAL routine)
- CONTROL     EDIT SETBANK B@ B! SLEEP MS TURBO REBOOT clock ...
+ CONTROL     SLEEP MS TURBO REBOOT RANDOM I2CPEEK clock ...
  FLOAT       S>F F+ F* FSQRT FSIN F. ...   (FLOAT.FTH)
  BIT         SPLIT CATNIB SBIT CBIT FBIT
  ASSEMBLER   inline 6502 assembler  CODE ... END-CODE
 ==============================================================
+
+BANK and KERNAL are gone from this index, and from the /HELP directory.
+They documented the 6502 machine underneath the X16: an 8 KB window at
+$A000 with a bank register behind it, and calls into a KERNAL sitting in
+banked ROM. The 65816 addresses all sixteen megabytes flat and there is
+no ROM here past the boot page, so those pages described a machine you
+could not reach from this one. Where the data went instead: the
+dictionary spans program banks $01-$04 (HELP MEMORY) and bulk data lives
+in SDRAM through FAR-ALLOC and friends (HELP MEMORY, FAR-*).
+
+(Do not start a prose line in these files with a bracket pair. The
+checkbox tracker is parsed, and a wrapped sentence beginning "[ ] here"
+became an entry claiming HERE was missing.)

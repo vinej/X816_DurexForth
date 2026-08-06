@@ -61,6 +61,29 @@ user-confirmed on the MiSTer:
   card on the MiSTer and reported all tests passed — that run included
   the new far-data suite (testfar), so the SDRAM allocator is
   hardware-proven too, not just emulator-proven.
+- **BANK and KERNAL are gone from the helpdoc** (2026-08-05, user: remove
+  entries that are not related to the flat model). Both pages documented
+  the 6502 machine underneath the X16 rather than this one: an 8 KB
+  window at $A000 with a bank register behind it (BANKLOAD, BANKSAVE,
+  BANK>MEM, MEM>BANK, DATABANK, and CONTROL's SETBANK/B@/B!), and calls
+  into a KERNAL in banked ROM (SYSCALL, BCALL, and the CHKIN/CHKOUT/
+  CHRIN/CLRCHN/READST channel words that left mod/bmx.fs the same day).
+  A 65816 addresses sixteen megabytes flat and there is no ROM past the
+  boot page, so an unticked box under those names promised a machine you
+  cannot reach from this one. Where the words that DO the job live is
+  named in their place: banks $01-$04 and the FAR-* SDRAM allocator.
+  Same treatment for MEM-DECOMPRESS (`bcall $feed`). The leftover prose
+  went too - INCLUDE-FILE "staged in the highest RAM bank", GRAPHIC's
+  "cart ROM bank 40", PCM-PLAY's `( bank addr ... )` signature, which is
+  a flat 24-bit address here. VRAM banks 0/1 and the program banks are
+  NOT this: they are real, and they stayed.
+  - **The tracker's own numbers were inflated**, which this found: the
+    counting regex used `^\s+\[x\]` alongside `^\[x\]`, and `\s`
+    matches a NEWLINE, so every unindented entry after a blank line was
+    counted twice. Strict per-line counting says **505 ticked / 76
+    open** across 38 pages (92 open before the pruning), where the same
+    files used to report 543/97. Count lines, not regex matches.
+
 - **BMX, the last unrun suite - and the palette does not read back**
   (2026-08-05). All eight module suites now run. mod/bmx.fs was the
   heaviest KERNAL user left: OPEN a logical file on device 8 with a
