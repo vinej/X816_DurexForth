@@ -27,22 +27,59 @@ FILE page lists.
     S" MYFONT.BIN" 0 FONT2 2048 VSAVE DROP
     S" MYFONT.BIN" 0 FONT2 VLOAD 2DROP  FONT2 CHARSET
 
+--- tilesets, tilemaps, sprites and palettes ---
+VLOAD and VSAVE with the address and the length filled in from VERA's own
+registers. Every one is a wrapper and that is the point: a line that says
+what it loads reads better, and cannot get the map's size wrong.
+
+You name a LAYER, not an address. The X16 took a VRAM address and its
+TMAPSAVE was hardwired to layer 1; here the words read where the layer
+points. Layer 0 is the console on this machine, so 0 TMAPSAVE saves the
+text screen and 1 TMAPSAVE saves your game's.
+
+[x] TILELOAD ( c-addr u layer -- u ior ) - load tile data to that layer's
+    tile base.
+[x] TILESAVE ( c-addr u layer len -- ior ) - save len bytes of it. Tile
+    data has no inherent length, so this one still asks.
+[x] TMAPLOAD ( c-addr u layer -- u ior ) - load the tilemap back to its
+    own address.
+[x] TMAPSAVE ( c-addr u layer -- ior ) - save it, self-sizing: the config
+    byte gives the map's width and height, at 2 bytes a cell.
+[x] SPRITE-LOAD ( c-addr u n -- u ior ) - load pixels to sprite n's image
+    address, read out of its attributes.
+[x] SPRITE-SAVE ( c-addr u n -- ior ) - save them, self-sizing from the
+    size codes and the 4/8 bpp bit.
+[x] PAL-LOAD ( c-addr u start -- u ior ) - load palette entries from
+    index start.
+[x] PAL-SAVE ( c-addr u start count -- ior ) - save count of them.
+[x] LAYER-MAP ( layer -- vbank vaddr ), LAYER-TILES ( layer -- vbank
+    vaddr ), LAYER-MAP-SIZE ( layer -- u ) - what the wrappers read, for
+    when you want the numbers yourself.
+[x] SPRITE-ADDR ( n -- vbank vaddr ), SPRITE-BYTES ( n -- u ) - the same
+    for a sprite.
+
+PAL-SAVE takes a RANGE for a hardware reason, not a stylistic one: this
+machine cannot read back palette entries nobody wrote, so saving all 256
+and loading them back would install garbage over the console's colours.
+Save the entries you set. If your program keeps its palette in memory,
+BSAVE that instead and no readback is involved at all. HELP ADVANCED,
+BMX-PAL, has the whole story.
+
+    \ a level's map and tiles, and the sprite that walks on them
+    S" LEVEL.MAP" 1 TMAPLOAD 2DROP
+    S" LEVEL.TIL" 1 TILELOAD 2DROP
+    S" HERO.SPR"  0 SPRITE-LOAD 2DROP
+
 --- X16 words that did not port ---
-Each of these took a device number, a PRG header, or a CBM DOS channel.
-LOAD/SAVE are BLOAD/BSAVE without the header; BVLOAD/BVERIFY have no
-counterpart yet; TILESAVE/TILELOAD/TMAPSAVE/TMAPLOAD are VSAVE/VLOAD
-with the tile or map address, which you now pass yourself.
-[ ] LOAD ( c-addr u dev -- ) - load a PRG file to the address in its
+Each took a device number, a PRG header, or a CBM DOS channel. LOAD/SAVE
+are BLOAD/BSAVE without the header.
+[-] LOAD ( c-addr u dev -- ) - load a PRG file to the address in its
     2-byte header.
-[ ] SAVE ( c-addr u dev start end -- ) - save memory as a PRG file.
-[ ] BVLOAD ( c-addr u dev bank vaddr -- ) - headerless load into VRAM.
-[ ] BVERIFY ( c-addr u dev addr -- flag ) - verify a file against memory.
-[ ] TILESAVE ( c-addr u vaddr len -- ) - save a tileset.
-[ ] TILELOAD ( c-addr u vaddr -- ) - load a tileset.
-[ ] TMAPSAVE ( c-addr u -- ) - save the tilemap.
-[ ] TMAPLOAD ( c-addr u -- ) - load the tilemap.
+[-] SAVE ( c-addr u dev start end -- ) - save memory as a PRG file.
+[-] BVLOAD ( c-addr u dev bank vaddr -- ) - headerless load into VRAM.
+[-] BVERIFY ( c-addr u dev addr -- flag ) - verify a file against memory.
 
 --- durexForth: raw binary load / save ---
-[ ] LOADB ( nameptr namelen dst -- endaddr ) - superseded by BLOAD,
+[-] LOADB ( nameptr namelen dst -- endaddr ) - superseded by BLOAD,
     which reports a count and an ior instead of overloading 0.
-[ ] SAVEB ( start end nameptr namelen -- ) - superseded by BSAVE.
+[-] SAVEB ( start end nameptr namelen -- ) - superseded by BSAVE.

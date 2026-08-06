@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """Annotate help/helpdoc/*.txt: prefix every word-definition line with
-[x] (word exists in durexForth) or [ ] (not implemented). Report durexForth
-words that appear in no help file."""
+[x] (word exists in durexForth) or [ ] (not implemented yet). Report
+durexForth words that appear in no help file.
+
+The third state, [-], is NOT derived and never rewritten: it means the word
+belonged to the X16 or the C64 and is not coming - a device number, a CBM
+DOS channel, a ROM call, a PRG header. This script leaves those lines
+exactly as it found them, so the judgement stays with whoever made it."""
 import re, glob, os, subprocess, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -47,6 +52,12 @@ for path in sorted(glob.glob('help/helpdoc/*.txt') + glob.glob('help/helpdoc/*.T
         continue
     out = []
     for line in open(path, encoding='latin1').read().split('\n'):
+        # [-] is a decision, not a measurement: pass it through untouched
+        if re.match(r'^\s*\[-\] ', line):
+            out.append(line)
+            w = leading_word(re.sub(r'^(\s*)\[-\] ', r'\1', line))
+            if w: matched.add(w.lower())
+            continue
         # strip any prior annotation so the script is idempotent
         stripped = re.sub(r'^\[[ x]\] ', '', line)
         w = leading_word(stripped)

@@ -14,8 +14,13 @@ access set the address once with VADDR then stream with V!/V@.
 [x] synonym VREAD V@
 [x] V!W ( w -- ) - store a 16-bit word through the data port, low byte first.
 [x] synonym VWSTORE V!
-[ ] SCREEN ( mode -- ) - set the video mode. 0=80x60, 1=80x30, 2=40x60, 3=40x30,
-    128=320x240x256. 0 SCREEN
+[x] SCREEN ( mode -- ) - 0 = the text console, 128 = 320x240 at 256
+    colours. Entering 128 saves the console's font and layer setup and
+    0 SCREEN puts them back, because the bitmap lies on top of both -
+    76,800 bytes from VRAM $00000 covers the character map AND the font
+    at $04000. The X16's other text modes (1=80x30, 2=40x60, 3=40x30)
+    are not here yet: they are DC_HSCALE/DC_VSCALE settings, and 0 and
+    128 are what GRAPHIC needs.
 [x] COLOR ( fg bg -- ) - set the text colours used FROM NOW ON. 1 6 COLOR
     is white on blue. Text already on screen keeps the attribute it was
     drawn with - this is a pen, not a repaint - but CLS fills with the

@@ -1067,6 +1067,68 @@ create (vbuf) 256 allot
   repeat
   (bfd) @ close-file drop 0 ;
 
+( TILESETS, TILEMAPS, SPRITES AND PALETTES - VLOAD and VSAVE with the
+  address and the length filled in.
+
+  Every one of these is a wrapper and nothing more, and that is the
+  point: `s" LEVEL.MAP" 1 tmapload` says what it does, where
+  `s" LEVEL.MAP" 1 $b000 vload` says it to somebody who already knows
+  where layer 1's map is and how big it is. The hardware knows both -
+  the map base, the tile base and the map's size are in VERA's own
+  registers - so asking the caller to repeat them is asking for the
+  chance to get them wrong.
+
+  A LAYER, not an address: the X16's TILESAVE/TILELOAD took a VRAM
+  address and its TMAPSAVE was hardwired to layer 1. Here you name the
+  layer and the words read where it points. Layer 0 is the console on
+  this machine, so `0 tmapsave` saves the text screen and `1 tmapsave`
+  saves your game's.
+
+  PAL-SAVE takes a RANGE, and that is about hardware, not taste. This
+  machine cannot read back palette entries nobody wrote - see the head
+  of mod/bmx.fs, which found it the hard way - so saving all 256 and
+  loading them back installs garbage over the console's own colours.
+  Save the entries you set. If you keep your palette in memory, BSAVE
+  that instead and nothing depends on a readback at all. )
+
+: (lreg) ( layer -- reg )       \ VERA's layer registers, 7 apart
+  if $9f34 else $9f2d then ;
+: (split17) ( u -- vbank vaddr ) dup 16 rshift swap 65535 and ;
+: (mapdim) ( code -- n ) 32 swap lshift ;      \ 0-3 = 32/64/128/256 cells
+
+: layer-map ( layer -- vbank vaddr )           \ MAPBASE holds addr 16:9
+  (lreg) 1+ ioc@ 9 lshift (split17) ;
+: layer-tiles ( layer -- vbank vaddr )         \ TILEBASE holds addr 16:11
+  (lreg) 2 + ioc@ 252 and 9 lshift (split17) ;
+: layer-map-size ( layer -- u )                \ cells * 2 bytes
+  (lreg) ioc@ dup 4 rshift 3 and (mapdim)
+  swap 6 rshift 3 and (mapdim) * 2* ;
+
+: tileload ( c-addr u layer -- u ior ) layer-tiles vload ;
+: tilesave ( c-addr u layer len -- ior ) >r layer-tiles r> vsave ;
+: tmapload ( c-addr u layer -- u ior ) layer-map vload ;
+: tmapsave ( c-addr u layer -- ior )
+  dup >r layer-map r> layer-map-size vsave ;
+
+\ Sprite attributes are eight bytes each from VRAM $1FC00. Byte 0 and the
+\ low nibble of byte 1 are the image address >> 5; bit 7 of byte 1 picks
+\ 8bpp over 4bpp; byte 7 carries the two size codes.
+: (sprb) ( n i -- b ) swap 8 * $fc00 + + 1 swap vpeek ;
+: (sprdim) ( code -- px ) 8 swap lshift ;      \ 0-3 = 8/16/32/64 pixels
+: sprite-addr ( n -- vbank vaddr )
+  dup 0 (sprb) swap 1 (sprb) 15 and 8 lshift or 5 lshift (split17) ;
+: sprite-bytes ( n -- u )
+  dup 7 (sprb) dup 4 rshift 3 and (sprdim)
+  swap 6 rshift 3 and (sprdim) *
+  swap 1 (sprb) 128 and 0= if 1 rshift then ;  \ 4bpp: half a byte a pixel
+: sprite-load ( c-addr u n -- u ior ) sprite-addr vload ;
+: sprite-save ( c-addr u n -- ior )
+  dup >r sprite-addr r> sprite-bytes vsave ;
+
+: pal-load ( c-addr u start -- u ior ) 2* $fa00 + 1 swap vload ;
+: pal-save ( c-addr u start count -- ior )
+  2* >r 2* $fa00 + 1 swap r> vsave ;
+
 ( HELP - the manual, on the card, in /HELP.
 
   Card names are the topic TRUNCATED TO EIGHT characters and

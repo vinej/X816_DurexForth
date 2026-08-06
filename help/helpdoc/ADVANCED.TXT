@@ -38,8 +38,8 @@ Graphics (NEEDS ADVGFX, after GRAPHIC) - tested by testadvgfx.
 [x] FX-COPY ( sbank saddr dbank daddr u -- ) - cached 4-byte copies.
 [x] AFFINE-ON AFFINE-RAY AFFINE-SPAN AFFINE-LINE AFFINE-OFF - rotozoom /
     mode-7 sampling (see VERAFX).
-[ ] circle / disc - GRAPHIC's OVAL/OVALF cover these (unclipped).
-[ ] text onto the bitmap - not ported.
+[-] circle / disc - GRAPHIC's OVAL/OVALF cover these (unclipped).
+[-] text onto the bitmap - GRAPHIC's GTEXT draws it.
 
 Audio (NEEDS ADVSND) - envelopes and ADPCM are tested by testadvsnd.
 [ ] ENV-START ENV-RELEASE ENV-STOP ENV-TICK - per-frame ASR envelopes on
@@ -54,7 +54,7 @@ Audio (NEEDS ADVSND) - envelopes and ADPCM are tested by testadvsnd.
     live).
 
 Storage / util
-[ ] DOS words - in the core (see DICTIONARY: DOS).
+[-] DOS words - in the core (see DICTIONARY: DOS).
 [x] BMX-LOAD ( c-addr u vbank vaddr -- ior ) - load a BMX v1 image: the
       palette into VERA's, the pixels into VRAM, rows BMX-STRIDE apart.
       No device number - there is no IEC bus. ior 1 = i/o (including a

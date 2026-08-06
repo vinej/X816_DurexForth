@@ -61,6 +61,39 @@ user-confirmed on the MiSTer:
   card on the MiSTer and reported all tests passed — that run included
   the new far-data suite (testfar), so the SDRAM allocator is
   hardware-proven too, not just emulator-proven.
+- **The load/save wrappers, and a third checkbox state** (2026-08-05).
+  TILELOAD/TILESAVE/TMAPLOAD/TMAPSAVE, SPRITE-LOAD/SPRITE-SAVE and
+  PAL-LOAD/PAL-SAVE are in base.fs, next to VLOAD/VSAVE and made of
+  them. They exist for READABILITY: `s" LEVEL.MAP" 1 tmapload` against
+  `s" LEVEL.MAP" 1 $b000 vload`, and the length comes out of VERA rather
+  than out of the caller's memory.
+  - **You name a LAYER, not an address.** MAPBASE holds addr 16:9,
+    TILEBASE holds addr 16:11 in bits 7:2, and the config byte's two
+    2-bit codes give the map's width and height (32/64/128/256), so
+    TMAPSAVE is self-sizing. LAYER-MAP / LAYER-TILES / LAYER-MAP-SIZE
+    are exposed for anyone who wants the numbers.
+  - Sprites the same: SPRITE-ADDR reads byte 0 plus the low nibble of
+    byte 1, shifted left 5; SPRITE-BYTES multiplies the two size codes
+    and HALVES for 4bpp - both SPRITE-MEM and SPRITE-IMAGE leave that
+    mode bit clear, so a save that assumed 8bpp would put 128 bytes of
+    someone else's VRAM in the file.
+  - **PAL-SAVE takes a RANGE** because of the palette readback: saving
+    all 256 and loading them back installs garbage over the console's
+    own colours. Save what you set.
+  - Tests are in testload.fs (already in the suite, so no new
+    registration). Trap paid for: layer config $50 is 64x64, not 64x32 -
+    bits 7:6 are the HEIGHT code and bits 5:4 the width.
+  - **`[-]` is a third state in the helpdoc**, for words that are not
+    coming because they were X16/C64-only: LOAD/SAVE/BVLOAD/BVERIFY/
+    LOADB/SAVEB (PRG + device), DEVICE/DOS/SEND-CMD/RDERR/RDIR (the CBM
+    command channel), EDIT/MONITOR (X16 ROM), USR, FMPOKE, GETKEY,
+    SAVE-PRG/SAVE-FORTH. 530 done / 44 open / 24 not coming. An honest
+    `[ ]` is a promise, and leaving those as `[ ]` made the tracker read
+    as though a chunk of the port was outstanding when it was finished.
+    INDEX.TXT carries the legend; `build/annotate.py` passes `[-]` lines
+    through untouched (it derives `[x]`/`[ ]` from a live word list, and
+    a decision is not a measurement).
+
 - **BANK and KERNAL are gone from the helpdoc** (2026-08-05, user: remove
   entries that are not related to the flat model). Both pages documented
   the 6502 machine underneath the X16 rather than this one: an 8 KB

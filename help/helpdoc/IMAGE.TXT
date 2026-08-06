@@ -1,7 +1,7 @@
 --- durexForth: turnkey images ---
 [ ] SAVE-PACK ( "name" -- ) - save a packed turnkey image (dictionary moved adjacent to the code) that runs START on load.
-[ ] SAVE-PRG ( "name" -- ) - save a plain runnable PRG image.
-[ ] SAVE-FORTH ( "name" -- ) - save the raw $0801..top memory range as a PRG.
+[-] SAVE-PRG ( "name" -- ) - save a plain runnable PRG image.
+[-] SAVE-FORTH ( "name" -- ) - save the raw $0801..top memory range as a PRG.
 [ ] TOP ( -- addr ) - top of dictionary space (just below the I/O area).
 [ ] TOP! ( addr -- ) - move the dictionary down to addr, packing it against the code.
 [x] START ( -- addr ) - the startup-word pointer executed at boot (turnkey hook).

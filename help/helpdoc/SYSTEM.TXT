@@ -23,7 +23,7 @@
     X16 IS FALSE: the hardware is X16-shaped - the same VERA, VIAs and YM -
     and is not an X16, so code testing X16 to decide whether a KERNAL exists
     gets the right answer and does not call into nothing.
-[ ] USR ( i*x addr -- j*x ) - call machine code at addr. NOT HERE, and not
+[-] USR ( i*x addr -- j*x ) - call machine code at addr. NOT HERE, and not
     for want of trying: durexForth carries an assembler, so machine code is
     an ordinary word - `code myword ... end-code` - which is more than USR
     offered and gets the calling convention right. Words are entered by jsl

@@ -3,6 +3,17 @@
 [x]   PAL!  ( rgb index -- )   set palette entry index (0-255) to a 12-bit $RGB
                            colour.  $0F00 1 PAL!   makes colour 1 pure red.
 
+[x]   PAL-LOAD ( c-addr u start -- u ior )     load entries from index start
+[x]   PAL-SAVE ( c-addr u start count -- ior ) save count entries from it
+
+PAL-SAVE takes a RANGE rather than assuming all 256, and that is hardware
+talking. This machine does not read back palette entries nobody wrote:
+entries your program set come back exactly, the rest come back as
+something that is not the palette in use. Save the entries you set.
+Better still, if your program keeps its palette in memory, BSAVE that -
+then nothing depends on a readback at all. HELP ADVANCED, under BMX-PAL,
+is where this was measured.
+
 VERA has 256 palette entries, each 12-bit ($0RGB: 4 bits red, green, blue).
 Entry 0 is the background/transparent colour. The default palette matches the
 C64/X16 16-colour set in entries 0-15. Reprogram entries to get custom colours

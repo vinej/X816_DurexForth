@@ -67,6 +67,86 @@ T{ (bad) -> 0 }T
 (scheck)
 T{ (bad) -> 0 }T
 
+cr .( testload: tilesets, tilemaps, sprites and palettes ) cr
+\ The wrappers, and what they are for: every one is VLOAD or VSAVE with
+\ the address and the length read out of VERA instead of typed by hand.
+\ So the assertions are about the ARITHMETIC - does a layer's map base,
+\ map size, tile base, and a sprite's image address and pixel count come
+\ back the way the registers say - and then that the bytes survive.
+\ Layer 1 throughout. Layer 0 is the console on this machine, and a test
+\ that saved and reloaded the text screen would be writing over the thing
+\ every later file prints on.
+
+\ 64x32 cells at $10000 (VRAM bank 1), tiles at $12000, so nothing here
+\ touches the console's map at $00000 or its font at $04000.
+1 1 $0000 mapbase
+1 1 $2000 tilebase
+1 $10 layer-mode                        \ %0001_0000: width code 1 = 64
+                                        \ cells, height code 0 = 32
+
+T{ 1 layer-map -> 1 $0000 }T
+T{ 1 layer-tiles -> 1 $2000 }T
+T{ 1 layer-map-size -> 4096 }T          \ 64 * 32 cells * 2 bytes
+
+: (mpaint) 1 $0000 vaddr 4096 0 do i 255 and v! loop ;
+: (mscrub) 1 $0000 vaddr 4096 0 do 0 v! loop ;
+(mpaint)
+T{ s" TMTEST.BIN" 1 tmapsave -> 0 }T
+(mscrub)
+T{ s" TMTEST.BIN" 1 tmapload -> 4096 0 }T
+0 to (bad)
+: (mcheck) 1 $0000 vaddr 4096 0 do v@ i 255 and <> if -1 to (bad) leave then loop ;
+(mcheck)
+T{ (bad) -> 0 }T
+
+\ Tile data has no inherent length - a tileset is as long as it is - so
+\ TILESAVE takes one and TILELOAD does not need one.
+: (tpaint) 1 $2000 vaddr 512 0 do i 255 and v! loop ;
+: (tscrub) 1 $2000 vaddr 512 0 do 0 v! loop ;
+(tpaint)
+T{ s" TSTEST.BIN" 1 512 tilesave -> 0 }T
+(tscrub)
+T{ s" TSTEST.BIN" 1 tileload -> 512 0 }T
+0 to (bad)
+: (tcheck) 1 $2000 vaddr 512 0 do v@ i 255 and <> if -1 to (bad) leave then loop ;
+(tcheck)
+T{ (bad) -> 0 }T
+
+\ Sprite 5: image at VRAM $4000 of bank 1, 16x16. SPRITE-MEM leaves the
+\ mode bit clear (both it and SPRITE-IMAGE write 4bpp), so the pixel
+\ count is 16*16/2 = 128 bytes - and that halving is the assertion worth
+\ having, because a save that believed 8bpp would put 128 bytes of
+\ somebody else's VRAM in the file.
+5 1 $4000 sprite-mem
+1 1 5 sprite-size                       \ size codes 1,1 = 16 x 16
+T{ 5 sprite-addr -> 1 $4000 }T
+T{ 5 sprite-bytes -> 128 }T
+
+: (spaint) 1 $4000 vaddr 128 0 do i 255 and v! loop ;
+: (sscrub) 1 $4000 vaddr 128 0 do 0 v! loop ;
+(spaint)
+T{ s" SPTEST.BIN" 5 sprite-save -> 0 }T
+(sscrub)
+T{ s" SPTEST.BIN" 5 sprite-load -> 128 0 }T
+0 to (bad)
+: (scheck2) 1 $4000 vaddr 128 0 do v@ i 255 and <> if -1 to (bad) leave then loop ;
+(scheck2)
+T{ (bad) -> 0 }T
+
+\ Palette entries 240-255, never 0-15: the console owns the low sixteen,
+\ and PAL-SAVE can only be trusted on entries this program wrote - the
+\ readback does not answer for anything else. That is why the word takes
+\ a range instead of assuming all 256.
+: (ppaint) 16 0 do i 16 * 1+ 240 i + pal! loop ;
+: (pscrub) 16 0 do $0999 240 i + pal! loop ;
+: (pv@) ( entry -- lo ) 240 + 2* $fa00 + 1 swap vpeek ;
+(ppaint)
+T{ s" PLTEST.BIN" 240 16 pal-save -> 0 }T
+(pscrub)
+T{ 0 (pv@) -> $99 }T
+T{ s" PLTEST.BIN" 240 pal-load -> 32 0 }T
+T{ 0 (pv@) 1 (pv@) 15 (pv@) -> 1 17 241 }T
+
 cr .( testload: a missing file is reported, not guessed at ) cr
 dst (wipe)
 T{ s" NOSUCH.BIN" dst bload nip 0<> -> true }T  \ nonzero ior
@@ -76,6 +156,10 @@ T{ s" NOSUCH.BIN" 0 $9000 vload nip 0<> -> true }T
 cr .( testload: clean up ) cr
 T{ s" BLTEST.BIN" delete-file -> 0 }T
 T{ s" VLTEST.BIN" delete-file -> 0 }T
+T{ s" TMTEST.BIN" delete-file -> 0 }T
+T{ s" TSTEST.BIN" delete-file -> 0 }T
+T{ s" SPTEST.BIN" delete-file -> 0 }T
+T{ s" PLTEST.BIN" delete-file -> 0 }T
 \ No FAR-EMPTY here: that would reset the far pointer for everyone, and
 \ unwinding ---testload--- puts it back on its own (MARKER saves it).
 

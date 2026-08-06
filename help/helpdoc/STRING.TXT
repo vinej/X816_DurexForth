@@ -50,4 +50,4 @@ stay valid until the next such call (max 189 characters).
 [x] SLITERAL ( addr len -- ) - compile a string literal. Immediate.
 [ ] TIB ( -- addr ) - the terminal input buffer.
 [x] #TIB ( -- addr ) - variable: number of characters in TIB.
-[ ] GETKEY ( -- char )   block until a key is pressed, return its PETSCII code.
+[-] GETKEY ( -- char )   KEY does this; the codes are ASCII/CP437, not PETSCII code.

@@ -17,7 +17,7 @@ per-operator detune, CSM.
     answers writes ONLY - there is no register readback in the hardware -
     so this is a shadow, not a probe. reg is masked to 0-255.
 
-[ ] FMPOKE ( value reg -- ) - the X16 wrote registers through the ROM
+[-] FMPOKE ( value reg -- ) - the X16 wrote registers through the ROM
     audio driver so its volume shadows stayed in step. Here YM! IS the
     shadowing write - mod/fm.fs reads its own state back through YM@ -
     so there is nothing for a second word to keep in step: use YM!.

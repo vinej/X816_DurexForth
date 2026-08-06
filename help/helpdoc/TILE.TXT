@@ -1,8 +1,9 @@
 === TILE - tilemap cells & layer setup ===
 
-Read/write cells of the layer-1 tilemap (the text screen). Each cell is a
-screen/tile code plus a colour attribute; the address follows the current
-screen mode.
+Read/write cells of the console's tilemap - VRAM $00000, two bytes a cell,
+128 cells to a row. That is LAYER 0 here: the X16 put its text screen on
+layer 1, and these words follow this machine, not that one. Each cell is a
+screen/tile code plus a colour attribute.
 
 [x]   TILE  ( x y code attr -- )   write a tile cell
 [x]   TDATA ( x y -- code )        read a cell's tile/screen code
@@ -15,7 +16,14 @@ VERA layer configuration (either layer 0 or 1):
 [x]   TILEBASE   ( layer bank addr -- )  set tile-data base (2 KB aligned)
 [x]   LAYER-MODE ( layer cfg -- )        write the layer config byte (map size,
                                      T256C, bitmap mode, colour depth)
-[ ] TMAPSAVE ( c-addr u -- ) - save the layer-1 tilemap (self-sizing).
-[ ] TMAPLOAD ( c-addr u -- ) - load the layer-1 tilemap back to its VRAM address.
-[ ] TILESAVE ( c-addr u vaddr len -- ) - save len bytes of a bank-1 tileset.
-[ ] TILELOAD ( c-addr u vaddr -- ) - load a tileset into bank-1 VRAM at vaddr.
+[x]   TMAPSAVE ( c-addr u layer -- ior )     save that layer's tilemap
+[x]   TMAPLOAD ( c-addr u layer -- u ior )   load it back to its own address
+[x]   TILESAVE ( c-addr u layer len -- ior ) save len bytes of its tile data
+[x]   TILELOAD ( c-addr u layer -- u ior )   load tile data to its tile base
+[x]   LAYER-MAP ( layer -- vbank vaddr )     where its map lives
+[x]   LAYER-TILES ( layer -- vbank vaddr )   where its tile data lives
+[x]   LAYER-MAP-SIZE ( layer -- u )          the map's size in bytes
+
+TMAPSAVE is self-sizing: the config byte carries the map's width and
+height codes and a cell is two bytes. Tile data has no inherent length,
+so TILESAVE asks for one and TILELOAD does not. HELP LOADSAVE.

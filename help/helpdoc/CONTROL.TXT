@@ -1,6 +1,6 @@
 === CONTROL - X16 system control ===
 
-[ ] EDIT ( c-addr u -- ) - open the named file in the built-in X16 text editor
+[-] EDIT ( c-addr u -- ) - open the named file in the built-in X16 text editor
   (x16edit, ROM bank $0D; u=0 opens a new empty buffer). Edit, save (Ctrl-S),
   quit (Ctrl-Q), then INCLUDE the file to compile it. Typical loop:
     S" PROG.FS" EDIT   S" PROG.FS" INCLUDED
@@ -63,7 +63,7 @@ message, not the code - CATCH sees -28 either way:
             you just ran is compiling something wrong.
 
 --- power / debug ---
-[ ] MONITOR  ( -- )   enter the built-in machine-language monitor (exit with X;
+[-] MONITOR  ( -- )   enter the built-in machine-language monitor (exit with X;
                   it does NOT cleanly return - reset afterward).
 [x] RESET    ( -- )   hardware reset via the System Management Controller -
              the same command Ctrl+Alt+Del raises.

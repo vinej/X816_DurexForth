@@ -2,7 +2,8 @@
 
 [x]   KEY    ( -- char )   wait for a key, return its code (standard Forth; echoes).
 [x]   KEY?   ( -- flag )   true if a key is waiting (non-destructive peek).
-[ ]   GETKEY ( -- char )   block until a key is pressed, return its PETSCII code.
+[-]   GETKEY ( -- char )   KEY is this machine's word for it, and what
+      comes back is ASCII/CP437 - there is no PETSCII here to return.
 [ ]   KEYMAP ( c-addr u -- )   set the keyboard layout (core).  S" DE-DE" KEYMAP
 
 GETKEY and KEYMAP are in asm/sysx.asm, which durexforth.asm does NOT
