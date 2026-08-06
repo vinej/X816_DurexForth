@@ -44,8 +44,8 @@ VERA PSG - voice registers, 4 bytes each at VRAM $1F9C0:
                                are full-strength at any width.
 [x]   PSGPAN   ( pan voice -- )    stereo pan (1=left 2=right 3=both);
                                keeps the volume in the same byte
-[ ]   PSGPLAY  ( c-addr u voice -- )   play a play-string (blocking)
-[ ]   PSGCHORD ( c-addr u voice -- )   play a chord string (blocking)
+[x]   PSGPLAY  ( c-addr u voice -- )   play a play-string (blocking)
+[x]   PSGCHORD ( c-addr u voice -- )   play a chord string (blocking)
 
 YM2151 FM - all of these are NEEDS FM:
 [x]   FMINIT   ( -- )              silence the chip, clear the volume
@@ -61,10 +61,13 @@ YM2151 FM - all of these are NEEDS FM:
                                changes the timbre, not the loudness
 [x]   FMNOTE   ( note channel -- ) play a packed note (0 = release)
 [x]   FMMIDI   ( note channel -- ) the same in MIDI numbering, 60 = C4
-[ ]   FMFREQ   ( freq channel -- ) a raw frequency in Hz. NOT here: the
-                               chip's pitch is logarithmic and this
-                               wants a log to reach it. FMNOTE covers
-                               every note; raw key codes go through YM!
+[x]   FMFREQ   ( freq channel -- ) a raw frequency in Hz. The chip is
+                               addressed in NOTES, so this walks the
+                               MIDI frequency table PSGNOTE already
+                               carries - a logarithm somebody else has
+                               taken - and divides the remainder into
+                               64ths of a semitone for the key fraction.
+                               0 Hz releases the channel
 [x]   FMDRUM   ( drum channel -- ) play a drum sound (GM notes 25-87).
                                Each drum is a whole instrument plus a
                                fixed key code, so this costs a patch load
@@ -75,8 +78,8 @@ YM2151 FM - all of these are NEEDS FM:
 [x]   FMPAN    ( pan channel -- )  stereo pan (1=left 2=right 3=both),
                                keeping the instrument's feedback, which
                                shares the same register
-[ ]   FMPLAY   ( c-addr u channel -- )  play a play-string (blocking)
-[ ]   FMCHORD  ( c-addr u channel -- )  play a chord string (blocking)
+[x]   FMPLAY   ( c-addr u channel -- )  play a play-string (blocking)
+[x]   FMCHORD  ( c-addr u channel -- )  play a chord string (blocking)
                                Both are a string parser on top of the
                                words above - a job of its own, not a
                                binding.

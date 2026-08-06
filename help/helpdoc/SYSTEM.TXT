@@ -48,4 +48,4 @@
 [x] EMU-EXIT ( status -- ) - stop the X816 EMULATOR with an exit status, so a
     test harness gets its verdict instantly. Open bus on real hardware: the
     word is a harmless no-op there (callers put a hardware fallback after it).
-[ ] STOP ( clk -- ) - print the time elapsed since TI (TIMER.FTH; pairs with TI ( -- clk ); named like BASIC TI - not START, which is the turnkey boot cell).
+[x] STOP ( clk -- ) - print the time elapsed since TI (TIMER.FTH; pairs with TI ( -- clk ); named like BASIC TI - not START, which is the turnkey boot cell).

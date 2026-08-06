@@ -10,7 +10,7 @@ System / IRQ (base.fs - no module needed)
     whatever word was executing when the interrupt landed.
 [x] LINE-IRQ ( xt line -- ) - run xt each frame at a raster line.
 [x] SPRCOL-IRQ ( xt -- ) / COLLISIONS - sprite-collision interrupt.
-[ ] AFLOW-IRQ ( xt -- ) - arms the slot, but the audio-FIFO enable bit
+[x] AFLOW-IRQ ( xt -- ) - arms the slot, but the audio-FIFO enable bit
     does not stick on this hardware (writing 8 to $9F26 reads back as no
     enables), so it will not fire. The kernel excludes AFLOW from its
     acknowledge for the same reason.
@@ -42,13 +42,13 @@ Graphics (NEEDS ADVGFX, after GRAPHIC) - tested by testadvgfx.
 [-] text onto the bitmap - GRAPHIC's GTEXT draws it.
 
 Audio (NEEDS ADVSND) - envelopes and ADPCM are tested by testadvsnd.
-[ ] ENV-START ENV-RELEASE ENV-STOP ENV-TICK - per-frame ASR envelopes on
+[x] ENV-START ENV-RELEASE ENV-STOP ENV-TICK - per-frame ASR envelopes on
     all 16 PSG voices; arm with ' ENV-TICK IRQ.
 [ ] PCM-PLAY ( addr ud rate -- ) PCM-STOP PCM-PLAYING? PCM-LOOP -
     background FIFO streaming off the AFLOW interrupt, auto-disarm,
     looping. The X16 took a bank and an offset; a flat 24-bit address
     says the same thing here. Blocked on AFLOW, above.
-[ ] ADPCM-INIT ADPCM! ADPCM>PCM ( src dst u -- dst' ) - IMA ADPCM, low
+[x] ADPCM-INIT ADPCM! ADPCM>PCM ( src dst u -- dst' ) - IMA ADPCM, low
     nibble first, 8-bit signed out. Offline only: decode whole buffers up
     front, then PCM-PLAY the result (Forth is too slow to feed the DAC
     live).

@@ -132,6 +132,14 @@ fs_flush
 !al
     rtl
 
+    ; (fs-flush) - hand the interpreter's read-ahead back to the kernel.
+    ; CLOSE-SOURCE needs it: seeking the handle to EOF does not touch the
+    ; bytes already cached here, so without this the line AFTER the one
+    ; that called CLOSE-SOURCE still runs - which is exactly the bug this
+    ; word was added to fix, caught by the test rather than by reading.
+    +BACKLINK "(fs-flush)", 10
+    jmp fs_flush
+
     +BACKLINK "included", 8
 INCLUDED ; ( addr u -- ) interpret a file as source
     ; Copy the name out of the parameter stack before anything moves it.

@@ -51,14 +51,19 @@ I2C - each of which says so on its own page.
 
 Every word in these pages carries one of three marks:
 
-  [x]  it is here, and the machine has been asked: a probe card runs
-       FIND-NAME over every entry, both directions, so an [x] with
-       nothing behind it fails the check.
-  [ ]  not yet. Real work, still to do.
-  [-]  not coming. The word belonged to the X16 or the C64 - a device
-       number, a CBM DOS channel, a ROM call, a PRG header - and there
-       is nothing here for it to mean. Where a replacement exists, the
-       entry names it.
+  x  the word is here, and the machine has been asked: a probe card
+     runs FIND-NAME over every entry, both directions, so a ticked box
+     with nothing behind it fails the check.
+  (blank)  not yet. Real work, still to do.
+  -  not coming. The word belonged to the X16 or the C64 - a device
+     number, a CBM DOS channel, a ROM call, a PRG header - and there is
+     nothing here for it to mean. Where a replacement exists, the entry
+     names it.
+
+(Those three are written above without their brackets on purpose: a line
+in these files that STARTS with a bracket pair is an entry as far as the
+tracker is concerned, and a legend that described itself would be counted
+as three more words.)
 
 An honest [ ] is a promise. Leaving X16-only words as [ ] made the tracker
 read as though a chunk of the port was outstanding when it was finished;

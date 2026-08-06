@@ -19,7 +19,7 @@ error, 6 exists, 7 not empty. These words RETURN it; they do not throw.
 [x] INCLUDE ( "name" -- ) - load and interpret a file by name. INCLUDE GAME.FTH
 [x] INCLUDED ( addr len -- ) - load and interpret the file named by a string. S"
     GAME.FTH" INCLUDED
-[ ] INCLUDE-FILE ( fileid -- ) - interpret the rest of an already-open
+[x] INCLUDE-FILE ( fileid -- ) - interpret the rest of an already-open
     file. The X16 staged it through the 8 KB bank window and could not
     nest; here it would be an ordinary buffer in flat memory.
 [x] REQUIRE ( "name" -- ) - include a file only once, by name.
@@ -60,7 +60,7 @@ error, 6 exists, 7 not empty. These words RETURN it; they do not throw.
     There is no BIN: every file here is bytes, and no mode changes that.
 [x] COMPARE ( a1 u1 a2 u2 -- n ) - listed here too because checking a file
     read back is what it is for. -1, 0 or 1. (Also in STRING.)
-[ ] INCLUDE-FILE ( fileid -- ) - interpret an already-open file. NOT
+[x] INCLUDE-FILE ( fileid -- ) - interpret an already-open file. NOT
     implemented: the interpreter's source stack (asm/io.asm) is entered by
     INCLUDED, which opens the file itself, and handing it a handle somebody
     else opened means opening those internals up. INCLUDED does the job.

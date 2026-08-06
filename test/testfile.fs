@@ -115,12 +115,51 @@ cr .( testfile: the two words that report they cannot ) cr
 T{ 1 flush-file -> 1 }T
 T{ 0 0 1 resize-file -> 1 }T
 
-\ NOT TESTED HERE, and not silently: INCLUDE-FILE ( fileid -- ) is not
-\ implemented - the interpreter's source stack (io.asm) is entered by
-\ INCLUDED, which opens the file itself, and handing it an already-open
-\ handle means opening those internals up. R/W modify mode is not
-\ implemented because the kernel has no such open mode. Both are [ ] in
-\ FILE.TXT for exactly these reasons.
+cr .( testfile: INCLUDE-FILE interprets a handle somebody else opened ) cr
+\ Line by line, not one big EVALUATE: a `\` comment has to end at the end
+\ of its LINE, and a buffer full of newlines is one line to the parser.
+\ The two-line file below is the test of exactly that - if the whole file
+\ were evaluated at once, the comment would swallow the definition.
+variable ifd
+T{ s" IFTEST.FTH" r/o create-file swap ifd ! -> 0 }T
+T{ s" \ a comment that must end here" ifd @ write-line -> 0 }T
+T{ s" 2 3 + constant ifsum" ifd @ write-line -> 0 }T
+T{ ifd @ close-file -> 0 }T
+T{ s" IFTEST.FTH" r/o open-file swap ifd ! -> 0 }T
+ifd @ include-file
+T{ ifsum -> 5 }T
+\ ...and it closed the handle, as ANS says it must: closing it again
+\ fails, which is how we know the first close happened.
+T{ ifd @ close-file 0<> -> true }T
+
+cr .( testfile: SAVE-INPUT and RESTORE-INPUT ) cr
+\ Read the same word twice out of one line. The proof is the second
+\ PARSE-NAME seeing anything at all: without the restore it reads what
+\ comes after, and this line has nothing after it.
+variable si1 variable si2
+: si-test ( "name" -- u1 u2 )
+  save-input drop si2 ! si1 !
+  parse-name nip
+  si1 @ si2 @ 2 restore-input drop
+  parse-name nip ;
+T{ si-test hello -> 5 5 }T
+\ A spec from another source is refused rather than believed.
+T{ 0 -1 2 restore-input -> true }T
+T{ 0 0 0 3 restore-input -> true }T
+
+cr .( testfile: CLOSE-SOURCE ends the file now, not at its end ) cr
+\ The second line must never run. It cannot be checked from inside the
+\ file - the file is what stops - so it is checked from out here.
+0 value csv
+T{ s" CSTEST.FTH" r/o create-file swap ifd ! -> 0 }T
+T{ s" 1 to csv close-source" ifd @ write-line -> 0 }T
+T{ s" 2 to csv" ifd @ write-line -> 0 }T
+T{ ifd @ close-file -> 0 }T
+s" CSTEST.FTH" included
+T{ csv -> 1 }T
+
+T{ s" IFTEST.FTH" delete-file -> 0 }T
+T{ s" CSTEST.FTH" delete-file -> 0 }T
 
 cr .( testfile ok ) cr
 

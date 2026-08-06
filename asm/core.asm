@@ -372,6 +372,32 @@ BL
     and #$ff
     jmp PUSHA
 
+    +BACKLINK "sp@", 3
+SP_FETCH ; ( -- n ) the data stack pointer
+    ; An INDEX, not an address, and it cannot be anything else: a cell
+    ; lives in TWO planes (LSB, x and MSB, x), so there is no single
+    ; address holding one. X counts two bytes per cell, so
+    ; (sp@ - sp0) / -2 is the depth, which is what DEPTH does above.
+    sep #$20
+!as
+    txa
+    rep #$20
+!al
+    and #$ff
+    jmp PUSHA
+
+    +BACKLINK "sp0", 3
+SP_ZERO ; ( -- n ) the empty-stack value of SP@
+    lda #X_INIT
+    jmp PUSHA
+
+    +BACKLINK "rp@", 3
+RP_FETCH ; ( -- n ) the 65816 hardware stack pointer
+    ; The return stack IS the CPU stack here - return addresses are three
+    ; bytes and >R lives on it - so this is S, all sixteen bits of it.
+    tsc
+    jmp PUSHA
+
     +BACKLINK "within", 6
 WITHIN ; ( test low high -- flag )
     jsl BANK1 + OVER

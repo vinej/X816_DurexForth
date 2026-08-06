@@ -270,6 +270,14 @@ TIB_TOP
 TIB_SIZE
     !word 0, 0 ; padded to a cell: #tib hands this address to @
 
+    +BACKLINK "tib", 3
+    ; ( -- addr ) the terminal input buffer itself. SOURCE is what you
+    ; almost always want - under EVALUATE the current source is not this
+    ; buffer at all - but TIB is the address the standard names, and
+    ; ACCEPT-and-parse code asks for it.
+    lda #TIB
+    jmp pushbank1
+
     +BACKLINK "#tib", 4
     ; ( -- addr ) the cell holding the number of characters in TIB
     lda #TIB_SIZE

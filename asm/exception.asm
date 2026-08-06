@@ -4,6 +4,11 @@
 ; stage-A code could only snapshot SL through an 8-bit tsx and rebuilt SH
 ; from the top-of-stack page, an assumption THROW no longer needs.
 
+    ; HANDLER is the ordinary Forth name for this cell (Forth-83, gforth,
+    ; and FLOW.TXT). It holds the CPU stack pointer of the innermost
+    ; CATCH frame, or 0 when nothing is catching - which is what a
+    ; debugger wants to see and what THROW unwinds to.
+    +BACKLINK "handler", 7
 EXCEPTION_HANDLER
     +VALUE BANK1 + _EXCEPTION_HANDLER
 _EXCEPTION_HANDLER

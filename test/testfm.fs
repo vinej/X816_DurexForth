@@ -141,6 +141,120 @@ T{ 0 psg@ 1 psg@ 8 lshift or -> 2362 }T \ an octave up is twice the word
 0 0 psgnote                             \ note 0 releases: volume to zero
 T{ 2 psg@ 63 and -> 0 }T
 
+cr .( testfm: PSGMIDI, the same voice in MIDI numbering ) cr
+psginit
+69 0 psgmidi                            \ A4 = 440 Hz
+T{ 0 psg@ 1 psg@ 8 lshift or -> 1181 }T
+81 0 psgmidi                            \ an octave up is twice the word
+T{ 0 psg@ 1 psg@ 8 lshift or -> 2362 }T
+
+cr .( testfm: the play-string parser ) cr
+\ THE STRING IS COPIED FIRST, and that is not fussiness: S" at the
+\ interpreter hands back a pointer into the input buffer, which the next
+\ line overwrites. A parser tested across several lines would be reading
+\ the test file itself - which is exactly what the first run of this did,
+\ and it reported every note as 64.
+create sbuf 40 allot
+: >sbuf ( c-addr u -- addr u ) dup >r sbuf swap move sbuf r> ;
+: 1st ( c-addr u -- x code ) >sbuf (ps-start) (ps-next) ;
+: nth ( n -- x code ) 0 ?do (ps-next) 2drop loop (ps-next) ;
+
+\ Middle C is 60, and the scale walks the white notes.
+T{ s" C" 1st -> 60 1 }T
+ps-reset
+T{ s" CDEFGAB" >sbuf (ps-start) 6 nth -> 71 1 }T   \ B4
+ps-reset
+\ Accidentals stack, and they are read before the length.
+T{ s" C#" 1st -> 61 1 }T
+T{ s" C-" 1st -> 59 1 }T
+T{ s" C##" 1st -> 62 1 }T                          \ C double sharp is D
+\ Octaves: O sets, < and > step, and both clamp rather than wrapping.
+T{ s" O2C" 1st -> 36 1 }T
+ps-reset
+T{ s" >C" 1st -> 72 1 }T
+ps-reset
+T{ s" <C" 1st -> 48 1 }T
+ps-reset
+T{ s" O0<<<C" 1st -> 12 1 }T                       \ clamped at octave 0
+ps-reset
+T{ s" O7>>>C" 1st -> 96 1 }T                       \ ...and at 7
+ps-reset
+
+\ Lengths are 240/denominator, and a dot adds half of the last addition.
+s" C4" 1st 2drop   T{ ps-len @ -> 60 }T
+s" C8" 1st 2drop   T{ ps-len @ -> 30 }T
+s" C4." 1st 2drop  T{ ps-len @ -> 90 }T
+s" C4.." 1st 2drop T{ ps-len @ -> 105 }T
+\ L sets the default for the notes that give none.
+s" L8C" >sbuf (ps-start) (ps-next) 2drop
+T{ ps-len @ ps-deflen @ -> 30 30 }T
+ps-reset
+
+\ The settings that are not notes, and the codes for the ones that are.
+T{ s" V12" 1st -> 12 3 }T
+T{ s" P2" 1st -> 2 4 }T
+T{ s" I5" 1st -> 5 5 }T
+T{ s" R8" 1st -> 0 2 }T
+s" T90" >sbuf (ps-start) (ps-next) 2drop  T{ ps-tempo @ -> 90 }T
+s" S4" >sbuf (ps-start) (ps-next) 2drop   T{ ps-art @ -> 4 }T
+ps-reset
+\ A bare V or I with no digits is ignored rather than read as a zero -
+\ the ROM's parser does the same, and the alternative is a silent
+\ instrument change nobody typed.
+T{ s" VC" 1st -> 60 1 }T
+\ Lower case is the same language.
+T{ s" c" 1st -> 60 1 }T
+ps-reset
+
+cr .( testfm: FMPLAY and PSGPLAY reach the chips ) cr
+\ Short notes on purpose: these BLOCK for real frames, and the suite has
+\ a whole machine to test after this one. L64 at tempo 240 is under a
+\ frame a note, so the string costs what the parse costs.
+fminit
+s" T240L64O4CDE" >sbuf 0 fmplay
+T{ $28 ym@ -> 68 }T                     \ E4's key code, still in the shadow
+T{ ps-octave @ -> 4 }T
+ps-reset
+psginit
+63 0 psgvol
+s" T240L64O4A" >sbuf 0 psgplay
+T{ 0 psg@ 1 psg@ 8 lshift or -> 1181 }T \ A4 was the last frequency written
+T{ 2 psg@ 63 and -> 0 }T                \ ...and the note released after it
+ps-reset
+
+cr .( testfm: the chord forms sound at once and return ) cr
+\ One note per channel, no waiting: after a three-note chord from
+\ channel 0 the parser is pointing at channel 3, and all three key codes
+\ are in the shadow.
+fminit
+s" O4CEG" >sbuf 0 fmchord
+T{ $28 ym@ -> 62 }T                     \ ch0 C4
+T{ $29 ym@ -> 68 }T                     \ ch1 E4
+T{ $2a ym@ -> 72 }T                     \ ch2 G4
+T{ ps-ch @ -> 3 }T
+ps-reset
+
+cr .( testfm: FMFREQ, a frequency the chip has to be told as a note ) cr
+\ The proof is that FMFREQ and FMMIDI agree: 440 Hz and MIDI 69 are the
+\ same pitch, so they must produce the same key code and no fraction.
+fminit
+69 0 fmmidi
+T{ $28 ym@ -> 74 }T                     \ MIDI 69 is A4...
+440 0 fmfreq
+T{ $28 ym@ $30 ym@ -> 74 0 }T           \ ...and so is 440 Hz, to the 64th
+880 0 fmfreq
+T{ $28 ym@ -> 90 }T                     \ an octave up is +16: KC is octave<<4
+262 0 fmfreq
+T{ $28 ym@ -> 62 }T                     \ C4, and a shade sharp of 261.63 Hz
+T{ $30 ym@ 0> -> true }T
+\ Half a semitone above A4 lands near half of 64: the fraction is real
+\ arithmetic, not a rounded note.
+453 0 fmfreq
+T{ $28 ym@ -> 74 }T
+T{ $30 ym@ 2 rshift 26 38 within -> true }T
+0 0 fmfreq
+T{ $08 ym@ -> 0 }T                      \ 0 Hz is a key-off on channel 0
+
 cr .( testfm ok ) cr
 
 ---testfm---

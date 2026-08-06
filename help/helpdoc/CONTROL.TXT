@@ -35,9 +35,9 @@ any of it; HELP MEMORY has the map and the FAR-* allocator for SDRAM.
 
 --- clock (battery RTC / jiffy timer) ---
 [x] TICKS   ( -- ud )      the 24-bit jiffy counter (1/60 s) as an unsigned double.
-[ ] TIME@   ( -- h m s )   read the wall-clock time.
-[ ] DATE@   ( -- y mo d )  read the date (y = full 4-digit year).
-[ ] SETTIME ( y mo d h m s -- )  set the clock.  2025 7 8 14 30 0 SETTIME
+[x] TIME@   ( -- h m s )   read the wall-clock time.
+[x] DATE@   ( -- y mo d )  read the date (y = full 4-digit year).
+[x] SETTIME ( y mo d h m s -- )  set the clock.  2025 7 8 14 30 0 SETTIME
 
 --- I2C bus (SMC, RTC, and other I2C devices) ---
 [x] I2CPEEK ( dev reg -- byte )   read a byte from I2C device dev, register reg.

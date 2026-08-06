@@ -413,3 +413,223 @@ fm-data 4904 +   constant fm-tl        ( the patch's TL, ch*4+op )
   bas>midi dup 0 < if drop r> drop exit then
   dup fm-psglo + c@ swap fm-psghi + c@ 8 lshift or
   r> psgfreq ;
+
+\ ---------------------------------------------------------------------
+\ FMFREQ - a raw frequency in Hz, which the chip cannot be told directly.
+\
+\ The YM2151 is addressed in NOTES: a key code (octave and semitone) plus
+\ a key fraction of 1/64 of a semitone. Going from Hz to that is a
+\ logarithm, and there is no log here - but there is a table of every
+\ MIDI note's frequency already, the one PSGNOTE uses, and a table lookup
+\ is a logarithm somebody else has already taken.
+\
+\ So: turn the Hz into the PSG's frequency units (the table's units -
+\ 1181 of them is the 440 Hz that base.fs's own PSG example quotes),
+\ walk the table for the note at or below it, and divide the remainder
+\ into 64ths of the way to the next note. That last step is LINEAR
+\ across a semitone where the truth is exponential; the error peaks
+\ near a quarter of a 64th - about 0.5 cents - which is inaudible and
+\ far below the chip's own resolution.
+\
+\ 0 Hz releases the channel, as the X16's FMFREQ does. Above the top of
+\ the table the note is clamped to 127 rather than wrapping, because a
+\ wrapped pitch is a wrong note and a clamped one is an obvious one.
+\ ---------------------------------------------------------------------
+variable fq-w  variable fq-n  variable fq-ch
+: (psg-w) ( midi -- w ) dup fm-psglo + c@ swap fm-psghi + c@ 8 lshift or ;
+: (hz>w) ( hz -- w ) 1181 * 440 / ;     \ 1181 units = 440 Hz
+: fmfreq ( freq channel -- )
+  7 and fq-ch !
+  ?dup 0= if 0 fq-ch @ fmnote exit then
+  (hz>w) fq-w !
+  127 fq-n !
+  127 0 do i 1+ (psg-w) fq-w @ > if i fq-n ! leave then loop
+  fq-n @ 127 < if
+    fq-w @ fq-n @ (psg-w) - 64 *
+    fq-n @ 1+ (psg-w) fq-n @ (psg-w) - /
+    0 max 63 min
+  else 0 then                           ( kf )
+  fq-n @ midi>kc dup 0 < if 2drop exit then   ( kf kc )
+  swap 4 * fq-ch @ $30 + ym!            \ key fraction, bits 7:2
+  fq-ch @ $28 + ym!                     \ key code
+  fq-ch @ fm-keyoff
+  fq-ch @ fm-keyon ;
+
+\ ---------------------------------------------------------------------
+\ PSGMIDI - a PSG voice in MIDI numbering, the counterpart of FMMIDI.
+\ PSGNOTE's packed note is BASIC's; the play-strings below think in MIDI
+\ and so does everything else that talks to a keyboard or a file.
+\ ---------------------------------------------------------------------
+: psgmidi ( midinote voice -- )
+  swap dup 0 < over 127 > or if 2drop exit then
+  dup fm-psglo + c@ swap fm-psghi + c@ 8 lshift or
+  swap psgfreq ;
+
+\ =====================================================================
+\ PLAY-STRINGS - the X16's PLAY syntax, parsed here.
+\
+\ FMPLAY, FMCHORD, PSGPLAY and PSGCHORD read the same little language
+\ the X16's BASIC PLAY does, and this is a PORT OF ITS PARSER (the ROM's
+\ audio/playstring.s), not an invention - a string written for one plays
+\ the same on the other:
+\
+\   C D E F G A B  a note, optionally followed by accidentals and a
+\                  length. + or # sharpens, - flattens, and they stack:
+\                  C## is D.
+\   R              a rest, with the same optional length.
+\   4 8 16 ...     a length AFTER a note or rest: the denominator of a
+\                  whole note, so C4 is a crotchet and C16 a semiquaver.
+\                  Dots add half of the last addition, as in music: C4..
+\   L<n>           set the default length for notes that give none.
+\   O<n>           octave 0-7 (4 is the one middle C lives in).
+\   < >            down and up an octave, clamped at the ends.
+\   T<n>           tempo in quarter-notes a minute.
+\   V<n>           volume, P<n> pan, I<n> instrument - each applied to
+\                  the current channel as it is read, so a string can
+\                  change instrument in the middle.
+\   S<0-7>         articulation: 0 is legato (the note fills its whole
+\                  length) and 7 is the shortest staccato. It SPLITS the
+\                  length rather than shortening it, so the tempo of the
+\                  piece does not change with the phrasing.
+\   K              re-articulate: play the next note from its attack
+\                  even if it repeats the one before.
+\
+\ TIMING IS FRAMES, off the VSYNC counter TICKS reads, because a frame is
+\ what a machine drawing a screen is actually paced by: a note is
+\ notelen*60/tempo frames, where notelen is 240 for a whole note. The ROM
+\ kept a fractional-frame accumulator to stop rounding from dragging a
+\ long piece flat; splitting the SAME total between the note and its
+\ silence, as below, means the rounding cannot accumulate at all.
+\
+\ These BLOCK, which is what the X16's do and what a play-string is for.
+\ The chord forms do not: they start one note per channel and return, so
+\ the caller decides when to stop them.
+\ =====================================================================
+
+decimal
+variable ps-tempo   120 ps-tempo !     \ quarter-notes a minute
+variable ps-octave  4 ps-octave !
+variable ps-deflen  60 ps-deflen !     \ 240/4: a quarter note
+variable ps-art     0 ps-art !         \ 0 legato .. 7 staccato
+variable ps-len     variable ps-dot
+variable ps-adr     variable ps-pos    variable ps-max
+variable ps-ch      variable ps-rekey
+
+: ps-reset ( -- ) 120 ps-tempo ! 4 ps-octave ! 60 ps-deflen ! 0 ps-art ! ;
+
+: (ps-more?) ( -- flag ) ps-pos @ ps-max @ < ;
+: (ps-c) ( -- c ) ps-adr @ ps-pos @ + c@ ;
+: (ps-uc) ( c -- c ) dup 'a' 'z' 1+ within if 32 - then ;
+: (ps-step) ( -- ) 1 ps-pos +! ;
+: (ps-digit?) ( -- flag )
+  (ps-more?) if (ps-c) dup '0' 1- > swap '9' 1+ < and else false then ;
+: (ps-num) ( -- n digits )
+  0 0 begin (ps-digit?) while
+    swap 10 * (ps-c) '0' - + swap 1+ (ps-step)
+  repeat ;
+
+: (ps-acc) ( n -- n' )                 \ + and # sharpen, - flattens
+  begin (ps-more?) while
+    (ps-c) dup '+' = swap dup '#' = swap '-' = >r or r>
+    if drop 1- (ps-step)
+    else if 1+ (ps-step) else exit then then
+  repeat ;
+
+: (ps-dots) ( -- )
+  ps-len @ 1 rshift ps-dot !
+  begin (ps-more?) if (ps-c) '.' = else false then while
+    ps-dot @ ps-len +!  (ps-step)
+    ps-dot @ 1 rshift ps-dot !
+  repeat ;
+: (ps-notelen) ( -- )                  \ 240/denominator, then the dots
+  ps-deflen @ ps-len !
+  (ps-num) if 240 swap / ps-len ! else drop then
+  (ps-dots) ;
+
+\ ( -- x code ): 0 = end of string, 1 = note (MIDI), 2 = rest,
+\ 3 = volume, 4 = pan, 5 = instrument.
+: (ps-note) ( base -- midi 1 ) (ps-acc) (ps-notelen) ps-octave @ 12 * + 1 ;
+: (ps-oct!) ( -- ) (ps-num) if 7 min ps-octave ! else drop then ;
+: (ps-next) ( -- x code )
+  begin
+    (ps-more?) 0= if 0 0 exit then
+    (ps-c) (ps-uc) (ps-step)
+    dup 'C' = if drop 12 (ps-note) exit then
+    dup 'D' = if drop 14 (ps-note) exit then
+    dup 'E' = if drop 16 (ps-note) exit then
+    dup 'F' = if drop 17 (ps-note) exit then
+    dup 'G' = if drop 19 (ps-note) exit then
+    dup 'A' = if drop 21 (ps-note) exit then
+    dup 'B' = if drop 23 (ps-note) exit then
+    dup 'R' = if drop (ps-notelen) 0 2 exit then
+    dup 'V' = if drop (ps-num) if 3 exit then drop
+    else dup 'P' = if drop (ps-num) if 4 exit then drop
+    else dup 'I' = if drop (ps-num) if 5 exit then drop
+    else dup 'L' = if drop (ps-notelen) ps-len @ ps-deflen !
+    else dup 'T' = if drop (ps-num) if ps-tempo ! else drop then
+    else dup 'O' = if drop (ps-oct!)
+    else dup '<' = if drop ps-octave @ 1- 0 max ps-octave !
+    else dup '>' = if drop ps-octave @ 1+ 7 min ps-octave !
+    else dup 'S' = if drop (ps-num) if 7 min ps-art ! else drop then
+    else dup 'K' = if drop 1 ps-rekey !
+    else drop
+    then then then then then then then then then then
+  again ;
+
+\ One frame of the VSYNC counter. TICKS is 16 bits and wraps, so this
+\ waits for a CHANGE rather than comparing against a target - a target
+\ computed across the wrap would be reached at once, or never.
+: (ps-frame) ( -- ) ticks drop begin dup ticks drop <> until drop ;
+: (ps-wait) ( n -- ) 0 max 0 ?do (ps-frame) loop ;
+: (ps-split) ( -- on off )             \ the note, and its silence
+  ps-len @ 60 * ps-tempo @ /
+  dup ps-art @ * 8 / tuck - swap ;
+: (ps-start) ( c-addr u -- ) ps-max ! ps-adr ! 0 ps-pos ! 0 ps-rekey ! ;
+
+: fmplay ( c-addr u channel -- )
+  ps-ch !  (ps-start)
+  begin (ps-next) dup while            ( x code )
+    dup 1 = if drop ps-ch @ fmmidi (ps-split) swap (ps-wait)
+                    0 ps-ch @ fmnote (ps-wait)
+    else dup 2 = if 2drop (ps-split) + (ps-wait)
+    else dup 3 = if drop ps-ch @ fmvol
+    else dup 4 = if drop ps-ch @ fmpan
+    else drop ps-ch @ fminst
+    then then then then
+  repeat 2drop ;
+
+: psgplay ( c-addr u voice -- )
+  ps-ch !  (ps-start)
+  begin (ps-next) dup while
+    dup 1 = if drop ps-ch @ psgmidi (ps-split) swap (ps-wait)
+                    0 ps-ch @ psgvol (ps-wait)
+    else dup 2 = if 2drop (ps-split) + (ps-wait)
+    else dup 3 = if drop ps-ch @ psgvol
+    else dup 4 = if drop ps-ch @ psgpan
+    else 2drop                         \ no instruments on the PSG
+    then then then then
+  repeat 2drop ;
+
+\ The chord forms sound every note at once, one channel up per note, and
+\ RETURN - so the caller can go on doing something while it rings. Note
+\ lengths are still parsed (a string is a string) and then ignored.
+: fmchord ( c-addr u channel -- )
+  ps-ch !  (ps-start)
+  begin (ps-next) dup while
+    dup 1 = if drop ps-ch @ fmmidi 1 ps-ch +!
+    else dup 3 = if drop ps-ch @ fmvol
+    else dup 4 = if drop ps-ch @ fmpan
+    else dup 5 = if drop ps-ch @ fminst
+    else 2drop
+    then then then then
+  repeat 2drop ;
+
+: psgchord ( c-addr u voice -- )
+  ps-ch !  (ps-start)
+  begin (ps-next) dup while
+    dup 1 = if drop ps-ch @ psgmidi 1 ps-ch +!
+    else dup 3 = if drop ps-ch @ psgvol
+    else dup 4 = if drop ps-ch @ psgpan
+    else 2drop
+    then then then
+  repeat 2drop ;

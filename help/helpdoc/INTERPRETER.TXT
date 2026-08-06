@@ -1,6 +1,6 @@
 === INTERPRETER - Interpreter and input source ===
 
-[ ] TIB ( -- addr ) - the terminal input buffer.
+[x] TIB ( -- addr ) - the terminal input buffer.
 [x] #TIB ( -- addr ) - variable: number of characters in TIB.
 [x] >IN ( -- addr ) - variable: current parse offset into the input.
 [x] SOURCE ( -- addr len ) - the current input buffer and its length.
@@ -8,9 +8,9 @@
 [x] REFILL ( -- flag ) - read the next input line; false at end.
 [x] EVALUATE ( addr len -- ) - interpret a string as Forth. S" 2 3 +" EVALUATE .
     ->  5
-[ ] SAVE-INPUT ( -- xn..x1 n ) - save the input position.
-[ ] RESTORE-INPUT ( xn..x1 n -- flag ) - restore a saved input position.
-[ ] CLOSE-SOURCE ( -- ) - close the current file input source (used by nested
+[x] SAVE-INPUT ( -- xn..x1 n ) - save the input position.
+[x] RESTORE-INPUT ( xn..x1 n -- flag ) - restore a saved input position.
+[x] CLOSE-SOURCE ( -- ) - close the current file input source (used by nested
     INCLUDE).
 [x] "xxx" ( -- addr len ) - string literal, same semantics as S" but no space
     after the quote: "hello world" TYPE. Only kicks in for undefined tokens

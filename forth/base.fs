@@ -449,6 +449,80 @@ decimal
 : turbo ( flag -- ) 0<> 4 and $9f80 ioc! ;
 : cpu-mhz ( -- u ) turbo? if 14 else 8 then ;
 
+( A WALL CLOCK, IN SOFTWARE.
+
+  There is no battery-backed RTC on this machine and the kernel's clock
+  call answers milliseconds since boot, so the date has to come from
+  somewhere: you tell it once with SETTIME and everything after that is
+  arithmetic on the free-running millisecond timer. A power cycle
+  forgets it and DATE@ reads 1970-01-01 again - which is the honest
+  behaviour for a machine with no clock chip, and better than a plausible
+  wrong date. If an I2C RTC ever appears on the SMC bus, SETTIME from it
+  at boot and everything here keeps working.
+
+  MS@ is the same timer MS runs on: $9F90 IS READ FIRST because reading
+  it latches bits 31:8, and reading the high bytes without it hands back
+  whatever the last latch held. It wraps after 49.7 days.
+
+  Two honest limits. The seconds count is one 32-bit cell, so this is a
+  1970..2038 clock. And SECONDS divides the millisecond count with the
+  signed /, which is exact until the timer passes 2^31 ms - 24.8 days of
+  uptime - after which the wall clock jumps. Neither is worth a double
+  on a machine you power off. )
+variable (clk0)                       \ seconds at millisecond-timer zero
+: ms@ ( -- u )                        \ milliseconds since boot
+  $9f90 ioc@  $9f91 ioc@ 8 lshift or
+  $9f92 ioc@ 16 lshift or  $9f93 ioc@ 24 lshift or ;
+: seconds ( -- u ) ms@ 1000 / (clk0) @ + ;
+
+( Howard Hinnant's civil-from-days / days-from-civil, which is exact for
+  every proleptic Gregorian date and needs no month table - the 153/5
+  business is the length of a five-month cycle in a year that starts in
+  March, which is why March is month 0 here. Positive years only: the
+  algorithm wants FLOOR division and Forth's is symmetric, and they only
+  disagree below year 0. )
+variable (cy) variable (cm) variable (cd)
+variable (era) variable (yoe) variable (doy) variable (doe) variable (mp)
+: civil>days ( y mo d -- days )       \ days since 1970-01-01
+  (cd) ! (cm) ! (cy) !
+  (cm) @ 3 < if (cy) @ 1- (cy) ! then
+  (cy) @ 400 / (era) !
+  (cy) @ (era) @ 400 * - (yoe) !
+  (cm) @ dup 2 > if 3 - else 9 + then 153 * 2 + 5 / (cd) @ + 1- (doy) !
+  (yoe) @ 365 * (yoe) @ 4 / + (yoe) @ 100 / - (doy) @ + (doe) !
+  (era) @ 146097 * (doe) @ + 719468 - ;
+: days>civil ( days -- y mo d )
+  719468 +  dup 146097 / (era) !
+  (era) @ 146097 * - (doe) !
+  (doe) @ (doe) @ 1460 / - (doe) @ 36524 / + (doe) @ 146096 / - 365 / (yoe) !
+  (doe) @ (yoe) @ 365 * (yoe) @ 4 / + (yoe) @ 100 / - - (doy) !
+  (doy) @ 5 * 2 + 153 / (mp) !
+  (doy) @ (mp) @ 153 * 2 + 5 / - 1+ (cd) !
+  (mp) @ dup 10 < if 3 + else 9 - then (cm) !
+  (yoe) @ (era) @ 400 * + (cm) @ 3 < if 1+ then (cy) !
+  (cy) @ (cm) @ (cd) @ ;
+
+: settime ( y mo d h m s -- )
+  >r >r >r civil>days 86400 *
+  r> 3600 * +  r> 60 * +  r> +
+  ms@ 1000 / - (clk0) ! ;
+: time@ ( -- h m s )
+  seconds 86400 mod
+  dup 3600 / swap 3600 mod
+  dup 60 / swap 60 mod ;
+: date@ ( -- y mo d ) seconds 86400 / days>civil ;
+: .time ( -- ) time@ >r >r 0 <# # # #> type ':' emit
+  r> 0 <# # # #> type ':' emit  r> 0 <# # # #> type ;
+: .date ( -- ) date@ >r >r 0 <# # # # # #> type '-' emit
+  r> 0 <# # # #> type '-' emit  r> 0 <# # # #> type ;
+
+( TI and STOP, named after BASIC's, over the VSYNC frame counter that
+  TICKS reads. Jiffies, not milliseconds: a frame is the unit anything
+  drawing to the screen is actually paced by. )
+: ti ( -- clk ) ticks drop ;
+: stop ( clk -- ) ti swap - 65535 and
+  dup . ." jiffies (" 1000 60 */ . ." ms)" cr ;
+
 ( THE CONSOLE FONT - the X816's answer to the X16's CHARSET.
 
   There is no charset ROM to select from, so the X16 word cannot port:
@@ -590,6 +664,57 @@ create (rl-nl) 1 allot  10 (rl-nl) c!
 : write-line ( c-addr u fileid -- ior )
   dup >r write-file ?dup if r> drop exit then
   (rl-nl) 1 r> write-file ;
+
+( THE INPUT SOURCE - INCLUDE-FILE, and the position words.
+
+  INCLUDE-FILE interprets a file somebody else opened, and it does it
+  LINE BY LINE rather than reading the lot into a buffer and calling
+  EVALUATE on that. The X16 version read 8 KB and evaluated it in one
+  go, which quietly changes the language: a `\` comment eats to the end
+  of the BUFFER rather than the end of the line, because a newline is
+  just a character to the parser. A colon definition still spans lines
+  here - compilation state survives EVALUATE - so nothing is lost by
+  going a line at a time except the surprise.
+
+  ANS says INCLUDE-FILE closes the file when it reaches the end, and
+  this does. )
+create (if-buf) 200 allot
+: include-file ( fileid -- )
+  >r
+  begin
+    (if-buf) 200 r@ read-line        ( u2 flag ior )
+    ?dup if drop 2drop r> close-file drop exit then
+  while                              ( u2 )
+    (if-buf) swap evaluate
+  repeat
+  drop
+  r> close-file drop ;
+
+( SAVE-INPUT hands back the parse offset and which source it belonged
+  to, and RESTORE-INPUT refuses - the FALSE/TRUE flag ANS asks for -
+  when the source has changed underneath it. Within one line that is
+  the whole job; across a REFILL it is not, and saying so beats
+  restoring an offset into a line that is no longer there. )
+: save-input ( -- x1 x2 n ) >in @ source-id 2 ;
+: restore-input ( xn..x1 n -- flag )
+  \ A spec this word did not write is DROPPED, not left lying: ANS
+  \ consumes xn..x1 n whether the restore worked or not, and a refusal
+  \ that also unbalanced the stack would be two problems.
+  dup 2 <> if 0 ?do drop loop true exit then
+  drop
+  source-id <> if drop true exit then
+  >in ! false ;
+
+( CLOSE-SOURCE ends the current file source now instead of at its last
+  line. It seeks to the end rather than closing the handle: the handle
+  belongs to the interpreter, which closes it and pops back to the
+  parent source when the read comes up empty - doing that here would
+  pull a file out from under the machinery still holding it. )
+: close-source ( -- )
+  source-id dup 0> if
+    (fs-flush)                          \ the read-ahead first: see fs.asm
+    dup >r file-size drop r> reposition-file drop
+  else drop then ;
 
 ( DIRECTORIES. The X16's CD/DIR talked to a CBM device over the IEC
   bus and took DOS command strings; here they are kernel calls, and a

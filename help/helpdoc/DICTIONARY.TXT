@@ -7,22 +7,22 @@ MARKER, ...) are explained with examples in the [advanced
 [x] ' ( "name" -- xt ) - find a word's execution token. ' DUP EXECUTE
 [x] ['] ( "name" -- ) - compile a word's xt (in a definition).
 [x] COMPILE, ( xt -- ) - append a call to xt to the current definition.
-[ ] COMPILE ( -- ) - (legacy) compile the following word into the definition.
+[x] COMPILE ( -- ) - (legacy) compile the following word into the definition.
 [x] [ ( -- ) - switch to interpret state inside a definition (IMMEDIATE).
 [x] ] ( -- ) - switch back to compile state.
 [x] LITERAL ( x -- ) - compile x as a literal (IMMEDIATE). [ 2 3 + ] LITERAL
 [x] 2LITERAL ( d -- ) - compile a double literal.
 [x] POSTPONE ( "name" -- ) - compile the compilation behaviour of a word
     (IMMEDIATE).
-[ ] [COMPILE] ( "name" -- ) - (legacy) force-compile an immediate word.
+[x] [COMPILE] ( "name" -- ) - (legacy) force-compile an immediate word.
 [x] IMMEDIATE ( -- ) - mark the most recent definition immediate.
 [x] MARKER ( "name" -- ) - create a word that, when run, forgets everything
     defined after it. MARKER SANDBOX
-[ ] FORGET ( "name" -- ) - remove a word and all words defined after it.
+[x] FORGET ( "name" -- ) - remove a word and all words defined after it.
 [x] >BODY ( xt -- addr ) - data-field address of a CREATEd word.
-[ ] ?COMP ( -- ) - abort unless currently compiling.
-[ ] ?STACK ( -- ) - check the data stack for under/overflow.
-[ ] ," ( "ccc\"" -- ) - compile a counted string into the dictionary.
+[x] ?COMP ( -- ) - abort unless currently compiling.
+[x] ?STACK ( -- ) - check the data stack for under/overflow.
+[x] ," ( "ccc\"" -- ) - compile a counted string into the dictionary.
 
 --- durexForth ---
 [x] LATEST ( -- nt ) - name token of the most recently defined word.

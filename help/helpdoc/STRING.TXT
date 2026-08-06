@@ -10,10 +10,10 @@ stay valid until the next such call (max 189 characters).
     after the quote: "hello world" TYPE. Only kicks in for undefined tokens
     (defined words always win); an unterminated string errors like an
     unknown word. Handler cell: 'QUOTE (see INTERPRETER).
-[ ] S\" ( "ccc\"" -- addr len ) - string literal with escapes: \n \t \" \\ \e etc.
+[x] S\" ( "ccc\"" -- addr len ) - string literal with escapes: \n \t \" \\ \e etc.
 [x] ." ( "ccc\"" -- ) - print a literal string when the word runs. : HI ." hello"
     ;
-[ ] C" ( "ccc\"" -- c-addr ) - a counted-string literal.
+[x] C" ( "ccc\"" -- c-addr ) - a counted-string literal.
 [x] COUNT ( c-addr -- addr len ) - convert a counted string to address/length.
 [x] TYPE ( addr len -- ) - print a string. S" hi" TYPE
     Throws "stack" if fewer than two cells are on the stack (a bare TYPE or
@@ -48,6 +48,6 @@ stay valid until the next such call (max 189 characters).
     clamped to 200. [CHAR] * 5
     RPT TYPE  ->  *
 [x] SLITERAL ( addr len -- ) - compile a string literal. Immediate.
-[ ] TIB ( -- addr ) - the terminal input buffer.
+[x] TIB ( -- addr ) - the terminal input buffer.
 [x] #TIB ( -- addr ) - variable: number of characters in TIB.
 [-] GETKEY ( -- char )   KEY does this; the codes are ASCII/CP437, not PETSCII code.
