@@ -53,5 +53,22 @@ Audio (NEEDS ADVSND) - envelopes and ADPCM are tested by testadvsnd.
 
 Storage / util
 [ ] DOS words - in the core (see DICTIONARY: DOS).
-[ ] BMX-LOAD BMX-SAVE + header vars (NEEDS BMX) - BMX bitmap files.
+[x] BMX-LOAD ( c-addr u vbank vaddr -- ior ) - load a BMX v1 image: the
+      palette into VERA's, the pixels into VRAM, rows BMX-STRIDE apart.
+      No device number - there is no IEC bus. ior 1 = i/o (including a
+      file shorter than its header claims), 2 = not a BMX v1 or a
+      palette that would not fit, 3 = compressed (unsupported).
+[x] BMX-SAVE ( c-addr u vbank vaddr -- ior ) - write one from VRAM,
+      described by the variables below.
+[x] BMX-WIDTH BMX-HEIGHT BMX-BPP BMX-PALSTART BMX-PALCOUNT BMX-BORDER
+      BMX-STRIDE - set before BMX-SAVE; published by BMX-LOAD, which
+      leaves them ALONE when it refuses a file.
+[x] BMX-PAL ( -- addr ) - a VALUE: PALCOUNT*2 bytes of your own memory
+      holding the palette, or 0 to use VERA's. USE IT. VERA's palette
+      does not read back on this machine - entries you wrote come back
+      exactly, entries nobody wrote come back as something that is not
+      the palette in use - so BMX-SAVE from VERA writes bytes that are
+      not colours, and the BMX-LOAD of that file installs them for real
+      and the screen goes to pieces. With BMX-PAL set, BMX-SAVE writes
+      that buffer and BMX-LOAD fills it.
 [ ] TSCrunch decompression - not ported.

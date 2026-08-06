@@ -61,6 +61,45 @@ user-confirmed on the MiSTer:
   card on the MiSTer and reported all tests passed — that run included
   the new far-data suite (testfar), so the SDRAM allocator is
   hardware-proven too, not just emulator-proven.
+- **BMX, the last unrun suite - and the palette does not read back**
+  (2026-08-05). All eight module suites now run. mod/bmx.fs was the
+  heaviest KERNAL user left: OPEN a logical file on device 8 with a
+  ",S,R" name, CHKIN, CHRIN a byte at a time into the VERA port, READST
+  after every stage. It is OPEN-FILE / READ-FILE / REPOSITION-FILE now -
+  five CODE words gone, the seek replacing a CHRIN loop that drained the
+  header-to-pixels gap one byte at a time - and the device argument went
+  with them, as it did from BLOAD and VLOAD.
+  - **VERA's palette cannot be read back on this machine.** Entries a
+    program wrote itself come back exactly; entries nobody wrote come
+    back as something that is NOT the palette in use - at boot as bytes
+    that would make the console invisible while the console is plainly
+    readable, and the same sixteen bytes read twice, with nothing
+    written in between, disagree. Measured in the emulator; the board
+    has not answered yet, and testbmx says so where it asserts it.
+  - So `bmx-save` reading the palette out of VRAM is a trap that
+    SUCCEEDS: the file looks right, and the `bmx-load` of it installs
+    those bytes for real. That is how the first green-looking version of
+    this file blanked the suite's screen for every test after it - the
+    verdict channel is the exit code, so the machine reported failure
+    while every assertion in the file had passed. **`bmx-pal`** is the
+    fix and the documented path: point it at PALCOUNT*2 bytes of your
+    own memory, and BMX-SAVE writes that while BMX-LOAD fills it.
+  - The same trap was in **X816_Library's assembly bmx** (which was
+    already X816-converted, and whose own test fills the eight entries
+    it saves, so it never noticed): `bmx_palptr` added there too, with
+    test 6 of run-libbmx.sh proving it and the negative control updated
+    for the second port store.
+  - The test round-trips **palette entries 240-255**, never 0-15: the
+    console owns the low sixteen and a test that repaints them has
+    changed the machine for every file that runs after it.
+  - Debugging note that cost an hour: **`.` between two `v@`s invalidates
+    the reading.** The console writes through VERA port 0 and leaves the
+    address wherever the text landed, so a probe that prints as it walks
+    VRAM reads the character cell at the cursor from the second byte on
+    (it comes back $20 - a space - forever). Collect into memory, print
+    afterwards. Same reason `2 dcsel` before a `.(` is undone: DCSEL
+    lives in VERA_CTRL and console output clears it.
+
 - **SYSTEM, and the CONTROL/FILE words the SMC made possible** (2026-08-05).
   testsystem is in the suite; SEVEN of the eight module suites now run, and
   the helpdoc stands at 494 ticked / 100 open, from 463/128 this morning.
@@ -77,10 +116,8 @@ user-confirmed on the MiSTer:
   - LS, OPEN and CLOSE landed too. LS's pattern is a SUBSTRING and says so:
     the kernel hands back 8.3 names, and matching "*.TXT" would pretend to a
     shell that is not here.
-  - **BMX is the one suite still out**, and it is a real port rather than a
-    fix: it drives the C64 KERNAL channel model - open with a logical file
-    and device, chkin, chrin a byte at a time, readst, clrchn - over a
-    ",S,R" filename. All of that has to become the ANS file words.
+  - **BMX was the one suite still out**, and it is done - see the entry
+    above.
   - Process note worth keeping: parencheck DOES catch `(ssn)` inside a `(`
     comment; it was skipped after a late edit, and the boot died on the word
     after the stray `)`. Run it after every edit, not once per session.
