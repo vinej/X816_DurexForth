@@ -119,7 +119,24 @@ code (e:facos) $00502a jsl, rtl, end-code
 : fatan ( F: r -- atan r) (f1>) (e:fatan) (f<) ;
 : fasin ( F: r -- asin r) (f1>) (e:fasin) (f<) ;
 : facos ( F: r -- acos r) (f1>) (e:facos) (f<) ;
-: fpow ( F: x y -- x^y ) fswap fln f* fexp ;      \ x > 0, as before
+\ AN INTEGRAL EXPONENT MULTIPLIES INSTEAD. BASIC's ^ has taken this
+\ road since always (Q_FP_POW_INT: repeated multiply, exponent in a
+\ 16-bit register), and it is why K^2 there is one engine call where
+\ exp(2 ln K) is two series. The same test here -- y positive,
+\ integral, under 65536 -- takes the same road, so the two languages'
+\ power operators cost the same for the powers programs actually
+\ write. Everything else still goes through fln/fexp, x > 0 as before.
+: (fipow) ( n -- ) ( F: x -- x^n )     \ n >= 1
+  fdup  1 ?do fover f* loop  fnip ;
+: fpow ( F: x y -- x^y )
+  fdup f0> if
+    fdup 65536 s>f f< if
+      fdup f>s                         ( n ) ( F: x y )
+      dup s>f fover f= if fdrop (fipow) exit then
+      drop
+    then
+  then
+  fswap fln f* fexp ;
 : f** fpow ;
 
 \ --- defining words ------------------------------------------------------------------
