@@ -32,6 +32,9 @@ KERNEL="../X816_Calypsi/examples/shell/kernel.bin"
 python build/parencheck.py forth/*.fs forth/mod/*.fs test/*.fs || exit 1
 
 ./build.sh || exit 1
+# FLOAT is the SuperBasic engine now (fpengine/); the card must carry
+# the blob or testfloat dies at include with FPENGINE.BIN missing.
+(cd fpengine && bash build.sh) || exit 1
 
 NEG=0
 [ "${1:-}" = "--negative" ] && NEG=1 && \
@@ -54,6 +57,8 @@ fat.close()
 
 fs = PyFatFS(out)
 with open("build/forth.bin", "rb") as f, fs.open("/FORTH.BIN", "wb") as g:
+    g.write(f.read())
+with open("fpengine/fpengine.bin", "rb") as f, fs.open("/FPENGINE.BIN", "wb") as g:
     g.write(f.read())
 
 # (repo file, card name): card names are BARE 8.3 - the kernel's FAT32
