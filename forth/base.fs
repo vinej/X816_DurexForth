@@ -1279,7 +1279,7 @@ create (vbuf) 256 allot
 : pal-save ( c-addr u start count -- ior )
   2* >r 2* $fa00 + 1 swap r> vsave ;
 
-( HELP - the manual, on the card, in /HELP.
+( HELP - the manual, on the card, in /FORTH/HELP.
 
   Card names are the topic TRUNCATED TO EIGHT characters and
   uppercased: the kernel's FAT32 reader skips long filenames on
@@ -1297,16 +1297,21 @@ variable (hlen)
 
 : (hupper) ( c -- c ) dup 'a' 'z' 1+ within if $20 - then ;
 
-( Build "/HELP/TOPIC.TXT" - six characters, up to eight more, four
-  more - and hand back the whole thing as a string. )
+( Build "/FORTH/HELP/TOPIC.TXT" - twelve characters, up to eight more,
+  four more - and hand back the whole thing as a string.
+
+  ABSOLUTE, so HELP works from whatever directory the reader is in.
+  The pages moved from /HELP to /FORTH/HELP when the card grew a folder
+  per language. The 12 below is that prefix, and the hpath buffer's 24
+  bytes is exactly 12 + 8 + 4 with nothing spare. )
 : (hpath!) ( c-addr u -- c-addr u )
   8 min dup (hlen) !
-  s" /HELP/" (hpath) swap move
+  s" /FORTH/HELP/" (hpath) swap move
   0 ?do
-    dup i + c@ (hupper) (hpath) 6 + i + c!
+    dup i + c@ (hupper) (hpath) 12 + i + c!
   loop drop
-  s" .TXT" (hpath) 6 + (hlen) @ + swap move
-  (hpath) (hlen) @ 10 + ;
+  s" .TXT" (hpath) 12 + (hlen) @ + swap move
+  (hpath) (hlen) @ 16 + ;
 
 ( true = the reader asked to stop. ESC or Q; anything else carries on. )
 : (hpause) ( -- flag )

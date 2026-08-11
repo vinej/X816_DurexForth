@@ -1,4 +1,4 @@
-\ HELP - the manual, read off the card (base.fs, /HELP on the card).
+\ HELP - the manual, read off the card (base.fs, /FORTH/HELP on the card).
 \
 \ NOTHING HERE CALLS `help` ON A REAL PAGE, deliberately. HELP pauses
 \ every 22 lines and waits for a key, so a page longer than that would
@@ -20,10 +20,10 @@ cr .( testhelp: topic -> card path ) cr
 \ because the kernel's FAT32 reader skips long filenames. Both card
 \ builders apply that rule (run-tests.sh and X816_core mksdcard.py); if
 \ this and they ever disagree, HELP looks for a file that is not there.
-T{ s" PAL" (hpath!) s" /HELP/PAL.TXT" compare -> 0 }T
-T{ s" ARITHMETIC" (hpath!) s" /HELP/ARITHMET.TXT" compare -> 0 }T
-T{ s" INTERPRETER" (hpath!) s" /HELP/INTERPRE.TXT" compare -> 0 }T
-T{ s" video" (hpath!) s" /HELP/VIDEO.TXT" compare -> 0 }T
+T{ s" PAL" (hpath!) s" /FORTH/HELP/PAL.TXT" compare -> 0 }T
+T{ s" ARITHMETIC" (hpath!) s" /FORTH/HELP/ARITHMET.TXT" compare -> 0 }T
+T{ s" INTERPRETER" (hpath!) s" /FORTH/HELP/INTERPRE.TXT" compare -> 0 }T
+T{ s" video" (hpath!) s" /FORTH/HELP/VIDEO.TXT" compare -> 0 }T
 
 cr .( testhelp: the pages are actually on the card ) cr
 \ One short name, and every name that had to be truncated - those are the

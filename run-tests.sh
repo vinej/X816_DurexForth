@@ -94,10 +94,16 @@ for d, n, card in SRC:
 # the kernel's FAT32 reader skips long filenames. Same rule as
 # ../X816_core/tools/mksdcard.py; if these two ever disagree, the suite
 # passes and the real card cannot find its own help.
-fs.makedir("/HELP")
+#
+# /FORTH/HELP, not /HELP: the release card gives each language a folder of
+# its own, and base.fs's (hpath!) builds that absolute path. This card is
+# otherwise flat -- only the help directory has to match, because only the
+# help path is absolute.
+fs.makedir("/FORTH")
+fs.makedir("/FORTH/HELP")
 for name in sorted(os.listdir("help/helpdoc")):
     if name.endswith(".TXT"):
-        with open(os.path.join("help/helpdoc", name), "rb") as f,              fs.open("/HELP/" + name[:-4][:8].upper() + ".TXT", "wb") as g:
+        with open(os.path.join("help/helpdoc", name), "rb") as f,              fs.open("/FORTH/HELP/" + name[:-4][:8].upper() + ".TXT", "wb") as g:
             g.write(f.read())
 
 if neg:
