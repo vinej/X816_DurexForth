@@ -16,6 +16,15 @@
 #                             and no banner may print, proving check 1 can
 #                             fail
 #
+# THE CARD MUST CARRY base.fs. This script was written at stage A, when the
+# Forth was a bare assembled REPL and FORTH.BIN alone was a complete machine.
+# It is not any more: COLD calls load_base, which INCLUDEs `base` off the card,
+# so a card holding only FORTH.BIN makes the boot throw -37 and the uncaught-
+# error path calls emu-exit 1 -- the emulator stops with status 1 and the
+# banner check fails with nothing to say why. That is not a Forth fault and it
+# was not one: it went unnoticed because run-tests.sh writes the sources and is
+# the suite anybody actually reads. Anything COLD needs goes on the card here.
+#
 # Requires: pip install pillow pyfatfs, and a built X816_Calypsi
 # programs/shell/kernel.bin (sh build.sh there).
 set -u
@@ -45,17 +54,36 @@ fi
 # A scratch card with FORTH.BIN on it, written by pyfatfs -- an independent
 # FAT32 implementation, as everywhere else in the tree.
 cp "$CORE/boot/fat32.img" "$OUT/scratch.img"
-python - "$WOUT/scratch.img" "$WOUT/forth.bin" <<'PY'
-import sys
+python - "$WOUT/scratch.img" "$WOUT/forth.bin" "$(pwd)" <<'PY'
+import sys, os
 from pyfatfs.PyFatFS import PyFatFS
-img, binpath = sys.argv[1], sys.argv[2]
+img, binpath, repo = sys.argv[1], sys.argv[2], sys.argv[3]
 fs = PyFatFS(img)
 with open(binpath, "rb") as f:
     data = f.read()
 with fs.open("/FORTH.BIN", "wb") as g:
     g.write(data)
-fs.close()
 print("card: FORTH.BIN = %d bytes" % len(data))
+
+# THE WHOLE BOOT CHAIN, not just base.fs. COLD compiles `base` off the card
+# (asm/durexforth.asm load_base) and base.fs then includes seven more: `asm` at
+# its line 114, then wordlist, labels, doloop, debug, require and accept. Miss
+# any one and the compile stops mid-banner -- the first attempt at this fix
+# carded `base` alone and got as far as "compile base..asm.." before dying,
+# which looks exactly like a broken Forth and is not one.
+#
+# `compat` is deliberately NOT here: it is the test suite's compatibility
+# layer, included by test.fs, not by COLD. No AUTORUN and no test sources
+# either -- the three checks below are about booting and typing.
+for name in ("base", "asm", "wordlist", "labels", "doloop", "debug",
+             "require", "accept"):
+    path = os.path.join(repo, "forth", name + ".fs")
+    with open(path, "rb") as f:
+        src = f.read()
+    with fs.open("/" + name.upper(), "wb") as g:
+        g.write(src)
+    print("card: %-9s = %d bytes" % (name.upper(), len(src)))
+fs.close()
 PY
 [ $? -eq 0 ] || exit 1
 

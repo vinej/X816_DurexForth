@@ -6,8 +6,8 @@
 \ fetch/store/move/fill really do reach 24-bit addresses outside the
 \ program banks, that a block may cross a bank boundary (the whole point
 \ of a flat data space), that exhaustion is refused LOUDLY rather than
-\ walking into the VERA2 window, and that MARKER and FAR-EMPTY give the
-\ space back.
+\ walking into the kernel's writable-data region above it, and that MARKER
+\ and FAR-EMPTY give the space back.
 
 marker ---testfar---
 
@@ -18,11 +18,29 @@ require tester
 
 decimal
 
+\ THE TOP IS NOT A LITERAL ANY MORE, and three assertions below used to spell
+\ it $e00000. The kernel's writable-data region ($C0:0000-$DF:FFFF, the
+\ resident editor's page pool) is reserved at boot and MEM-RELEASE hands it to
+\ the heap for the rest of a session, so sdram-size is a VALUE set from MEM-TOP
+\ rather than a constant. An invariant like "far-here and far-unused always sum
+\ to the top" is about the SUM, not about which address the top happens to be -
+\ writing the literal conflated the two, and moving the boundary failed a test
+\ that was not actually about the boundary.
+sdram sdram-size + constant far-top
+
 cr .( testfar: the space is where the memory map says ) cr
 T{ sdram -> $50000 }T
-T{ sdram sdram-size + -> $e00000 }T
+\ The BOOT ceiling, with the region reserved. Not tautological: it checks that
+\ the kernel's default is the one MEMORY_MAP.md 1.1 documents and that far-init
+\ turned MEM-TOP's last-usable-byte into a size correctly (the 1+).
+T{ mem-top -> $bfffff }T
+T{ far-top -> $c00000 }T
+\ No release here on purpose: MEM-RELEASE is one way for the session, so a test
+\ that took the 2 MB would change the space every later case runs in. The
+\ release path is covered on the kernel side by
+\ X816_Calypsi/programs/shell/run-mem.sh, with a negative control.
 T{ far-here sdram u< -> 0 }T                  \ never below the space
-T{ far-here sdram sdram-size + u< -> -1 }T    \ never past its end
+T{ far-here far-top u< -> -1 }T               \ never past its end
 
 cr .( testfar: far-allot bumps far-here and drains far-unused ) cr
 far-here constant f-a
@@ -30,7 +48,7 @@ far-unused constant u-a
 100 far-allot
 T{ far-here f-a - -> 100 }T
 T{ u-a far-unused - -> 100 }T
-T{ far-here far-unused + -> $e00000 }T        \ the two always sum to the top
+T{ far-here far-unused + -> far-top }T        \ the two always sum to the top
 
 cr .( testfar: a far block holds cells and bytes ) cr
 T{ $12345678 f-a ! f-a @ -> $12345678 }T      \ 32-bit cell, in SDRAM
@@ -66,8 +84,8 @@ T{ far-here -> f-b }T                         \ a refused claim moves nothing
 far-unused constant f-left
 f-left far-allot                              \ the exact fit IS allowed
 T{ far-unused -> 0 }T
-T{ far-here -> $e00000 }T
-T{ 0 far-allot far-here -> $e00000 }T         \ zero at the top is still legal
+T{ far-here -> far-top }T
+T{ 0 far-allot far-here -> far-top }T         \ zero at the top is still legal
 T{ (try) -> -8 }T
 f-b to far-here                               \ hand the tail back by hand
 T{ fb2 c@ fbig @ -> 0 $a5 }T                  \ and the live blocks survived
