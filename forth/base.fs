@@ -382,14 +382,28 @@ swap r> 0< if negate then ;
   only goes up, MARKER puts it back where it was, and FAR-EMPTY
   drops the lot.
 
-  NOT the kernel heap. MEM_ALLOC's arena starts at $20:0000 -
-  KERNEL.md 5.5 - and overlaps this space, including the block
-  table in its first page. Nothing in this Forth calls MEM_ALLOC -
-  no binding exists, and the kernel's own FS does not allocate -
-  so the arena is dormant and this pointer owns the space.
-  Whoever binds MEM_ALLOC has to carve the two apart first. )
+  THE CEILING IS THE KERNEL'S TO SAY, AND IT MOVES. The top of
+  what used to be data space, $C0:0000-$DF:FFFF, is the kernel
+  writable-data region - the resident editor's page pool. It is
+  reserved at boot and MEM-RELEASE hands it to the kernel heap for
+  the rest of the session, so there is no one number to compile in.
+  sdram-size is therefore a VALUE set from MEM-TOP, not a constant:
+  a compile-time copy would be wrong on one side of a release and
+  would say nothing about it, which is the whole failure this
+  arrangement exists to prevent. FAR-INIT re-asks; base.fs is
+  compiled off the card at every COLD so the ordinary boot has
+  already asked, but a frozen or cartridge image must call it.
+
+  NOT the kernel heap, and no longer a hand-carve. MEM_ALLOC's
+  arena starts at $20:0000 - KERNEL.md 5.5 - and ends at the same
+  ceiling MEM-TOP reports, so the two allocators take their bound
+  from one place and cannot drift apart. This is what retires the
+  note that used to stand here: whoever bound MEM_ALLOC would have
+  had to separate it from far-here by hand. )
 $50000 constant sdram ( first data address in SDRAM, flat )
-$e00000 sdram - constant sdram-size
+0 value sdram-size
+: far-init ( -- ) mem-top 1+ sdram - to sdram-size ;
+far-init
 sdram value far-here
 : far-unused ( -- u ) sdram sdram-size + far-here - ;
 ( -8, dictionary overflow: far space IS data space. Refusing
@@ -1324,9 +1338,15 @@ variable (hlen)
 
 cr
 ( the machine's two spaces: program in the four single-cycle banks
-  via HERE/ALLOT, data in SDRAM from bank $05 up to $DF via
-  FAR-HERE/FAR-ALLOT - the top 2 MB, banks $E0-$FF, belong to the
-  VERA2 window and the kernel firmware. )
+  via HERE/ALLOT, data in SDRAM from bank $05 up via FAR-HERE and
+  FAR-ALLOT, stopping wherever MEM-TOP says. The top 4 MB, banks
+  $C0-$FF, are the kernel writable-data region, the VERA2 window
+  and the kernel firmware - and the first of those three is
+  RELEASABLE, so the data figure below is 2 MB larger after a
+  MEM-RELEASE. That is why it is printed from the queried value
+  and not from a constant: a stale boundary is this arrangement's
+  failure mode, and the number being on screen is the standing
+  check against it. )
 cpu-mhz
 0 u.r space .( MHz cpu.) cr
 unused

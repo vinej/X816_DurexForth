@@ -34,8 +34,8 @@ OUT=$(mktemp -d)
 trap 'rm -rf "$OUT"' EXIT
 WOUT=$(cygpath -m "$OUT" 2>/dev/null || echo "$OUT")
 
-KERNEL="../X816_Calypsi/examples/shell/kernel.bin"
-[ -f "$KERNEL" ] || { echo "kernel.bin missing -- run sh build.sh in X816_Calypsi/examples/shell"; exit 1; }
+KERNEL="../X816_Calypsi/programs/shell/kernel.bin"
+[ -f "$KERNEL" ] || { echo "kernel.bin missing -- run sh build.sh in X816_Calypsi/programs/shell"; exit 1; }
 
 RAW=0
 [ "${1:-}" = "--raw" ] && RAW=1

@@ -221,3 +221,37 @@ TICKS ; ( -- ud ) VSYNC frame counter as an unsigned double (16-bit, wraps)
     stz LSB, x                  ; high cell = 0
     stz MSB, x
     rtl
+
+; The top of data space is the KERNEL'S to say, not ours. $C0:0000-$DF:FFFF is
+; the kernel writable-data region - the resident editor's page pool - reserved
+; at boot and handed to the kernel heap by MEM_RELEASE, so the ceiling MOVES
+; within a session. base.fs sets sdram-size from MEM-TOP for that reason: the
+; old `$e00000 sdram - constant sdram-size` was a compile-time copy, and a copy
+; is wrong on one side of a release with nothing to say so. This is also what
+; retires the note base.fs used to carry, that whoever bound MEM_ALLOC would
+; have to carve it apart from far-here by hand - both sides ask the kernel now,
+; so they cannot disagree.
+    +BACKLINK "mem-top", 7
+MEM_TOP ; ( -- a ) last usable byte of user SDRAM, as the kernel reports it
+    jsl BANK1 + kern_mem_top     ; KTMP = low 16, KTMP2 = bank
+    dex
+    dex
+    lda KTMP
+    sta LSB, x
+    lda KTMP2
+    sta MSB, x
+    rtl
+
+; ONE WAY for the session - there is no re-reserve, because a program that had
+; already far-allotted into the region would have it taken back with no way to
+; find out. Reboot restores the reservation. After this the editor refuses to
+; open, which is the trade being made.
+    +BACKLINK "mem-release", 11
+MEM_RELEASE ; ( n -- a ) hand kernel region n to the heap; a = the new ceiling
+    lda LSB, x                  ; region id (0 = the editor region)
+    jsl BANK1 + kern_mem_release
+    lda KTMP
+    sta LSB, x
+    lda KTMP2
+    sta MSB, x
+    rtl

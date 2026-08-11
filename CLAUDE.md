@@ -705,7 +705,7 @@ user-confirmed on the MiSTer:
   and a blink mid-copy would be duplicated a row up and stranded —
   that WAS the stray `?` cells in old suite GIF rows; they are gone
   now. Every `console.o` link needs `ccursor.o` (shell build.sh and
-  nine `examples/kernel/run-*.sh` were patched). CURTEST, IRQTEST,
+  nine `programs/kernel/run-*.sh` were patched). CURTEST, IRQTEST,
   KFSTEST, MEMTEST and the Forth suite are green on the new kernel.
   Two traps found on the way: the kernel call clobbers X/Y like every
   kernel call (COLD's bare jsl cost a boot — phx/phy like the shims),
