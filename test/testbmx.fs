@@ -57,10 +57,15 @@ create hb 16 allot
 variable tfd
 : hbclr   16 0 do 0 hb i + c! loop ;
 : hbmagic 'B' hb c!  'M' hb 1+ c!  'X' hb 2 + c!  1 hb 3 + c! ;
+\ THROW, not DROP, on all three iors. This helper used to discard them, so a
+\ refused create stored a meaningless handle in tfd and the failure surfaced
+\ later as a wrong BMX result -- a test that lies about which step broke. The
+\ pool being finite makes that reachable: a create can fail with ior 3, no free
+\ handle, and nothing about the eventual symptom would say so.
 : mkfile ( c-addr u n -- )              \ n bytes of HB into the named file
-  >r w/o create-file drop tfd !
-  hb r> tfd @ write-file drop
-  tfd @ close-file drop ;
+  >r w/o create-file throw tfd !
+  hb r> tfd @ write-file throw
+  tfd @ close-file throw ;
 
 cr .( testbmx: save an 8x2 stamp ) cr
 mkstamp mkpal

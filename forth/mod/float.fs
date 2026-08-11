@@ -28,9 +28,20 @@ $003020 constant (fa1)          \ operand 1 and the result
 $003028 constant (fa2)          \ operand 2
 $003040 constant (ferr)         \ 0 = ok, else the engine's error code
 
+\ The ior is REPORTED, not discarded, and the two causes are named
+\ separately. This used to print "missing from the card" for every
+\ failure - and the failure it actually got was ior 3, KERR_NOSPACE:
+\ no free file handle, because this open is the SIXTH in the suite's
+\ chain - base, autorun, test, testfloa, float, then this. The file
+\ was on the card the whole time, and the message sent the reader
+\ looking for it. kfs.h says the same thing about NOSPACE being
+\ mistaken for a full card; this is that mistake one layer up.
 : (engload) ( -- )
-  s" FPENGINE.BIN" r/o open-file
-  if drop cr ." FPENGINE.BIN missing from the card -- HELP FLOAT" cr
+  s" FPENGINE.BIN" r/o open-file            ( fileid ior )
+  ?dup if
+     nip cr ." FPENGINE.BIN not opened, ior " dup .
+     3 = if ." -- no free file handle; too deep in nested includes"
+          else ." -- missing from the card, see HELP FLOAT" then cr
      -38 throw then
   >r (eng) $1800 r@ read-file throw drop
   r> close-file throw ;
