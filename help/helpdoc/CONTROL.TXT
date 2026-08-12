@@ -1,12 +1,10 @@
 === CONTROL - X16 system control ===
 
-[-] EDIT ( c-addr u -- ) - open the named file in the built-in X16 text editor
-  (x16edit, ROM bank $0D; u=0 opens a new empty buffer). Edit, save (Ctrl-S),
-  quit (Ctrl-Q), then INCLUDE the file to compile it. Typical loop:
-    S" PROG.FS" EDIT   S" PROG.FS" INCLUDED
-  EDIT saves/restores the data-stack zeropage the editor uses, resets the RAM
-  bank to 0, closes the editor's files, and hides the mouse on exit; file I/O
-  and console output after EDIT work normally.
+[x] EDIT ( -- ) - launch the X816 resident full-screen editor and return
+  to Forth after exit. The editor lives in the kernel firmware and is entered
+  through K_EDIT, so Forth is not unloaded.
+  Current limitation: editor file load/save is still being ported to K_FS_*.
+  For now EDIT opens the resident editor path; named-file editing will follow.
 SETBANK, B@ and B! are gone rather than unticked: they selected and
 reached the X16's 8 KB RAM window at $A000, and a 65816 addressing
 sixteen megabytes flat has no window to select. Ordinary @ and ! reach

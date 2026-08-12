@@ -19,7 +19,7 @@ Don't want to build? Ready-made binaries are in **`release/`**:
 | `durexforth.crt` | `x16emu -cart durexforth.crt -sdcard sdcard.img` | core cart; modules via `NEEDS`, libraries from the card |
 | `durexforth.bin`, `durexforth_full.bin` | MiSTer X16 core | the same cartridges as **raw ROM bank images** (no .crt header - the MiSTer core maps them straight at bank 32; x16emu wants the headered `.crt`) |
 | `durexforth.prg` | `x16emu -prg durexforth.prg -run -sdcard sdcard.img` | RAM program; compiles the core from the card at boot |
-| `sdcard.img` | (mount as the SD card) | FAT32 card with the Forth libraries; where `EDIT` saves and `INCLUDE` loads |
+| `sdcard.img` | (mount as the SD card) | FAT32 card with the Forth libraries; `INCLUDE` loads from here |
 
 On Windows, double-click one of the launchers:
 

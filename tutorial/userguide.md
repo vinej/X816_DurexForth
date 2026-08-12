@@ -105,15 +105,17 @@ SEE DUP          \ decompile a word
 
 ### The edit / run loop
 
-durexForth uses the built-in X16Edit for source files:
+durexForth can launch the X816 resident editor and return to the Forth prompt:
 
 ```forth
-S" GAME.FS" EDIT       \ edit (Ctrl-S saves, Ctrl-Q quits)
-S" GAME.FS" INCLUDED   \ compile it
+EDIT                    \ open the resident editor
+INCLUDE GAME.FS         \ compile a source file after it exists on the card
 ```
 
-or by name: `INCLUDE GAME.FS`. A file named `AUTORUN` on the SD card is
-INCLUDEd automatically at every boot — put your startup code there.
+Named-file edit/save is still being ported to the X816 kernel filesystem API.
+For now, compile files by name with `INCLUDE GAME.FS`. A file named `AUTORUN`
+on the SD card is INCLUDEd automatically at every boot — put your startup
+code there.
 
 ### On-demand modules: NEEDS and INCLUDE
 
@@ -143,7 +145,7 @@ dot makes a 32-bit double: `1000000. D.`
 - `HELP ( "topic" -- )` — show a help page. **topic**: a section name (STACK, VIDEO, ...); omitted = the index.
 - `NEEDS ( "name" -- )` — load a module from cartridge ROM. **name**: module name, case-insensitive; already-loaded modules are recompiled, so guard with MARKER if needed.
 - `INCLUDE ( "name" -- )` — compile a file from the SD card. **name**: filename as typed (no quotes).
-- `EDIT ( c-addr u -- )` — open X16Edit. **c-addr u**: the filename string; u = 0 opens an empty buffer.
+- `EDIT ( -- )` — launch the X816 resident editor and return to Forth after exit. Named-file edit/save is still pending.
 - `WORDS ( -- )`, `SEE ( "name" -- )`, `ABORT ( -- )` — list the dictionary / decompile a word / clear both stacks.
 
 ---
@@ -1561,7 +1563,7 @@ Channel I/O for your own file plumbing: `CHKIN CHKOUT CHRIN CLRCHN READST`.
 ## 39. CONTROL — system control, clock, I2C
 
 ```forth
-S" PROG.FS" EDIT        \ X16Edit; Ctrl-S save, Ctrl-Q quit
+EDIT                    \ resident editor; returns to Forth after exit
 60 SLEEP                \ ~1 s (jiffies)     500 MS   \ ~0.5 s
 TICKS D.                \ the 24-bit jiffy counter as a double
 TIME@ . . .             \ h m s        DATE@ . . .   \ y mo d
@@ -1575,7 +1577,7 @@ MONITOR                 \ ML monitor (X exits; reset afterwards)
 
 ### Word reference
 
-- `EDIT ( c-addr u -- )` — X16Edit on the named file; **u** = 0 opens an empty buffer. Ctrl-S saves, Ctrl-Q quits.
+- `EDIT ( -- )` — launch the X816 resident editor and return to Forth after exit. Named-file edit/save is still pending.
 - `SLEEP ( jiffies -- )` — wait in 1/60 s ticks. `MS ( u -- )` — wait ≈**u** milliseconds (busy loop, ≥ u).
 - `TICKS ( -- ud )` — the 24-bit jiffy clock as an unsigned double.
 - `TIME@ ( -- h m s )` / `DATE@ ( -- y mo d )` — read the RTC (y = 4-digit year).

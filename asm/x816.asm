@@ -25,6 +25,7 @@ KERN_GETXY  = $00fe18               ; -> C = column, X = row
 KERN_CURSOR = $00fe20               ; C = 1 blink at the console cursor, 0 off
 KERN_COLOR  = $00fe24               ; C = foreground, X = background (0-15)
 KERN_EXIT   = $00fe84               ; C = status; does not return
+KERN_EDIT   = $00fe88               ; C:X = filename pointer, or 0; returns after exit
 KERN_IRQ_SET = $00fec4              ; C = slot, X = handler lo16, Y = bank
                                     ;   -> C:X = the previous handler
 KERN_FRAMES = $00fed0               ; -> C = VSYNC frames, 16-bit, wraps
@@ -425,6 +426,67 @@ kern_fs_seekback
     ldx #1
     lda #fs_skblk
     jsl KERN_FS_SEEK
+    sep #$10
+!rs
+    ply
+    plx
+    rtl
+
+; edit ( addr u -- ) - launch the resident editor with the named file and
+; return to Forth after exit. Use 0 0 edit for an unnamed buffer.
+    +BACKLINK "edit", 4
+EDIT
+    lda LSB, x
+    sta W2                  ; length
+    lda LSB+2, x
+    sta W
+    lda MSB+2, x
+    sta W+2                 ; W = name, flat
+    inx
+    inx
+    inx
+    inx
+
+    lda W2
+    beq .launch_empty
+
+    ldy W2                  ; 8-bit Y: editor names are short
+    cpy #65
+    bcc +
+    ldy #64
++   sep #$20
+!as
+    lda #0
+    sta fs_name, y          ; terminator
+-   dey
+    bmi +
+    lda [W], y
+    sta fs_name, y
+    bra -
++   rep #$20
+!al
+
+    phx
+    phy
+    rep #$30
+!rl
+    ldx #1
+    lda #fs_name
+    jsl KERN_EDIT
+    sep #$10
+!rs
+    ply
+    plx
+    rtl
+
+.launch_empty
+    phx
+    phy
+    rep #$30
+!rl
+    lda #0
+    tax
+    jsl KERN_EDIT
     sep #$10
 !rs
     ply
