@@ -8,7 +8,9 @@
 \ and reached by JSL through a jump table. BASIC and Forth answering
 \ the same bits for the same expression is the point; the 40x speed
 \ over the old Forth-coded MFLPT series is the bonus. The card must
-\ carry FPENGINE.BIN in its root.
+\ carry FPENGINE.BIN BESIDE THE SOURCES -- the open below uses a bare
+\ name, so it is resolved against the directory Forth was started
+\ from, which is /FORTH on the release card.
 \
 \ A float is FOUR bytes now -- one cell -- on the same separate
 \ 16-deep float stack as before. Everything the old file computed

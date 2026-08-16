@@ -750,19 +750,35 @@ user-confirmed on the MiSTer:
   MiSTer. Hash-verify card files against sources with pyfatfs after
   every refresh. A stale release is indistinguishable from a change
   that did not work.
-- **Every X816 test file starts with `require tester`** so it can be
-  included on its own at the prompt: `include testfile` used to die on
-  `T{?` because only test.fs pulled the Hayes tester in. REQUIRE is
-  idempotent against the same list `included` records, so inside the
-  suite it costs nothing. Put it AFTER the file's `marker`, so
-  unwinding the marker takes the tester with it when it was loaded
-  standalone.
+- **The suite lives one directory down, and every reference to it
+  carries a `test/` prefix** (2026-08-12). On the card the language is
+  `/FORTH` and the suite is `/FORTH/TEST`, and the working directory
+  stays `/FORTH` — that is where `base`, `autorun`, the modules and
+  `FPENGINE.BIN` are read from, all by bare name. The kernel resolves a
+  relative path segment by segment (`kfs.c`, `kfs_abspath`), so a test is
+  `include test/testcore` and a module is still `include float`. Do NOT
+  `cd` into the test directory to shorten the names: everything else
+  Forth loads is up one level.
+- **Every X816 test file starts with `require test/tester`** so it can
+  be included on its own at the prompt: `include test/testfile` used to
+  die on `T{?` because only test.fs pulled the Hayes tester in. REQUIRE
+  is idempotent against the same list `included` records, so inside the
+  suite it costs nothing — but the spelling must match test.fs's
+  exactly, since the dedup is by the name string. Put it AFTER the
+  file's `marker`, so unwinding the marker takes the tester with it
+  when it was loaded standalone.
 - **A new test file must be added to THREE places**, two of them
-  outside this repo's test dir: `test/test.fs` (the include), the
-  `SRC` list in `run-tests.sh` (emulator card), and `FORTH_SRC` in
+  outside this repo's test dir: `test/test.fs` (the include, prefixed),
+  the `TEST` list in `run-tests.sh` (emulator card), and `FORTH_TEST` in
   `../X816_core/tools/mksdcard.py` (release card). Miss the third and
   the suite is green in the emulator while the hardware card dies on
   a missing file.
+- **Nothing in the suite may assume WHICH directory it runs from.**
+  `test/testdir.fs` asserted `/` and would have failed on the release
+  card, where the suite runs from `/FORTH`; it records its starting
+  directory instead (`home`, `tpath`) and builds absolute paths from it.
+  run-tests.sh now boots from `/FORTH` for the same reason — a harness
+  card shaped unlike the one that ships proves the wrong thing.
 
 ## Conventions that will bite you (short list — doc/STAGEC.md has all)
 
@@ -789,7 +805,7 @@ user-confirmed on the MiSTer:
    not an SMC I2C service, which is what this line used to claim.
 2. **Board run**: the turbo/MS/NMI batch is emulator-green only; the
    user takes `release/mister/` to the MiSTer (the card already
-   carries TURBO and TESTNMI in `include test`).
+   carries TURBO and TESTNMI in `include test/test`).
 3. **The audio note/patch API is DONE** (2026-08-05) — ported into
    X816_Library first, as the user asked, then bound here.
    `FMPLAY`/`FMCHORD` (play-strings, `playstring.s`, 961 lines) and

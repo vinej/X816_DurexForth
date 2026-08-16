@@ -18,7 +18,7 @@ ACME="${ACME:-acme/acme.exe}"
 
 echo "==> assembling forth.bin"
 mkdir -p build
-[ -f build/version.asm ] || printf '!text "durexForth X816"\n' > build/version.asm
+[ -f build/version.asm ] || printf '!text "durexForth 1.0"\n' > build/version.asm
 "$ACME" -I asm asm/durexforth.asm
 echo "    forth.bin = $(stat -c%s build/forth.bin) bytes"
 echo "==> done"

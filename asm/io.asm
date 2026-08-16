@@ -121,8 +121,9 @@ REFILL ; ( -- flag )
 
     ; getLineFromConsole
     ; X816: the KERNAL BASIN screen editor is gone; read keys from the
-    ; kernel console and edit the line here. CON_PUTC interprets $08 as
-    ; backspace, so echoing the key IS the screen edit.
+    ; kernel console and edit the line here. CON_PUTC treats $08 as a CURSOR
+    ; MOVE and nothing more -- it does not erase -- so echoing the key is NOT
+    ; the screen edit. See .backspace below.
 
     ldy #0         ; TIB index (kern_getc/PUTCHR preserve X and Y)
 -   jsl BANK1 + kern_getc
@@ -144,7 +145,22 @@ REFILL ; ( -- flag )
     cpy #0
     beq -
     dey
-    jsl BANK1 + PUTCHR     ; echo the $08: the console steps back and blanks
+    ; BACKSPACE IS THREE CHARACTERS. The comment above used to say the console
+    ; "steps back and blanks" on $08 and echoed the key alone -- but X816's
+    ; con_putc does only the first half: it decrements con_curx and returns,
+    ; leaving the glyph in VRAM. So every deleted character stayed on screen
+    ; while the TIB shortened underneath it, and the line you could see was
+    ; not the line you were about to run.
+    ;
+    ; Rub it out and step back over it, which is what the kernel's own
+    ; sh_readline does. PUTCHR preserves X and Y (see above) but not A, so
+    ; each character is loaded fresh.
+    lda #$08
+    jsl BANK1 + PUTCHR
+    lda #$20
+    jsl BANK1 + PUTCHR
+    lda #$08
+    jsl BANK1 + PUTCHR
     bra -
 .gotReturn
     ; Set TIB_SIZE to number of chars fetched.

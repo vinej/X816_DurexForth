@@ -131,7 +131,7 @@ powershell -ExecutionPolicy Bypass -File .\run-tests.ps1   # Windows
 ./run-tests.sh                                             # Git Bash / Linux
 ```
 
-Both assemble, boot the kernel with `base` rewired to `include test` instead of saving,
+Both assemble, boot the kernel with an AUTORUN of `include test/test`,
 runs the Forth 2012 core / core-ext / core-plus / exception conformance suites
 plus `test/testx16.fs` (port-specific: number parsing, the relocated zero-page
 stack, the golden-RAM buffers, and the inline assembler), and checks the

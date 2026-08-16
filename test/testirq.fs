@@ -13,8 +13,8 @@
 marker ---testirq---
 
 \ Standalone-safe: REQUIRE loads the Hayes tester only if it is not already
-\ in, so `include testirq` works on its own at the prompt.
-require tester
+\ in, so `include test/testirq` works on its own at the prompt.
+require test/tester
 
 decimal
 

@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # The durexForth test suite, end to end on the X816 emulator.
 #
-# Builds forth.bin, puts it on a scratch card together with the Forth
-# sources and an AUTORUN of "include test", and boots. base.fs's autorun
-# hook picks the tests up with no typing at all - so there is no autokeys
+# Builds forth.bin, puts it on a scratch card SHAPED LIKE THE RELEASE CARD
+# -- /FORTH for the language, /FORTH/TEST for the suite -- with an AUTORUN of
+# "include test/test", and boots it from /FORTH. base.fs's autorun hook picks
+# the tests up with no typing at a running program, so there is no autokeys
 # type-ahead to race the 16-byte SMC FIFO. On the first failed assertion
 # the Hayes tester prints "INCORRECT RESULT" / "WRONG NUMBER" and QUITs;
 # the +++ ALL TESTS PASSED +++ banner appears only if nothing failed.
@@ -42,6 +43,11 @@ NEG=0
 
 # Fresh FAT32 card: FORTH.BIN, the Forth sources (8.3 names, no extension,
 # exactly how `include` asks for them), and the AUTORUN hook.
+#
+# The directories mirror ../X816_core/tools/mksdcard.py because the suite's
+# own sources now name their files `test/testcore` and `require test/tester`.
+# This card was flat until then, and a flat card would prove those spellings
+# work in a layout nobody has -- while the card that ships went untested.
 python - "$WOUT" "$NEG" <<'PY'
 import os, sys
 from pyfatfs.PyFat import PyFat
@@ -56,9 +62,14 @@ fat.mkfs(out, fat_type=PyFat.FAT_TYPE_FAT32, sector_size=512, label="FORTHTST")
 fat.close()
 
 fs = PyFatFS(out)
-with open("build/forth.bin", "rb") as f, fs.open("/FORTH.BIN", "wb") as g:
+fs.makedir("/FORTH")
+fs.makedir("/FORTH/TEST")
+with open("build/forth.bin", "rb") as f, fs.open("/FORTH/FORTH.BIN", "wb") as g:
     g.write(f.read())
-with open("fpengine/fpengine.bin", "rb") as f, fs.open("/FPENGINE.BIN", "wb") as g:
+# Beside the sources, not at the root: forth/mod/float.fs opens it by bare
+# name, and a bare name is resolved against the working directory.
+with open("fpengine/fpengine.bin", "rb") as f, \
+        fs.open("/FORTH/FPENGINE.BIN", "wb") as g:
     g.write(f.read())
 
 # (repo file, card name): card names are BARE 8.3 - the kernel's FAT32
@@ -67,7 +78,12 @@ with open("fpengine/fpengine.bin", "rb") as f, fs.open("/FPENGINE.BIN", "wb") as
 SRC = [("forth", n, n) for n in ["base", "asm", "wordlist", "labels",
                                  "doloop", "debug", "require", "accept",
                                  "compat"]] + \
-      [("test", n, c) for n, c in [
+      [("forth/mod", n, n) for n in ["fm", "float", "floatx", "string",
+                                     "extras", "advanced", "advsnd",
+                                     "graphic", "advgfx", "system", "bmx"]]
+
+# The suite, into /FORTH/TEST.
+TEST = [("test", n, c) for n, c in [
           ("tester", "tester"), ("testcore", "testcore"),
           ("testcoreplus", "coreplus"), ("testcoreext", "coreext"),
           ("testexception", "testexc"), ("testdouble", "testdbl"),
@@ -82,12 +98,13 @@ SRC = [("forth", n, n) for n in ["base", "asm", "wordlist", "labels",
           ("testfm", "testfm"), ("testfloat", "testfloa"), ("testinput", "testinp"),
           ("teststring", "teststri"), ("testextras", "testextr"),
           ("testadv", "testadv"), ("testirq", "testirq"), ("testadvsnd", "testadvs"), ("testgraphic", "testgrap"), ("testadvgfx", "testadvg"), ("testsystem", "testsyst"), ("testbmx", "testbmx"),
-          ("test", "test"), ("1", "1")]] +       [("forth/mod", n, n) for n in ["fm", "float", "floatx", "string", "extras", "advanced", "advsnd", "graphic", "advgfx", "system", "bmx"]]
-for d, n, card in SRC:
-    with open(os.path.join(d, n + ".fs"), "rb") as f:
-        data = f.read()
-    with fs.open("/" + card.upper(), "wb") as g:
-        g.write(data)
+          ("test", "test"), ("1", "1")]]
+for prefix, files in (("/FORTH/", SRC), ("/FORTH/TEST/", TEST)):
+    for d, n, card in files:
+        with open(os.path.join(d, n + ".fs"), "rb") as f:
+            data = f.read()
+        with fs.open(prefix + card.upper(), "wb") as g:
+            g.write(data)
 
 # The help pages, so `help <topic>` can be tested like anything else.
 # Card names are the topic truncated to EIGHT characters, uppercased -
@@ -96,10 +113,8 @@ for d, n, card in SRC:
 # passes and the real card cannot find its own help.
 #
 # /FORTH/HELP, not /HELP: the release card gives each language a folder of
-# its own, and base.fs's (hpath!) builds that absolute path. This card is
-# otherwise flat -- only the help directory has to match, because only the
-# help path is absolute.
-fs.makedir("/FORTH")
+# its own, and base.fs's (hpath!) builds that absolute path -- the one
+# absolute path on either card.
 fs.makedir("/FORTH/HELP")
 for name in sorted(os.listdir("help/helpdoc")):
     if name.endswith(".TXT"):
@@ -109,17 +124,23 @@ for name in sorted(os.listdir("help/helpdoc")):
 if neg:
     # A failing assertion through the same tester the real suite uses: the
     # control proves the detector, not the plumbing around it.
-    autorun = "include compat\ninclude tester\nt{ 1 -> 2 }t\n"
+    autorun = "include compat\ninclude test/tester\nt{ 1 -> 2 }t\n"
 else:
-    autorun = "include test\n"
-with fs.open("/AUTORUN", "wb") as g:
+    autorun = "include test/test\n"
+# /FORTH/AUTORUN: base.fs probes for "autorun" by bare name, so it has to be
+# in the directory Forth is started from, like everything else here.
+with fs.open("/FORTH/AUTORUN", "wb") as g:
     g.write(autorun.encode())
 fs.close()
-print("card: %d source files + FORTH.BIN + AUTORUN" % len(SRC))
+print("card: %d sources + %d tests + FORTH.BIN + FPENGINE.BIN + AUTORUN"
+      % (len(SRC), len(TEST)))
 PY
 [ $? -eq 0 ] || exit 1
 
-# No -autokeys beyond the run command: AUTORUN does the rest.
+# CD FIRST, then run: the sources are in /FORTH now and every name Forth
+# reads -- base at boot, autorun, the modules, the suite's test/ files -- is
+# resolved against the working directory. Two typed lines instead of one, and
+# still nothing typed AT a running program: AUTORUN does the rest.
 # -mhz 32: the suite is a CORRECTNESS run, and at the real 8 MHz it needs
 # ~half an hour of emulated time (mostly compiling 50 KB of source read a
 # byte at a time through FS_READ). Overclocking the emulated CPU is fine
@@ -128,7 +149,7 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy timeout 480 \
     "$EMU/build/x16emu.exe" -boot "$(cygpath -m "$CORE/boot/boot.rom")" \
     -load "F00000,$(cygpath -m "$(pwd)/$KERNEL")" \
     -sdcard "$WOUT/card.img" \
-    -autokeys 'run FORTH.BIN\n' \
+    -autokeys 'cd /forth\nrun forth.bin\n' \
     -mhz 32 -warp -gif "$WOUT/out.gif" >/dev/null 2>&1
 
 python - "$WOUT/out.gif" "$RT/font_cp437.s" "$NEG" <<'PY'
@@ -147,6 +168,10 @@ for line in io.open(fontinc, encoding='utf-8'):
 glyph = {}
 for _c in range(0x20, 0x7F):
     glyph[tuple(vals[_c * 8:(_c + 1) * 8])] = chr(_c)
+# The prompt is CP437 $AF, the chevron from the boot mark, NOT '>'. The
+# table above stops at $7E, so decode $AF as '>' and every "the prompt is
+# back" assertion below keeps reading as what it means.
+glyph[tuple(vals[0xAF * 8:0xB0 * 8])] = ">"
 
 im = Image.open(gif)
 n = 0

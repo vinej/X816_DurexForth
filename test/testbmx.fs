@@ -19,9 +19,9 @@
 marker ---testbmx---
 
 \ Standalone-safe: REQUIRE loads the Hayes tester only if it is not already
-\ in, so `include testbmx` works on its own at the prompt and costs nothing
+\ in, so `include test/testbmx` works on its own at the prompt and costs nothing
 \ inside the suite, where test.fs loaded it first.
-require tester
+require test/tester
 
 include bmx
 

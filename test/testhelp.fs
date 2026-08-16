@@ -9,9 +9,9 @@
 marker ---testhelp---
 
 \ Standalone-safe: REQUIRE loads the Hayes tester only if it is not
-\ already in, so `include testhelp` works on its own at the prompt and
+\ already in, so `include test/testhelp` works on its own at the prompt and
 \ costs nothing inside the suite, where test.fs loaded it first.
-require tester
+require test/tester
 
 decimal
 

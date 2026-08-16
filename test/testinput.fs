@@ -13,8 +13,8 @@
 marker ---testinput---
 
 \ Standalone-safe: REQUIRE loads the Hayes tester only if it is not already
-\ in, so `include testinput` works on its own at the prompt.
-require tester
+\ in, so `include test/testinp` works on its own at the prompt.
+require test/tester
 
 decimal
 

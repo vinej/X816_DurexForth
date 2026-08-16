@@ -377,6 +377,56 @@ kern_fs_close
     plx
     rtl
 
+; kern_fs_create - open the NUL-terminated path staged in fs_name (fs.asm)
+; for WRITING. Mode 1 is KFS_WRITE, which the kernel documents as "created
+; if absent, TRUNCATED if present" - so this is create-or-replace and there
+; is no separate truncate to do. Out: carry clear and A = handle, or carry
+; set and A = KERR_*. Pulls and sep do not touch carry, so the kernel's
+; verdict survives, exactly as in kern_fs_open above.
+kern_fs_create
+    phx
+    phy
+    rep #$30
+!rl
+    ldx #1                          ; path bank = this bank
+    lda #fs_name
+    ldy #1                          ; mode 1 = write (KFS_WRITE)
+    jsl KERN_FS_OPEN
+    sta KTMP
+    sep #$10
+!rs
+    ply
+    plx
+    lda KTMP
+    rtl
+
+; kern_fs_wr - A = handle. The SOURCE and the COUNT are already in fs_wrblk
+; (fs.asm), because they are 24- and 32-bit and do not fit the one-register
+; convention the rest of these shims use. Out: carry clear and A = the low
+; sixteen bits of the byte count the kernel wrote, or carry set and
+; A = KERR_*.
+;
+; ONE CROSSING FOR THE WHOLE IMAGE: the count is 32 bits and kfs_write loops
+; internally over its own staging buffer, so a 64 KB save is a single call
+; rather than five hundred of them.
+kern_fs_wr
+    phx
+    phy
+    and #$ff
+    sta fs_wrblk+0                  ; handle
+    rep #$30
+!rl
+    ldx #1                          ; block pointer bank
+    lda #fs_wrblk
+    jsl KERN_FS_WRITE
+    sta KTMP
+    sep #$10
+!rs
+    ply
+    plx
+    lda KTMP
+    rtl
+
 ; kern_fs_fill - A = handle. Reads up to 128 bytes into fs_cache (fs.asm)
 ; with ONE kernel crossing and returns the count in A (0 = end of file, and
 ; a device error reads as end of file).

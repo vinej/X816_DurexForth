@@ -10,9 +10,9 @@
 marker ---testdir---
 
 \ Standalone-safe: REQUIRE loads the Hayes tester only if it is not
-\ already in, so `include testdir` works on its own at the prompt and
+\ already in, so `include test/testdir` works on its own at the prompt and
 \ costs nothing inside the suite, where test.fs loaded it first.
-require tester
+require test/tester
 
 decimal
 
@@ -21,39 +21,67 @@ decimal
 \ folds it to one flag, which is what every check below actually wants.
 : cwd= ( c-addr u -- flag ) cwd if 2drop 2drop 0 exit then compare 0= ;
 
+\ WHERE THIS RUNS FROM IS NOT FIXED, so it is recorded rather than
+\ asserted. It used to assert "/", which was true of the flat harness card
+\ and false of the release card, where Forth is started from /FORTH - so
+\ the one place it would have mattered is the one that ships. A test that
+\ pins the working directory is testing the card layout, not the kernel;
+\ this one works wherever it is included from.
+create (home) 66 allot                  \ counted: length byte, then path
+: (home!) ( -- )
+  cwd abort" testdir: cwd failed"
+  dup 65 > abort" testdir: cwd too long"
+  dup (home) c! (home) 1+ swap move ;
+(home!)
+: home ( -- c-addr u ) (home) count ;
+
+\ HOME + "/" + name, for the checks that have to name a path from the top
+\ rather than relative to wherever CD has left us. At the root HOME is just
+\ "/" and contributes nothing: the separator below is that slash, and
+\ copying both would produce "//TDIR", which the kernel resolves to the
+\ right file but CWD never spells back.
+create (tp) 80 allot
+variable (tn)
+: (tp+) ( c-addr u -- ) dup >r (tp) (tn) @ + swap move r> (tn) +! ;
+: tpath ( c-addr u -- c-addr u )
+  0 (tn) !
+  home dup 1 = if 2drop else (tp+) then
+  s" /" (tp+) (tp+)
+  (tp) (tn) @ ;
+
 cr .( testdir: where we start ) cr
-\ The suite runs from the card root. Asserting it means every relative
-\ path below is anchored, and a leftover CD from an earlier failed run
-\ shows up here rather than as a confusing failure three tests later.
-T{ s" /" cwd= -> true }T
+\ Anchors every relative path below, and shows a leftover CD from an
+\ earlier failed run here rather than as a confusing failure three tests
+\ later.
+T{ home cwd= -> true }T
 
 cr .( testdir: make one, enter it, come back ) cr
 T{ s" TDIR" mkdir -> 0 }T
 T{ s" TDIR" mkdir 0<> -> true }T        \ making it twice is refused
 T{ s" TDIR" cd -> 0 }T
-T{ s" /TDIR" cwd= -> true }T
+T{ s" TDIR" tpath cwd= -> true }T
 T{ s" .." cd -> 0 }T
-T{ s" /" cwd= -> true }T
+T{ home cwd= -> true }T
 
 cr .( testdir: a file made inside it is really inside it ) cr
 \ This is what proves CD moved the KERNEL's idea of the directory and not
 \ just a string: the file is created by a RELATIVE name while inside TDIR,
-\ then found by an ABSOLUTE one from the root.
+\ then found by an ABSOLUTE one from outside it.
 T{ s" TDIR" cd -> 0 }T
 variable fd
 T{ s" INNER.TXT" r/o create-file swap fd ! -> 0 }T
 T{ s" hi" fd @ write-file -> 0 }T
 T{ fd @ close-file -> 0 }T
 T{ s" .." cd -> 0 }T
-T{ s" /TDIR/INNER.TXT" file-status nip -> 0 }T
-T{ s" INNER.TXT" file-status nip 0<> -> true }T   \ not in the root
+T{ s" TDIR/INNER.TXT" tpath file-status nip -> 0 }T
+T{ s" INNER.TXT" file-status nip 0<> -> true }T   \ and not out here
 
 cr .( testdir: listing finds it, and knows it is not a directory ) cr
 0 value (h)
 0 value (seen)
 0 value (sawdir)
 0 value (err)
-T{ s" /TDIR" dir-open swap to (h) -> 0 }T
+T{ s" TDIR" tpath dir-open swap to (h) -> 0 }T
 \ The walk is a COLON DEFINITION, not loose lines: BEGIN/WHILE/REPEAT are
 \ compile-only, and typing them at the interpreter compiles branches into
 \ HERE that nothing ever executes - the loop silently does not loop.
@@ -79,8 +107,8 @@ cr .( testdir: a non-empty directory will not be removed ) cr
 \ FAT32 would happily orphan the contents; the kernel refuses instead, and
 \ that refusal is the only thing standing between a typo and lost files.
 T{ s" TDIR" rmdir 0<> -> true }T
-T{ s" /TDIR/INNER.TXT" file-status nip -> 0 }T    \ survived the attempt
-T{ s" /TDIR/INNER.TXT" delete-file -> 0 }T
+T{ s" TDIR/INNER.TXT" tpath file-status nip -> 0 }T  \ survived the attempt
+T{ s" TDIR/INNER.TXT" tpath delete-file -> 0 }T
 T{ s" TDIR" rmdir -> 0 }T
 T{ s" TDIR" cd 0<> -> true }T           \ and it is really gone
 
@@ -88,7 +116,9 @@ cr .( testdir: opening something that is not a directory ) cr
 T{ s" NOSUCHDIR" dir-open nip 0<> -> true }T
 
 cr .( testdir: we finish where we started ) cr
-T{ s" /" cwd= -> true }T
+\ Not a nicety: the suite carries on including files by relative name after
+\ this, so a CD left behind here breaks the NEXT file instead of this one.
+T{ home cwd= -> true }T
 
 cr .( testdir ok ) cr
 

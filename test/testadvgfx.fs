@@ -4,9 +4,9 @@
 marker ---testadvgfx---
 
 \ Standalone-safe: REQUIRE loads the Hayes tester only if it is not already
-\ in, so `include testadvgfx` works on its own at the prompt and costs nothing
+\ in, so `include test/testadvg` works on its own at the prompt and costs nothing
 \ inside the suite, where test.fs loaded it first.
-require tester
+require test/tester
 
 
 include graphic

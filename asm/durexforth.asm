@@ -241,6 +241,11 @@ COLD
 
     jsl BANK1 + PAGE
 
+    ; The banner goes here, before the start hook, so BOTH paths print it:
+    ; the normal boot that is about to spend twenty seconds compiling
+    ; base.fs, and a pre-compiled image that is about to do nothing at all.
+    jsl BANK1 + PRINT_BANNER
+
 _START = * + 1
     jsl BANK1 + load_base
 
@@ -366,19 +371,90 @@ MINUS_ONE
 
 BOOT_STRING
 !src "../build/version.asm"
-PRINT_BOOT_MESSAGE
-    ldx #0
+    !byte 0
+BANNER_SEP
+    !text ", "
+    !byte 0
+BANNER_TAIL
+    !text " MHz cpu."
+    !byte 0
+
+; print_cstr - A = address of a $00-terminated string in THIS bank. Y is the
+; index and PUTCHR preserves X and Y (io.asm), so the caller keeps both.
+print_cstr
+; !al/!rs, DECLARED AND NOT ASSUMED. ACME tracks the register widths from the
+; last !as/!al/!rs/!rl it saw, and what reaches here from the !src chain above
+; is !rl -- so `ldy #0` assembled as the THREE-byte 16-bit form while the
+; machine runs X=1. The CPU then took `a0 00` as the ldy and executed the
+; trailing $00 as BRK. That is what the boot showed.
+;
+; PRINT_BOOT_MESSAGE below had the SAME fault in its `ldx #X_INIT`, and had
+; had it all along -- harmless only because nothing ever reached it. It is
+; declared too now, because the saved image DOES call it.
+!al
+!rs
+    sta KTMP
+    ldy #0
 -   sep #$20
 !as
-    lda BOOT_STRING,x
+    lda (KTMP), y           ; DBR = $01 here, so this bank
     rep #$20
 !al
     and #$ff
+    beq +
     jsl BANK1 + PUTCHR
-    inx
-    cpx #(PRINT_BOOT_MESSAGE - BOOT_STRING)
-    bne -
+    iny
+    bra -
++   rtl
+
+; PRINT_BANNER - the first line on screen, printed on EVERY start.
+;
+; IT IS HERE AND NOT IN BASE.FS, and that is the whole point. base.fs runs
+; while COMPILING, which a pre-compiled image does exactly once - at build
+; time - so a banner printed from there would show the BUILD MACHINE's clock
+; speed for ever after. $9F80 bit 2 is read live, on this boot, on this
+; machine, whether the dictionary was just compiled or loaded ready-made.
+PRINT_BANNER
+!al
+!rs
+    lda #BOOT_STRING
+    jsl BANK1 + print_cstr
+    lda #BANNER_SEP         ; the version string holds the VERSION, nothing else
+    jsl BANK1 + print_cstr
+
+    +VIO
+    sep #$20
+!as
+    lda $9f80               ; SYSCTL, bit 2 = TURBO; DBR = $00 under VIO
+    and #4
+    rep #$20
+!al
+    and #$ff                ; drop B, keep the test result
+    +VIO_END
+    ; VIO_END is a plb, and plb sets N and Z from the byte it pulled -- so
+    ; the flags here describe the restored data bank and not the AND above.
+    ; Test the value. (The same leftover-flag trap the editor's kernel shim
+    ; documents; it is worth one instruction to not fall into it twice.)
+    cmp #0
+    beq +
+    lda #'1'
+    jsl BANK1 + PUTCHR
+    lda #'4'
+    jsl BANK1 + PUTCHR
+    bra ++
++   lda #'8'
+    jsl BANK1 + PUTCHR
+++  lda #BANNER_TAIL
+    jsl BANK1 + print_cstr
     jsl BANK1 + CR
+    rtl
+
+; The saved-image start. load_base points `start` here once the boot include
+; has run, so a turnkey image comes up straight at the prompt -- the banner
+; above has already printed, from COLD, on this boot.
+PRINT_BOOT_MESSAGE
+!al
+!rs
     ldx #X_INIT
     jmp QUIT
 

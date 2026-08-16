@@ -40,6 +40,20 @@ fs_blk
     !word 0                 ; +8  count high
     !fill 4, 0              ; +10 bytes-read result
 
+; FS_WRITE parameter block (X816_core doc/KERNEL.md 5.3), the mirror of
+; fs_blk above: handle +0, flat SOURCE address +2 as 24 bits in a 32-bit
+; field, byte count +6 as a full 32 bits, and the kernel's answer at +10.
+;
+; Source and count are patched per call rather than assembled, because the
+; one caller - SAVE_IMAGE - computes both from HERE.
+fs_wrblk
+    !word 0                 ; +0  handle
+    !word 0                 ; +2  source, low 16
+    !byte 0, 0              ; +4  source bank, pad
+    !word 0                 ; +6  count low
+    !word 0                 ; +8  count high
+    !fill 4, 0              ; +10 bytes-written result
+
 ; FS_SEEK parameter block: handle +0, whence +2 (1 = KFS_CUR), signed
 ; 32-bit offset +4. kern_fs_seekback patches the handle and the offset's
 ; low byte; the $FF fill is the sign extension of every -1..-128.
@@ -139,6 +153,119 @@ fs_flush
     ; word was added to fix, caught by the test rather than by reading.
     +BACKLINK "(fs-flush)", 10
     jmp fs_flush
+
+; SAVE-IMAGE ( addr u -- ior ) - write the LIVE program image to a card file.
+;
+; This is the turnkey save. Everything the interpreter has compiled lives in
+; the program banks, and so does the state that describes it - HERE, LATEST
+; and every VALUE are immediates inside the image itself - so writing the
+; banks out writes the machine's whole Forth state, with nothing to serialise
+; and nothing to keep in step.
+;
+; WHAT RANGE, and why it is not just "up to HERE". Code grows UP from
+; $01:0000 and the dictionary HEADERS grow DOWN from the top of the assembled
+; image, so the used memory is two regions with a hole between them. A length
+; measured from HERE alone stops below the headers and saves a dictionary
+; with no names in it. The whole of bank $01 covers both, so the count is
+; 64 KB or HERE, whichever is larger - the second case being a session that
+; has compiled its way up into bank $02 and beyond.
+;
+; ior is 0, or the kernel's KERR_* code. The CLOSE is checked and not just
+; attempted: fat32_close is what writes the directory entry, so a file that
+; was written but not closed has the length it had before - which for a
+; create-truncate is zero, and would ship as a card with an empty FORTH.BIN
+; on it.
+    +BACKLINK "save-image", 10
+SAVE_IMAGE ; ( addr u -- ior )
+    ; Copy the name out of the parameter stack before anything moves it.
+    lda LSB, x
+    sta W2                  ; length
+    lda LSB+2, x
+    sta W
+    lda MSB+2, x
+    sta W+2                 ; W = name, flat
+    inx
+    inx
+    inx
+    inx
+
+    ldy W2                  ; 8-bit Y: names are short
+    cpy #65
+    bcc +
+    ldy #64                 ; clamp - kernel paths are shorter anyway
++   sep #$20
+!as
+    lda #0
+    sta fs_name, y          ; terminator
+-   dey
+    bmi +
+    lda [W], y
+    sta fs_name, y
+    bra -
++   rep #$20
+!al
+
+    ; Source: the base of the program banks.
+    stz fs_wrblk+2          ; low 16 of $01:0000
+    lda #1
+    sta fs_wrblk+4          ; bank $01, and the pad byte above it
+
+    ; Count: $FF00, which is X816_EXEC_MAX - the largest image the shell's
+    ; `run` will load, because exec.s copies it with a 16-bit X. It is also
+    ; exactly the span of the assembled image, $01:0000 up to the top where
+    ; the dictionary headers live, so it covers BOTH growing ends: code up
+    ; from the bottom and headers down from the top.
+    ;
+    ; A full 64 KB was the obvious first answer and it is wrong: 256 bytes
+    ; over the ceiling, and `run` answers "TOO BIG" at boot rather than at
+    ; save time, which is the worst place to find out.
+    ;
+    ; So if HERE has climbed out of bank $01 the session has compiled past
+    ; what a loadable image can hold, and there is no file worth writing.
+    ; Refuse with KERR_NOSPACE (3) instead of producing one `run` will reject.
+    lda HERE_BANK
+    cmp #1
+    bne .too_big
+    lda HERE_PTR
+    cmp #$ff00
+    bcs .too_big
+
+    lda #$ff00
+    sta fs_wrblk+6          ; count low
+    stz fs_wrblk+8          ; count high
+    bra .named
+.too_big
+    lda #3                  ; KERR_NOSPACE
+    bra .push
+.named
+
+    jsl BANK1 + kern_fs_create
+    bcs .push               ; A already holds KERR_*
+    sta KTMP2               ; handle, needed again for the close
+
+    jsl BANK1 + kern_fs_wr  ; A is still the handle
+    bcc .wrote
+
+    ; The write failed. Close anyway - a handle left open is one the kernel
+    ; cannot hand out again - but report the WRITE's code, not the close's.
+    pha
+    lda KTMP2
+    jsl BANK1 + kern_fs_close
+    pla
+    bra .push
+
+.wrote
+    lda KTMP2
+    jsl BANK1 + kern_fs_close
+    bcs .push               ; A = KERR_* from the close
+    lda #0
+
+.push
+    dex
+    dex
+    sta LSB, x
+    stz MSB, x
+    rtl
 
     +BACKLINK "included", 8
 INCLUDED ; ( addr u -- ) interpret a file as source

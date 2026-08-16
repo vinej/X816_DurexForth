@@ -26,3 +26,43 @@ on, including across power cycles, so this is a one-time step.
 
 Then type LS at the prompt. LS reporting NO CARD just means nothing is
 mounted yet.
+
+WHAT IS ON THE CARD
+-------------------
+
+The root holds four directories, one per thing you can run:
+
+    /DEMO    the conformance tests and demos. Most print a verdict --
+             a green screen is a pass. TYPE /DEMO/README.TXT
+    /FORTH   durexForth, its sources, its benchmarks, its manual in
+             /FORTH/HELP, and its test suite in /FORTH/TEST
+    /BASIC   SuperBasic, its benchmarks and its manual
+    /KALK    the spreadsheet
+
+CD INTO A DIRECTORY BEFORE RUNNING WHAT IS IN IT:
+
+    cd /forth
+    run forth.bin
+
+That is not a style preference. Both languages load their own sources
+by bare name -- Forth includes BASE at boot, and INCLUDE TEST/TEST
+pulls in forty more files -- and a bare name is resolved against the
+working directory. Started from anywhere else, Forth stops at its
+first include, which reads as a broken build and is not one. The same
+goes for LOAD "BM1.BAS" in /BASIC.
+
+Stay in /FORTH even for the test suite: it is in /FORTH/TEST and is
+reached by the name INCLUDE TEST/TEST, because the modules and base
+words it needs are up here.
+
+THE EDITOR IS IN THE MACHINE, not on the card. At the prompt:
+
+    edit /forth/base
+
+X16 Edit, resident in the firmware, on any text file. Ctrl+O writes,
+Ctrl+X exits, Ctrl+G is its own help -- and press-and-release ESC works
+in place of holding Ctrl. It comes back to whatever called it, so the
+same editor opens from SuperBasic (EDIT "BM1.BAS") and from Forth
+(S" BASE" EDIT).
+
+Each directory has its own README.TXT. TYPE one to see what is there.

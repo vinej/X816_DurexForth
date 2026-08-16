@@ -15,8 +15,8 @@
 marker ---testfm---
 
 \ Standalone-safe: REQUIRE loads each only if it is not already in, so
-\ `include testfm` works on its own at the prompt.
-require tester
+\ `include test/testfm` works on its own at the prompt.
+require test/tester
 require fm
 
 decimal

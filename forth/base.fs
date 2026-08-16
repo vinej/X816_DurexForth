@@ -59,6 +59,28 @@ then ; immediate
 ; immediate
 : .( ')' parse type ; immediate
 
+( SYSCTL $9F80: bit 0 the boot overlay - dropped long before this
+  runs - bit 1 the live E flag, bit 2 TURBO: 0 paces the CPU to an
+  exact 8 MHz average, 1 releases the domain's full 14 MHz. The bit
+  flips safely at any time. Reads return the EFFECTIVE speed - the
+  MiSTer OSD's CPU Turbo option ORs over the software bit - so after
+  0 turbo the machine may truthfully still say it is fast.
+
+  THESE LIVE UP HERE, above everything else this file compiles, for
+  one reason: the banner below has to be the FIRST line on screen and
+  the include chatter starts on the very next one. Everything they
+  need is already present - IOC@ and IF/ELSE/THEN come from the
+  assembled image and 0<> is defined above. )
+: turbo? ( -- flag ) $9f80 ioc@ 4 and 0<> ;
+: turbo ( flag -- ) 0<> 4 and $9f80 ioc! ;
+: cpu-mhz ( -- u ) turbo? if 14 else 8 then ;
+
+( THE BANNER IS NOT PRINTED HERE. It used to be, and it was wrong for the
+  pre-compiled image: this file runs while COMPILING, which a turnkey image
+  does once at build time, so the speed it printed would have been the build
+  machine's for ever. PRINT_BANNER in asm/durexforth.asm prints it from COLD
+  instead, on every start, reading $9F80 live. )
+
 ( "xxx" string literals, same semantics
   as S". The kernel routes undefined
   tokens starting with " through the
@@ -453,15 +475,8 @@ hide dodoes hide (abort")
 
 decimal
 
-( SYSCTL $9F80: bit 0 the boot overlay - dropped long before this
-  runs - bit 1 the live E flag, bit 2 TURBO: 0 paces the CPU to an
-  exact 8 MHz average, 1 releases the domain's full 14 MHz. The bit
-  flips safely at any time. Reads return the EFFECTIVE speed - the
-  MiSTer OSD's CPU Turbo option ORs over the software bit - so after
-  0 turbo the machine may truthfully still say it is fast. )
-: turbo? ( -- flag ) $9f80 ioc@ 4 and 0<> ;
-: turbo ( flag -- ) 0<> 4 and $9f80 ioc! ;
-: cpu-mhz ( -- u ) turbo? if 14 else 8 then ;
+( TURBO?, TURBO and CPU-MHZ are defined at the TOP of this file, next to
+  the boot banner that has to print the speed before anything else. )
 
 ( A WALL CLOCK, IN SOFTWARE.
 
@@ -1352,12 +1367,29 @@ cr
   and not from a constant: a stale boundary is this arrangement's
   failure mode, and the number being on screen is the standing
   check against it. )
-cpu-mhz
-0 u.r space .( MHz cpu.) cr
-unused
-0 u.r space .( bytes program, fast ram.) cr
-far-unused
-0 u.r space .( bytes data, sdram.) cr
+( K and M, not bytes. The two figures are four and seven digits wide, and
+  at that length nobody reads them as sizes - "224210" and "12582912" are
+  a wall of digits that hide the very thing they are here to show, which
+  is whether the boundary moved. 219 K and 12 M are read at a glance, and
+  a MEM-RELEASE turning 12 M into 14 M is visible from across the room.
+
+  The MHz line is gone from here: it now leads the banner at the top of
+  this file, where it is the first thing on screen. )
+unused 1024 /
+0 u.r .( K program, fast ram.) cr
+far-unused 1048576 /
+0 u.r .( M data, sdram.) cr
+
+\ SYSTEM IS INCLUDED HERE, AT THE END, NOT UP WITH THE OTHER MODULES.
+\ It is in the boot chain at all so BYE exists at the prompt without anyone
+\ typing INCLUDE SYSTEM -- Forth is launched from the desktop's FORTH tile,
+\ and BYE is how a person expects to leave a Forth.
+\ It has to be DOWN HERE because BYE resets the machine through the SMC and
+\ the (I2C-*) words it needs are defined at the i2c block above, ~570 lines
+\ below the module list. Included up there it compiles against words that do
+\ not exist yet, COLD aborts, and the only symptom is make-turnkey.sh saying
+\ "produced no image" long afterwards.
+.( system..) include system
 
 ( boot hook: if an AUTORUN file exists on the card, include it before the
   prompt. INCLUDED throws -37 silently for a missing file, so that case is
